@@ -1,122 +1,118 @@
 <!-- Document editor page -->
 <script lang="ts">
-  import { onMount } from "svelte";
-  import { goto } from "$app/navigation";
-  import TipexEditor from "$lib/components/editor/TipexEditor.svelte";
-  import MarkdownToggle from "$lib/components/editor/MarkdownToggle.svelte";
-  import DocumentTitle from "$lib/components/editor/DocumentTitle.svelte";
-  import { updateDocument, deleteDocument } from "$lib/api/documents";
-  import * as m from "$lib/paraglide/messages.js";
-  import {
-    FileText,
-    Code,
-    ChevronRight,
-    Share2,
-    MoreHorizontal,
-    Download,
-    Trash2,
-    Check,
-    Loader2,
-    Pencil,
-  } from "lucide-svelte";
+import { goto } from "$app/navigation";
+import { deleteDocument, updateDocument } from "$lib/api/documents";
+import ShareDialog from "$lib/components/ShareDialog.svelte";
+import DocumentTitle from "$lib/components/editor/DocumentTitle.svelte";
+import MarkdownToggle from "$lib/components/editor/MarkdownToggle.svelte";
+import TipexEditor from "$lib/components/editor/TipexEditor.svelte";
+import * as m from "$lib/paraglide/messages.js";
+import {
+	Check,
+	ChevronRight,
+	Code,
+	Download,
+	FileText,
+	Loader2,
+	MoreHorizontal,
+	Pencil,
+	Share2,
+	Trash2,
+} from "lucide-svelte";
+import { onMount } from "svelte";
 
-  let { data } = $props();
+const { data } = $props();
 
-  let title = $state("");
-  let content = $state("");
-  $effect(() => {
-    title = data.document.title;
-    content = data.document.content ?? "";
-  });
-  let mode = $state<"wysiwyg" | "markdown">("wysiwyg");
-  let saveStatus = $state<"saved" | "saving" | "unsaved">("saved");
-  let showMenu = $state(false);
-  let loading = $state(true);
-  let error = $state<string | null>(null);
+let title = $state("");
+let content = $state("");
+$effect(() => {
+	title = data.document.title;
+	content = data.document.content ?? "";
+});
+let mode = $state<"wysiwyg" | "markdown">("wysiwyg");
+let saveStatus = $state<"saved" | "saving" | "unsaved">("saved");
+let showMenu = $state(false);
+let loading = $state(true);
+let error = $state<string | null>(null);
+let showShareDialog = $state(false);
 
-  // Initialize after mount
-  onMount(() => {
-    title = data.document.title;
-    content = data.document.content;
-    loading = false;
-  });
+// Initialize after mount
+onMount(() => {
+	title = data.document.title;
+	content = data.document.content;
+	loading = false;
+});
 
-  // Close dropdown on outside click
-  function handleWindowClick(e: MouseEvent) {
-    if (showMenu) {
-      const target = e.target as HTMLElement;
-      if (!target.closest("[data-menu-container]")) {
-        showMenu = false;
-      }
-    }
-  }
+// Close dropdown on outside click
+function handleWindowClick(e: MouseEvent) {
+	if (showMenu) {
+		const target = e.target as HTMLElement;
+		if (!target.closest("[data-menu-container]")) {
+			showMenu = false;
+		}
+	}
+}
 
-  // Auto-save debounce for content
-  let contentSaveTimer: ReturnType<typeof setTimeout> | null = null;
+// Auto-save debounce for content
+let contentSaveTimer: ReturnType<typeof setTimeout> | null = null;
 
-  function debounceContentSave(newContent: string) {
-    content = newContent;
-    saveStatus = "unsaved";
-    if (contentSaveTimer) clearTimeout(contentSaveTimer);
-    contentSaveTimer = setTimeout(async () => {
-      await saveContent(newContent);
-    }, 1000);
-  }
+function debounceContentSave(newContent: string) {
+	content = newContent;
+	saveStatus = "unsaved";
+	if (contentSaveTimer) clearTimeout(contentSaveTimer);
+	contentSaveTimer = setTimeout(async () => {
+		await saveContent(newContent);
+	}, 1000);
+}
 
-  async function saveContent(newContent: string) {
-    saveStatus = "saving";
-    try {
-      await updateDocument(data.document.id, { content: newContent });
-      saveStatus = "saved";
-    } catch (e) {
-      saveStatus = "unsaved";
-      error = m.doc_save_content_error();
-      console.error("Save content failed:", e);
-    }
-  }
+async function saveContent(newContent: string) {
+	saveStatus = "saving";
+	try {
+		await updateDocument(data.document.id, { content: newContent });
+		saveStatus = "saved";
+	} catch (e) {
+		saveStatus = "unsaved";
+		error = m.doc_save_content_error();
+	}
+}
 
-  async function handleTitleUpdate(newTitle: string) {
-    title = newTitle;
-    saveStatus = "saving";
-    try {
-      await updateDocument(data.document.id, { title: newTitle });
-      saveStatus = "saved";
-    } catch (e) {
-      saveStatus = "unsaved";
-      error = m.doc_save_title_error();
-      console.error("Save title failed:", e);
-    }
-  }
+async function handleTitleUpdate(newTitle: string) {
+	title = newTitle;
+	saveStatus = "saving";
+	try {
+		await updateDocument(data.document.id, { title: newTitle });
+		saveStatus = "saved";
+	} catch (e) {
+		saveStatus = "unsaved";
+		error = m.doc_save_title_error();
+	}
+}
 
-  async function handleDelete() {
-    showMenu = false;
-    if (!window.confirm(m.doc_delete_confirm_hard())) return;
-    try {
-      await deleteDocument(data.document.id);
-      goto("/");
-    } catch (e) {
-      error = m.doc_delete_error();
-      console.error("Delete failed:", e);
-    }
-  }
+async function handleDelete() {
+	showMenu = false;
+	if (!window.confirm(m.doc_delete_confirm_hard())) return;
+	try {
+		await deleteDocument(data.document.id);
+		goto("/");
+	} catch (e) {
+		error = m.doc_delete_error();
+	}
+}
 
-  function handleExport() {
-    showMenu = false;
-    const blob = new Blob([content], { type: "text/markdown" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `${title || m.doc_title_placeholder()}.md`;
-    a.click();
-    URL.revokeObjectURL(url);
-  }
+function handleExport() {
+	showMenu = false;
+	const blob = new Blob([content], { type: "text/markdown" });
+	const url = URL.createObjectURL(blob);
+	const a = document.createElement("a");
+	a.href = url;
+	a.download = `${title || m.doc_title_placeholder()}.md`;
+	a.click();
+	URL.revokeObjectURL(url);
+}
 
-  function handleShare() {
-    // Placeholder: copy current URL to clipboard
-    navigator.clipboard.writeText(window.location.href).then(() => {
-      // Could show a toast here
-    });
-  }
+function handleShare() {
+	showShareDialog = true;
+}
 </script>
 
 <svelte:window onclick={handleWindowClick} />
@@ -276,6 +272,8 @@
         {/if}
       </div>
     </main>
+
+    <ShareDialog bind:open={showShareDialog} documentId={data.document.id} documentTitle={title} />
   </div>
 {/if}
 

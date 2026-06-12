@@ -43,8 +43,9 @@ logs/
 # Test coverage
 coverage/
 
-# OpenCode
+# OpenCode / hiai-opencode boulder runtime
 .opencode/
+.bob/
 
 # MinIO data (local dev)
 minio_data/

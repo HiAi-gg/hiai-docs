@@ -1,37 +1,40 @@
 <script lang="ts">
-  interface DiffLine {
-    type: "added" | "removed" | "unchanged";
-    text: string;
-  }
+interface DiffLine {
+	type: "added" | "removed" | "unchanged";
+	text: string;
+}
 
-  let { oldContent, newContent }: { oldContent: string; newContent: string } = $props();
+const { oldContent, newContent }: { oldContent: string; newContent: string } =
+	$props();
 
-  function computeDiff(oldText: string, newText: string): DiffLine[] {
-    const oldLines = oldText.split("\n");
-    const newLines = newText.split("\n");
-    const result: DiffLine[] = [];
-    const maxLen = Math.max(oldLines.length, newLines.length);
+function computeDiff(oldText: string, newText: string): DiffLine[] {
+	const oldLines = oldText.split("\n");
+	const newLines = newText.split("\n");
+	const result: DiffLine[] = [];
+	const maxLen = Math.max(oldLines.length, newLines.length);
 
-    for (let i = 0; i < maxLen; i++) {
-      const oldLine = oldLines[i];
-      const newLine = newLines[i];
+	for (let i = 0; i < maxLen; i++) {
+		const oldLine = oldLines[i];
+		const newLine = newLines[i];
 
-      if (oldLine === undefined) {
-        result.push({ type: "added", text: newLine! });
-      } else if (newLine === undefined) {
-        result.push({ type: "removed", text: oldLine });
-      } else if (oldLine === newLine) {
-        result.push({ type: "unchanged", text: oldLine });
-      } else {
-        result.push({ type: "removed", text: oldLine });
-        result.push({ type: "added", text: newLine });
-      }
-    }
+		if (oldLine === undefined) {
+			if (newLine !== undefined) {
+				result.push({ type: "added", text: newLine });
+			}
+		} else if (newLine === undefined) {
+			result.push({ type: "removed", text: oldLine });
+		} else if (oldLine === newLine) {
+			result.push({ type: "unchanged", text: oldLine });
+		} else {
+			result.push({ type: "removed", text: oldLine });
+			result.push({ type: "added", text: newLine });
+		}
+	}
 
-    return result;
-  }
+	return result;
+}
 
-  const diff = $derived(computeDiff(oldContent, newContent));
+const diff = $derived(computeDiff(oldContent, newContent));
 </script>
 
 <div class="overflow-auto rounded-md border border-border font-mono text-sm">

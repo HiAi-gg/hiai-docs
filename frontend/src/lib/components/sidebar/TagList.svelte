@@ -1,24 +1,39 @@
 <script lang="ts">
-  import { onMount } from "svelte";
-  import { Plus } from "lucide-svelte";
-  import { cn } from "$lib/utils";
-  import { listTags, type Tag } from "$lib/api/tags";
-  import * as m from "$lib/paraglide/messages.js";
+import { type Tag, listTags } from "$lib/api/tags";
+import TagCreateDialog from "$lib/components/TagCreateDialog.svelte";
+import * as m from "$lib/paraglide/messages.js";
+import { cn } from "$lib/utils";
+import { Plus } from "lucide-svelte";
+import { onMount } from "svelte";
 
-  let tags = $state<Tag[]>([]);
-  let activeId = $state<string | null>(null);
+let tags = $state<Tag[]>([]);
+let activeId = $state<string | null>(null);
+let loadError = $state<string | null>(null);
+let showCreateDialog = $state(false);
 
-  onMount(async () => {
-    try {
-      tags = await listTags();
-    } catch (err) {
-      console.error("Failed to load tags:", err);
-    }
-  });
+async function refresh() {
+	try {
+		tags = await listTags();
+	} catch (e) {
+		console.error("TagList: failed to load tags", e);
+		loadError = "Failed to load tags";
+	}
+}
+
+onMount(() => {
+	void refresh();
+});
+
+function handleCreated(_tag: Tag) {
+	void refresh();
+}
 </script>
 
 <div class="space-y-1">
   <h3 class="mb-2 px-2 text-xs font-medium uppercase tracking-wider text-muted-foreground">{m.doc_tags()}</h3>
+  {#if loadError}
+    <p class="px-2 text-xs text-destructive">{loadError}</p>
+  {/if}
   <div class="flex flex-wrap gap-1 px-2">
     {#each tags as tag (tag.id)}
       <button
@@ -34,9 +49,16 @@
         {tag.name}
       </button>
     {/each}
-    <button class="inline-flex items-center gap-0.5 rounded-full px-2 py-0.5 text-xs text-muted-foreground transition-colors hover:bg-secondary hover:text-secondary-foreground">
+    <button
+      type="button"
+      onclick={() => { showCreateDialog = true; }}
+      class="inline-flex items-center gap-0.5 rounded-full px-2 py-0.5 text-xs text-muted-foreground transition-colors hover:bg-secondary hover:text-secondary-foreground"
+      aria-label={m.tags_new()}
+    >
       <Plus class="size-3" />
       {m.tags_add()}
     </button>
   </div>
 </div>
+
+<TagCreateDialog bind:open={showCreateDialog} onCreated={handleCreated} />

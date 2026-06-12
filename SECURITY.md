@@ -49,9 +49,12 @@ In-scope vulnerabilities include:
 ## Security Architecture
 
 - **Data isolation**: All queries filter by `owner_id` — no cross-user data access
-- **Auth**: Better Auth with session cookies (7-day expiry)
+- **Auth**: Better Auth with session cookies (7-day expiry) + optional API key (Bearer token)
+- **CSRF**: HMAC-signed double-submit cookie pattern on all unsafe methods
+- **Rate limiting**: Redis-based sliding window rate limiters on all public endpoints (search, documents, sharing, health)
 - **Sharing**: Token-based links with optional password + expiration
-- **Rate limiting**: Redis-based rate limits on public share endpoints
 - **Validation**: Zod schemas on all API inputs
 - **Secrets**: All configuration via environment variables, zero hardcoded secrets
 - **Encryption**: Passwords hashed with Bun.password (bcrypt)
+- **CSP**: Content Security Policy headers on all pages
+- **Webhook verification**: HMAC-SHA256 signature verification for MinIO webhooks

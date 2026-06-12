@@ -1,39 +1,39 @@
 <script lang="ts">
-  import type { Snippet } from "svelte";
+import type { Snippet } from "svelte";
 
-  let {
-    open = $bindable(false),
-    onOpenChange,
-    children,
-  }: {
-    open?: boolean;
-    onOpenChange?: (open: boolean) => void;
-    children?: Snippet;
-  } = $props();
+let {
+	open = $bindable(false),
+	onOpenChange,
+	children,
+}: {
+	open?: boolean;
+	onOpenChange?: (open: boolean) => void;
+	children?: Snippet;
+} = $props();
 
-  function close() {
-    open = false;
-    onOpenChange?.(false);
-  }
+function close() {
+	open = false;
+	onOpenChange?.(false);
+}
 
-  function handleKeydown(e: KeyboardEvent) {
-    if (e.key === "Escape") close();
-  }
+function handleKeydown(e: KeyboardEvent) {
+	if (e.key === "Escape") close();
+}
 
-  function handleBackdropClick(e: MouseEvent) {
-    if (e.target === e.currentTarget) close();
-  }
+function handleBackdropClick(e: MouseEvent) {
+	if (e.target === e.currentTarget) close();
+}
 
-  $effect(() => {
-    if (open) {
-      document.body.style.overflow = "hidden";
-    } else {
-      document.body.style.overflow = "";
-    }
-    return () => {
-      document.body.style.overflow = "";
-    };
-  });
+$effect(() => {
+	if (open) {
+		document.body.style.overflow = "hidden";
+	} else {
+		document.body.style.overflow = "";
+	}
+	return () => {
+		document.body.style.overflow = "";
+	};
+});
 </script>
 
 {#if open}

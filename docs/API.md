@@ -158,6 +158,68 @@ POST   /api/documents/:docId/tags      # Tag document
 DELETE /api/documents/:docId/tags/:tagId # Untag document
 ```
 
+## Agent Integration
+
+hiai-docs is designed for AI agent integration via its REST API. Use API key authentication for programmatic access.
+
+### API Key Auth
+
+Set `HIAI_DOCS_API_KEY` in your `.env` file. All API requests use Bearer token:
+
+```bash
+curl -H "Authorization: Bearer $HIAI_DOCS_API_KEY" \
+  http://localhost:50700/api/documents
+```
+
+### Semantic Search (RAG)
+
+```bash
+# Search documents by meaning (hybrid full-text + vector)
+curl -H "Authorization: Bearer $HIAI_DOCS_API_KEY" \
+  "http://localhost:50700/api/search?q=how+to+deploy+docker"
+
+# Response includes relevance scores:
+# { items: [{ id, title, content, score, rank }] }
+```
+
+### Document CRUD for Agents
+
+```bash
+# Create document
+curl -X POST http://localhost:50700/api/documents \
+  -H "Authorization: Bearer $HIAI_DOCS_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"title": "Agent Note", "content": "Important finding..."}'
+
+# Read document
+curl -H "Authorization: Bearer $HIAI_DOCS_API_KEY" \
+  http://localhost:50700/api/documents/UUID
+
+# Update document
+curl -X PATCH http://localhost:50700/api/documents/UUID \
+  -H "Authorization: Bearer $HIAI_DOCS_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"content": "Updated with new findings..."}'
+```
+
+### Mastra Integration
+
+```typescript
+import { Mastra } from "@mastra/core";
+
+const docsTool = {
+  name: "search_knowledge",
+  description: "Search the knowledge base for relevant documents",
+  execute: async ({ query }) => {
+    const res = await fetch(
+      `http://localhost:50700/api/search?q=${encodeURIComponent(query)}`,
+      { headers: { Authorization: `Bearer ${process.env.HIAI_DOCS_API_KEY}` } }
+    );
+    return res.json();
+  },
+};
+```
+
 ## Error Codes
 
 | Code | Meaning |

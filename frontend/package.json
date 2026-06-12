@@ -11,13 +11,15 @@
     "lint": "biome check src/",
     "lint:fix": "biome check --fix src/",
     "typecheck": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
-    "test": "vitest run"
+    "test": "bun test --path-ignore-patterns='*node_modules*' src/"
   },
   "dependencies": {
     "@inlang/paraglide-js": "^2.18.1",
     "@inlang/paraglide-sveltekit": "^0.16.1",
     "@tiptap/core": "^3.23.5",
     "@tiptap/extension-code-block-lowlight": "^3.18.0",
+    "@tiptap/extension-collaboration": "^3.26.0",
+    "@tiptap/extension-collaboration-cursor": "^2.26.2",
     "@tiptap/extension-highlight": "^3.18.0",
     "@tiptap/extension-link": "^3.18.0",
     "@tiptap/markdown": "^3.18.0",
@@ -31,19 +33,26 @@
     "shadcn-svelte": "^1.2.7",
     "svelte-tiptap": "^3.0.1",
     "tailwind-merge": "^3.6.0",
-    "tailwind-variants": "^3.2.2"
+    "tailwind-variants": "^3.2.2",
+    "y-prosemirror": "^1.3.7",
+    "y-websocket": "^3.0.0",
+    "yjs": "^13.6.31",
+    "zod": "^3.24.0"
   },
   "devDependencies": {
     "@biomejs/biome": "^1.9.0",
+    "@inlang/plugin-m-function-matcher": "^2.2.6",
+    "@inlang/plugin-message-format": "2.2.0",
     "@sveltejs/adapter-node": "^5.2.11",
     "@sveltejs/kit": "^2.60.0",
     "@sveltejs/vite-plugin-svelte": "^6.2.4",
     "@tailwindcss/vite": "^4.0.0",
+    "@types/bun": "^1.3.14",
     "@types/node": "^25.9.1",
     "svelte": "^5.55.0",
+    "svelte-check": "^4.1.0",
     "tailwindcss": "^4.0.0",
     "typescript": "^5.8.0",
-    "vite": "^7.3.1",
-    "vitest": "^3.0.0"
+    "vite": "^7.3.1"
   }
 }

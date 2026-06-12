@@ -1,47 +1,49 @@
 <!-- DocumentTitle.svelte — Editable title input with auto-save on blur -->
 <script lang="ts">
-  import * as m from "$lib/paraglide/messages.js";
+import * as m from "$lib/paraglide/messages.js";
 
-  let {
-    title = "",
-    onUpdate = (_title: string) => {},
-  }: {
-    title?: string;
-    onUpdate?: (title: string) => void;
-  } = $props();
+const {
+	title = "",
+	onUpdate = (_title: string) => {},
+}: {
+	title?: string;
+	onUpdate?: (title: string) => void;
+} = $props();
 
-  let focused = $state(false);
-  let localTitle = $state("");
-  $effect(() => { if (!focused) localTitle = title ?? ""; });
+let focused = $state(false);
+let localTitle = $state("");
+$effect(() => {
+	if (!focused) localTitle = title ?? "";
+});
 
-  // Sync external title changes
-  $effect(() => {
-    if (!focused) {
-      localTitle = title;
-    }
-  });
+// Sync external title changes
+$effect(() => {
+	if (!focused) {
+		localTitle = title;
+	}
+});
 
-  function handleBlur() {
-    focused = false;
-    if (localTitle !== title) {
-      onUpdate(localTitle);
-    }
-  }
+function handleBlur() {
+	focused = false;
+	if (localTitle !== title) {
+		onUpdate(localTitle);
+	}
+}
 
-  function handleKeydown(e: KeyboardEvent) {
-    if (e.key === "Enter") {
-      e.preventDefault();
-      (e.target as HTMLInputElement).blur();
-    }
-    if (e.key === "Escape") {
-      localTitle = title;
-      (e.target as HTMLInputElement).blur();
-    }
-  }
+function handleKeydown(e: KeyboardEvent) {
+	if (e.key === "Enter") {
+		e.preventDefault();
+		(e.target as HTMLInputElement).blur();
+	}
+	if (e.key === "Escape") {
+		localTitle = title;
+		(e.target as HTMLInputElement).blur();
+	}
+}
 
-  function handleFocus() {
-    focused = true;
-  }
+function handleFocus() {
+	focused = true;
+}
 </script>
 
 <input

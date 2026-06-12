@@ -1,17 +1,17 @@
 <script lang="ts">
-  import { goto } from "$app/navigation";
-  import { Search } from "lucide-svelte";
-  import { cn } from "$lib/utils";
-  import * as m from "$lib/paraglide/messages.js";
+import { goto } from "$app/navigation";
+import * as m from "$lib/paraglide/messages.js";
+import { cn } from "$lib/utils";
+import { Search } from "lucide-svelte";
 
-  let { class: className }: { class?: string } = $props();
-  let query = $state("");
+const { class: className }: { class?: string } = $props();
+let query = $state("");
 
-  function handleKeydown(e: KeyboardEvent) {
-    if (e.key === "Enter" && query.trim()) {
-      goto(`/search?q=${encodeURIComponent(query.trim())}`);
-    }
-  }
+function handleKeydown(e: KeyboardEvent) {
+	if (e.key === "Enter" && query.trim()) {
+		goto(`/search?q=${encodeURIComponent(query.trim())}`);
+	}
+}
 </script>
 
 <div class={cn("relative", className)}>

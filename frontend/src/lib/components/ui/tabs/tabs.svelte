@@ -1,20 +1,20 @@
 <script lang="ts">
-  import { cn } from "$lib/utils.js";
-  import type { Snippet } from "svelte";
+import { cn } from "$lib/utils.js";
+import type { Snippet } from "svelte";
 
-  let {
-    value = $bindable(""),
-    class: className,
-    children,
-  }: {
-    value?: string;
-    class?: string;
-    children?: Snippet;
-  } = $props();
+let {
+	value = $bindable(""),
+	class: className,
+	children,
+}: {
+	value?: string;
+	class?: string;
+	children?: Snippet;
+} = $props();
 
-  function selectTab(tabValue: string) {
-    value = tabValue;
-  }
+function selectTab(tabValue: string) {
+	value = tabValue;
+}
 </script>
 
 <div class={cn("w-full", className)} data-tabs-value={value}>

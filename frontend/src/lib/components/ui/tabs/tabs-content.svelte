@@ -1,18 +1,18 @@
 <script lang="ts">
-  import { cn } from "$lib/utils.js";
-  import type { Snippet } from "svelte";
+import { cn } from "$lib/utils.js";
+import type { Snippet } from "svelte";
 
-  let {
-    value: tabValue,
-    currentValue,
-    class: className,
-    children,
-  }: {
-    value: string;
-    currentValue: string;
-    class?: string;
-    children?: Snippet;
-  } = $props();
+const {
+	value: tabValue,
+	currentValue,
+	class: className,
+	children,
+}: {
+	value: string;
+	currentValue: string;
+	class?: string;
+	children?: Snippet;
+} = $props();
 </script>
 
 {#if currentValue === tabValue}

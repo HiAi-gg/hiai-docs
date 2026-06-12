@@ -1,0 +1,113 @@
+# ============================================
+# hiai-docs .dockerignore
+# Mirrors .gitignore with extra hardening for
+# image builds (no secrets, no VCS metadata,
+# no host volumes, no test artifacts).
+# ============================================
+
+# --- VCS ---
+.git
+.gitignore
+.gitattributes
+.github
+
+# --- Dependencies (re-installed inside image) ---
+node_modules
+**/node_modules
+# bun.lock is intentionally NOT ignored — required for `bun install --frozen-lockfile` reproducibility
+
+# --- Build outputs (regenerated inside image) ---
+dist
+build
+.svelte-kit
+.next
+.output
+**/.svelte-kit
+**/.next
+**/.output
+**/dist
+**/build
+packages/db/.drizzle
+
+# --- Paraglide generated (rebuilt in image) ---
+frontend/src/lib/paraglide
+
+# --- Secrets and local env (NEVER ship into image) ---
+.env
+.env.local
+.env.*.local
+**/.env
+**/.env.local
+!**/.env.example
+
+# --- Docker dev override (not needed in image) ---
+docker-compose.dev.yml
+
+# --- Local data volumes (host-only) ---
+minio_data
+ollama_data
+backup
+docker-data
+
+# --- Logs and runtime artifacts ---
+*.log
+logs
+**/*.log
+
+# --- Test artifacts ---
+coverage
+**/coverage
+**/*.test.ts
+**/*.test.tsx
+**/*.test.js
+**/*.spec.ts
+**/*.spec.tsx
+**/*.spec.js
+tests
+**/tests
+__tests__
+**/__tests__
+qa
+**/qa
+pytest.ini
+pytest-qa.ini
+
+# --- IDE / editor metadata ---
+.vscode
+.idea
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# --- OpenCode workspace metadata ---
+.opencode
+.bob
+
+# --- Docs (only README.md ships into the image per Wave 0 spec) ---
+# Exclude all *.md, but make an exception for README.md (per W0.5 spec: "*.md (except README)")
+*.md
+!README.md
+docs
+
+# --- ML / dataset scratch ---
+mlops
+dataset
+models
+artifacts
+cache
+
+# --- Python envs (legacy) ---
+.venv
+**/.venv
+__pycache__
+**/__pycache__
+*.pyc
+*.pyo
+
+# --- Backup / archive ---
+*.tar
+*.tar.gz
+*.tgz
+*.zip

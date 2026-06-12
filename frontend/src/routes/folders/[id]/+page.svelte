@@ -1,113 +1,144 @@
 <script lang="ts">
-  import { goto } from "$app/navigation";
-  import DocumentCard from "$lib/components/DocumentCard.svelte";
-  import FolderCard from "$lib/components/FolderCard.svelte";
-  import { Button } from "$lib/components/ui/button/index.js";
-  import { Badge } from "$lib/components/ui/badge/index.js";
-  import {
-    DropdownMenu,
-    DropdownMenuTrigger,
-    DropdownMenuContent,
-    DropdownMenuItem,
-  } from "$lib/components/ui/dropdown-menu/index.js";
-  import {
-    ChevronRight,
-    FileText,
-    FolderPlus,
-    Plus,
-    ArrowUpDown,
-    FolderOpen,
-    File,
-    Clock,
-    SortAsc,
-  } from "lucide-svelte";
-  import * as m from "$lib/paraglide/messages.js";
-  import type { SortOption, Document, Folder } from "$lib/types.js";
+import { goto } from "$app/navigation";
+import { apiFetch } from "$lib/api/client";
+import DocumentCard from "$lib/components/DocumentCard.svelte";
+import FolderCard from "$lib/components/FolderCard.svelte";
+import { Badge } from "$lib/components/ui/badge/index.js";
+import { Button } from "$lib/components/ui/button/index.js";
+import {
+	DropdownMenu,
+	DropdownMenuContent,
+	DropdownMenuItem,
+	DropdownMenuTrigger,
+} from "$lib/components/ui/dropdown-menu/index.js";
+import * as m from "$lib/paraglide/messages.js";
+import type { Document, Folder, SortOption } from "$lib/types.js";
+import {
+	ArrowUpDown,
+	ChevronRight,
+	Clock,
+	File,
+	FileText,
+	FolderOpen,
+	FolderPlus,
+	Plus,
+	SortAsc,
+} from "lucide-svelte";
 
-  let { data } = $props();
+const { data } = $props();
 
-  let sortBy = $state<SortOption>("updated");
-  let editingName = $state(false);
-  let editName = $state("");
+let sortBy = $state<SortOption>("updated");
+let editingName = $state(false);
+let editName = $state("");
 
-  /** Sort documents by the selected option. */
-  let sortedDocuments = $derived.by(() => {
-    const docs = [...data.folder.documents];
-    switch (sortBy) {
-      case "name":
-        return docs.sort((a, b) => a.title.localeCompare(b.title));
-      case "created":
-        return docs.sort(
-          (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
-        );
-      case "updated":
-      default:
-        return docs.sort(
-          (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
-        );
-    }
-  });
+/** Sort documents by the selected option. */
+const sortedDocuments = $derived.by(() => {
+	const docs = [...data.folder.documents];
+	switch (sortBy) {
+		case "name":
+			return docs.sort((a, b) => a.title.localeCompare(b.title));
+		case "created":
+			return docs.sort(
+				(a, b) =>
+					new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+			);
+		default:
+			return docs.sort(
+				(a, b) =>
+					new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
+			);
+	}
+});
 
-  /** Sort subfolders by name. */
-  let sortedSubfolders = $derived(
-    [...data.folder.children].sort((a, b) => a.name.localeCompare(b.name)),
-  );
+/** Sort subfolders by name. */
+const sortedSubfolders = $derived(
+	[...data.folder.children].sort((a, b) => a.name.localeCompare(b.name)),
+);
 
-  let isEmpty = $derived(
-    sortedSubfolders.length === 0 && sortedDocuments.length === 0,
-  );
+const isEmpty = $derived(
+	sortedSubfolders.length === 0 && sortedDocuments.length === 0,
+);
 
-  function startRename() {
-    editName = data.folder.name;
-    editingName = true;
-  }
+function startRename() {
+	editName = data.folder.name;
+	editingName = true;
+}
 
-  function cancelRename() {
-    editingName = false;
-    editName = "";
-  }
+function cancelRename() {
+	editingName = false;
+	editName = "";
+}
 
-  function submitRename() {
-    if (editName.trim() && editName.trim() !== data.folder.name) {
-      // In production, call updateFolder(data.folder.id, { name: editName.trim() })
-      data.folder.name = editName.trim();
-    }
-    editingName = false;
-  }
+function submitRename() {
+	if (editName.trim() && editName.trim() !== data.folder.name) {
+		// In production, call updateFolder(data.folder.id, { name: editName.trim() })
+		data.folder.name = editName.trim();
+	}
+	editingName = false;
+}
 
-  function handleRenameKeydown(e: KeyboardEvent) {
-    if (e.key === "Enter") submitRename();
-    if (e.key === "Escape") cancelRename();
-  }
+function handleRenameKeydown(e: KeyboardEvent) {
+	if (e.key === "Enter") submitRename();
+	if (e.key === "Escape") cancelRename();
+}
 
-  function handleDeleteFolder(id: string) {
-    // In production, call deleteFolder(id) then navigate
-    console.log("Delete folder:", id);
-  }
+function handleDeleteFolder(id: string) {
+	if (!confirm(m.folders_delete_confirm())) {
+		return;
+	}
+	apiFetch(`/api/folders/${id}`, { method: "DELETE" })
+		.then(() => {
+			data.folder.children = data.folder.children.filter(
+				(c: Folder) => c.id !== id,
+			);
+		})
+		.catch((e: unknown) => console.error("Failed to delete folder", e));
+}
 
-  function handleRenameFolder(id: string) {
-    // In production, show rename dialog
-    console.log("Rename folder:", id);
-  }
+function handleRenameFolder(id: string) {
+	const folder = data.folder.children.find((c: Folder) => c.id === id);
+	const current = folder?.name ?? "";
+	const name = prompt(m.folders_rename(), current);
+	const trimmed = name?.trim();
+	if (!trimmed || trimmed === current) return;
+	apiFetch<Folder>(`/api/folders/${id}`, {
+		method: "PATCH",
+		body: JSON.stringify({ name: trimmed }),
+	})
+		.then((updated) => {
+			const target = data.folder.children.find((c: Folder) => c.id === id);
+			if (target) {
+				target.name = updated.name;
+				target.updatedAt = updated.updatedAt;
+			}
+		})
+		.catch((e: unknown) => console.error("Failed to rename folder", e));
+}
 
-  function handleDeleteDocument(id: string) {
-    // In production, call deleteDocument(id) then refresh
-    console.log("Delete document:", id);
-    data.folder.documents = data.folder.documents.filter((d: Document) => d.id !== id);
-  }
+function handleDeleteDocument(id: string) {
+	data.folder.documents = data.folder.documents.filter(
+		(d: Document) => d.id !== id,
+	);
+}
 
-  function handleDuplicateDocument(id: string) {
-    // In production, call duplicateDocument(id) then refresh
-    console.log("Duplicate document:", id);
-  }
+function handleDuplicateDocument(id: string) {
+	apiFetch<Document>(`/api/documents/${id}/duplicate`, { method: "POST" })
+		.then((doc) => {
+			data.folder.documents = [...data.folder.documents, doc];
+		})
+		.catch((e: unknown) => console.error("Failed to duplicate document", e));
+}
 
-  function getSortLabel(option: SortOption): string {
-    switch (option) {
-      case "name": return m.sort_name();
-      case "updated": return m.sort_date_modified();
-      case "created": return m.sort_date_created();
-    }
-  }
+function getSortLabel(option: SortOption): string {
+	switch (option) {
+		case "name":
+			return m.sort_name();
+		case "updated":
+			return m.sort_date_modified();
+		case "created":
+			return m.sort_date_created();
+	}
+}
 </script>
 
 <svelte:head>

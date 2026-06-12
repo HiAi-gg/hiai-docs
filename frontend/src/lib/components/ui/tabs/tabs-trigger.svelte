@@ -1,22 +1,22 @@
 <script lang="ts">
-  import { cn } from "$lib/utils.js";
-  import type { Snippet } from "svelte";
+import { cn } from "$lib/utils.js";
+import type { Snippet } from "svelte";
 
-  let {
-    value,
-    class: className,
-    children,
-    onclick,
-  }: {
-    value: string;
-    class?: string;
-    children?: Snippet;
-    onclick?: (value: string) => void;
-  } = $props();
+const {
+	value,
+	class: className,
+	children,
+	onclick,
+}: {
+	value: string;
+	class?: string;
+	children?: Snippet;
+	onclick?: (value: string) => void;
+} = $props();
 
-  function handleClick() {
-    onclick?.(value);
-  }
+function handleClick() {
+	onclick?.(value);
+}
 </script>
 
 <button

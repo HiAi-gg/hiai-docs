@@ -1,0 +1,5 @@
+# Funding configuration for hiai-docs
+# https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/displaying-a-sponsor-button-in-your-repository
+
+# These settings support the `hiai-dev` GitHub Sponsors account.
+github: [hiai-dev]

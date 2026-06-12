@@ -1,14 +1,14 @@
 <script lang="ts">
-  import type { HTMLLabelAttributes } from "svelte/elements";
-  import type { WithElementRef } from "$lib/utils.js";
-  import { cn } from "$lib/utils.js";
+import type { WithElementRef } from "$lib/utils.js";
+import { cn } from "$lib/utils.js";
+import type { HTMLLabelAttributes } from "svelte/elements";
 
-  let {
-    ref = $bindable(null),
-    class: className,
-    children,
-    ...restProps
-  }: WithElementRef<HTMLLabelAttributes> = $props();
+let {
+	ref = $bindable(null),
+	class: className,
+	children,
+	...restProps
+}: WithElementRef<HTMLLabelAttributes> = $props();
 </script>
 
 <label

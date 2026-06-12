@@ -1,4 +1,4 @@
-import { pgTable, uuid, text, timestamp, bigint, jsonb, index, uniqueIndex, customType, boolean } from "drizzle-orm/pg-core";
+import { pgTable, uuid, text, timestamp, bigint, jsonb, index, uniqueIndex, customType, boolean, type AnyPgColumn } from "drizzle-orm/pg-core";
 
 // pgvector vector type — maps to PostgreSQL vector(n) column
 const vector = customType<{ data: number[] }>({
@@ -13,7 +13,15 @@ const vector = customType<{ data: number[] }>({
     return value as number[];
   },
 });
-import { relations } from "drizzle-orm";
+
+// PostgreSQL tsvector type — used for documents.search_vector full-text search
+const tsvector = customType<{ data: string }>({
+  dataType() {
+    return "tsvector";
+  },
+});
+
+import { relations, sql } from "drizzle-orm";
 
 // ============================================
 // users — managed by Better Auth
@@ -89,7 +97,9 @@ export const folders = pgTable(
     ownerId: uuid("owner_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
-    parentId: uuid("parent_id"),
+    parentId: uuid("parent_id").references((): AnyPgColumn => folders.id, {
+      onDelete: "set null",
+    }),
     name: text("name").notNull(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
@@ -129,6 +139,9 @@ export const documents = pgTable(
     content: text("content").default(""),
     contentTipex: jsonb("content_tipex"),
     metadata: jsonb("metadata"),
+    searchVector: tsvector("search_vector").generatedAlwaysAs(
+      sql`to_tsvector('english', COALESCE(title, '') || ' ' || COALESCE(content, ''))`
+    ),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
   },
@@ -136,6 +149,11 @@ export const documents = pgTable(
     index("documents_owner_id_idx").on(table.ownerId),
     index("documents_folder_id_idx").on(table.folderId),
     index("documents_created_at_idx").on(table.createdAt),
+    index("idx_documents_search_vector").using("gin", table.searchVector),
+    index("idx_documents_title_trgm").using(
+      "gin",
+      sql`${table.title} gin_trgm_ops`
+    ),
   ]
 );
 
@@ -334,6 +352,10 @@ export const documentEmbeddings = pgTable(
   (table) => [
     index("document_embeddings_doc_id_idx").on(table.documentId),
     uniqueIndex("document_embeddings_doc_chunk_idx").on(table.documentId, table.chunkIndex),
+    index("idx_document_embeddings_hnsw").using(
+      "hnsw",
+      sql`${table.embedding} vector_cosine_ops`
+    ),
   ]
 );
 

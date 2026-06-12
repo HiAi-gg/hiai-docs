@@ -1,55 +1,63 @@
 <script lang="ts">
-  import { Folder, Tag, Calendar } from "lucide-svelte";
+import { Calendar, Folder, Tag } from "lucide-svelte";
 
-  interface Props {
-    id: string;
-    title: string;
-    snippet: string; // may contain <mark> tags
-    score: number;
-    folderName: string;
-    tags: string[];
-    createdAt: string;
-    query?: string;
-  }
+interface Props {
+	id: string;
+	title: string;
+	snippet: string; // may contain <mark> tags
+	score: number;
+	folderName: string;
+	tags: string[];
+	createdAt: string;
+	query?: string;
+}
 
-  let { id, title, snippet, score, folderName, tags, createdAt, query = "" }: Props =
-    $props();
+const {
+	id,
+	title,
+	snippet,
+	score,
+	folderName,
+	tags,
+	createdAt,
+	query = "",
+}: Props = $props();
 
-  function escapeHtml(text: string): string {
-    return text
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;")
-      .replace(/'/g, "&#39;");
-  }
+function escapeHtml(text: string): string {
+	return text
+		.replace(/&/g, "&amp;")
+		.replace(/</g, "&lt;")
+		.replace(/>/g, "&gt;")
+		.replace(/"/g, "&quot;")
+		.replace(/'/g, "&#39;");
+}
 
-  function highlightText(text: string, q: string): string {
-    if (!q) return escapeHtml(text);
-    const escapedQuery = q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    const safe = escapeHtml(text);
-    return safe.replace(new RegExp(`(${escapedQuery})`, "gi"), "<mark>$1</mark>");
-  }
+function highlightText(text: string, q: string): string {
+	if (!q) return escapeHtml(text);
+	const escapedQuery = q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+	const safe = escapeHtml(text);
+	return safe.replace(new RegExp(`(${escapedQuery})`, "gi"), "<mark>$1</mark>");
+}
 
-  let highlightedSnippet = $derived(highlightText(snippet, query));
+const highlightedSnippet = $derived(highlightText(snippet, query));
 
-  let scorePercent = $derived(Math.round(score * 100));
+const scorePercent = $derived(Math.round(score * 100));
 
-  let scoreColor = $derived(
-    scorePercent >= 90
-      ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300"
-      : scorePercent >= 75
-        ? "bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300"
-        : "bg-muted text-muted-foreground",
-  );
+const scoreColor = $derived(
+	scorePercent >= 90
+		? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300"
+		: scorePercent >= 75
+			? "bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300"
+			: "bg-muted text-muted-foreground",
+);
 
-  let formattedDate = $derived(
-    new Date(createdAt).toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-    }),
-  );
+const formattedDate = $derived(
+	new Date(createdAt).toLocaleDateString("en-US", {
+		year: "numeric",
+		month: "short",
+		day: "numeric",
+	}),
+);
 </script>
 
 <a

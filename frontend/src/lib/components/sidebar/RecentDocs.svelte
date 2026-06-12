@@ -1,25 +1,30 @@
 <script lang="ts">
-  import { onMount } from "svelte";
-  import { FileText } from "lucide-svelte";
-  import { cn } from "$lib/utils";
-  import { listDocuments, type Document } from "$lib/api/documents";
-  import * as m from "$lib/paraglide/messages.js";
+import { type Document, listDocuments } from "$lib/api/documents";
+import * as m from "$lib/paraglide/messages.js";
+import { cn } from "$lib/utils";
+import { FileText } from "lucide-svelte";
+import { onMount } from "svelte";
 
-  let recentDocs = $state<Document[]>([]);
-  let activeId = $state<string | null>(null);
+let recentDocs = $state<Document[]>([]);
+let activeId = $state<string | null>(null);
+let loadError = $state<string | null>(null);
 
-  onMount(async () => {
-    try {
-      const res = await listDocuments({ limit: 5 });
-      recentDocs = res.items;
-    } catch (err) {
-      console.error("Failed to load recent documents:", err);
-    }
-  });
+onMount(async () => {
+	try {
+		const res = await listDocuments({ limit: 5 });
+		recentDocs = res.items;
+	} catch (e) {
+		console.error("RecentDocs: failed to load recent documents", e);
+		loadError = "Failed to load recent documents";
+	}
+});
 </script>
 
 <div class="space-y-1">
   <h3 class="mb-2 px-2 text-xs font-medium uppercase tracking-wider text-muted-foreground">{m.sidebar_recent()}</h3>
+  {#if loadError}
+    <p class="px-2 text-xs text-destructive">{loadError}</p>
+  {/if}
   {#each recentDocs as doc (doc.id)}
     <a
       href={`/docs/${doc.id}`}

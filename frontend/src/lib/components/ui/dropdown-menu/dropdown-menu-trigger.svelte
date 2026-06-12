@@ -1,14 +1,14 @@
 <script lang="ts">
-  import { DropdownMenu as DropdownMenuPrimitive } from "bits-ui";
+import { DropdownMenu as DropdownMenuPrimitive } from "bits-ui";
 
-  let {
-    ref = $bindable(null),
-    child,
-    children,
-    ...restProps
-  }: DropdownMenuPrimitive.TriggerProps & {
-    child?: import("svelte").Snippet<[{ props: Record<string, unknown> }]>;
-  } = $props();
+let {
+	ref = $bindable(null),
+	child,
+	children,
+	...restProps
+}: DropdownMenuPrimitive.TriggerProps & {
+	child?: import("svelte").Snippet<[{ props: Record<string, unknown> }]>;
+} = $props();
 </script>
 
 {#if child}

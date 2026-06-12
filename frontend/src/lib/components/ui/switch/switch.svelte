@@ -1,32 +1,32 @@
 <script lang="ts">
-  import { cn } from "$lib/utils.js";
+import { cn } from "$lib/utils.js";
 
-  let {
-    checked = $bindable(false),
-    id,
-    disabled = false,
-    class: className,
-    onchange,
-  }: {
-    checked?: boolean;
-    id?: string;
-    disabled?: boolean;
-    class?: string;
-    onchange?: (checked: boolean) => void;
-  } = $props();
+let {
+	checked = $bindable(false),
+	id,
+	disabled = false,
+	class: className,
+	onchange,
+}: {
+	checked?: boolean;
+	id?: string;
+	disabled?: boolean;
+	class?: string;
+	onchange?: (checked: boolean) => void;
+} = $props();
 
-  function toggle() {
-    if (disabled) return;
-    checked = !checked;
-    onchange?.(checked);
-  }
+function toggle() {
+	if (disabled) return;
+	checked = !checked;
+	onchange?.(checked);
+}
 
-  function handleKeydown(e: KeyboardEvent) {
-    if (e.key === " " || e.key === "Enter") {
-      e.preventDefault();
-      toggle();
-    }
-  }
+function handleKeydown(e: KeyboardEvent) {
+	if (e.key === " " || e.key === "Enter") {
+		e.preventDefault();
+		toggle();
+	}
+}
 </script>
 
 <button

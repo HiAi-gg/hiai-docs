@@ -1,24 +1,24 @@
 <script lang="ts">
-  import { cn } from "$lib/utils";
-  import type { Snippet } from "svelte";
+import { cn } from "$lib/utils";
+import type { Snippet } from "svelte";
 
-  interface Props {
-    icon?: typeof import("lucide-svelte").FileText;
-    title: string;
-    description?: string;
-    actionLabel?: string;
-    onAction?: () => void;
-    class?: string;
-  }
+interface Props {
+	icon?: typeof import("lucide-svelte").FileText;
+	title: string;
+	description?: string;
+	actionLabel?: string;
+	onAction?: () => void;
+	class?: string;
+}
 
-  let {
-    icon: Icon,
-    title,
-    description,
-    actionLabel,
-    onAction,
-    class: className,
-  }: Props = $props();
+const {
+	icon: Icon,
+	title,
+	description,
+	actionLabel,
+	onAction,
+	class: className,
+}: Props = $props();
 </script>
 
 <div

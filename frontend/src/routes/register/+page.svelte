@@ -1,33 +1,33 @@
 <script lang="ts">
-  import { signUp } from "$lib/auth-client";
-  import { goto } from "$app/navigation";
-  import * as m from "$lib/paraglide/messages.js";
+import { goto } from "$app/navigation";
+import { signUp } from "$lib/auth-client";
+import * as m from "$lib/paraglide/messages.js";
 
-  let name = $state("");
-  let email = $state("");
-  let password = $state("");
-  let error = $state("");
-  let loading = $state(false);
+let name = $state("");
+let email = $state("");
+let password = $state("");
+let error = $state("");
+let loading = $state(false);
 
-  async function handleSubmit(e: SubmitEvent) {
-    e.preventDefault();
-    loading = true;
-    error = "";
+async function handleSubmit(e: SubmitEvent) {
+	e.preventDefault();
+	loading = true;
+	error = "";
 
-    const result = await signUp.email({
-      name,
-      email,
-      password,
-      callbackURL: "/",
-    });
+	const result = await signUp.email({
+		name,
+		email,
+		password,
+		callbackURL: "/",
+	});
 
-    if (result.error) {
-      error = result.error.message ?? m.auth_signup_error();
-      loading = false;
-    } else {
-      goto("/");
-    }
-  }
+	if (result.error) {
+		error = result.error.message ?? m.auth_signup_error();
+		loading = false;
+	} else {
+		goto("/");
+	}
+}
 </script>
 
 <svelte:head>

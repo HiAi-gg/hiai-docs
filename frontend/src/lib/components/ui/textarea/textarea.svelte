@@ -1,14 +1,14 @@
 <script lang="ts">
-  import type { HTMLTextareaAttributes } from "svelte/elements";
-  import type { WithElementRef } from "$lib/utils.js";
-  import { cn } from "$lib/utils.js";
+import type { WithElementRef } from "$lib/utils.js";
+import { cn } from "$lib/utils.js";
+import type { HTMLTextareaAttributes } from "svelte/elements";
 
-  let {
-    ref = $bindable(null),
-    class: className,
-    value = $bindable(""),
-    ...restProps
-  }: WithElementRef<HTMLTextareaAttributes> = $props();
+let {
+	ref = $bindable(null),
+	class: className,
+	value = $bindable(""),
+	...restProps
+}: WithElementRef<HTMLTextareaAttributes> = $props();
 </script>
 
 <textarea

@@ -1,170 +1,175 @@
 <script lang="ts">
-  import * as m from "$lib/paraglide/messages.js";
-  import { goto } from "$app/navigation";
-  import {
-    Search,
-    X,
-    SlidersHorizontal,
-    ChevronLeft,
-    ChevronRight,
-    Loader2,
-    Folder,
-    Tag,
-    Calendar,
-    RotateCcw,
-    FileSearch,
-  } from "lucide-svelte";
-  import SearchResult from "$lib/components/SearchResult.svelte";
-  import { Badge } from "$lib/components/ui/badge";
-  import {
-    search,
-    getFilterOptions,
-    type SearchResponse,
-  } from "$lib/api/search";
+import { goto } from "$app/navigation";
+import { type SearchResponse, getFilterOptions, search } from "$lib/api/search";
+import SearchResult from "$lib/components/SearchResult.svelte";
+import { Badge } from "$lib/components/ui/badge";
+import * as m from "$lib/paraglide/messages.js";
+import {
+	Calendar,
+	ChevronLeft,
+	ChevronRight,
+	FileSearch,
+	Folder,
+	Loader2,
+	RotateCcw,
+	Search,
+	SlidersHorizontal,
+	Tag,
+	X,
+} from "lucide-svelte";
 
-  let { data } = $props();
+const { data } = $props();
 
-  // --- State -------------------------------------------------------------------
-  let query = $state("");
-  let activeFolder = $state("");
-  let activeTags = $state<string[]>([]);
-  let dateFrom = $state("");
-  let dateTo = $state("");
-  let currentPage = $state(1);
+// --- State -------------------------------------------------------------------
+let query = $state("");
+let activeFolder = $state("");
+let activeTags = $state<string[]>([]);
+let dateFrom = $state("");
+let dateTo = $state("");
+let currentPage = $state(1);
 
-  $effect(() => {
-    query = data.query ?? "";
-    activeFolder = data.filters?.folder ?? "";
-    activeTags = data.filters?.tags ?? [];
-    dateFrom = data.filters?.dateFrom ?? "";
-    dateTo = data.filters?.dateTo ?? "";
-    currentPage = data.page ?? 1;
-  });
+$effect(() => {
+	query = data.query ?? "";
+	activeFolder = data.filters?.folder ?? "";
+	activeTags = data.filters?.tags ?? [];
+	dateFrom = data.filters?.dateFrom ?? "";
+	dateTo = data.filters?.dateTo ?? "";
+	currentPage = data.page ?? 1;
+});
 
-  let searchResponse = $state<SearchResponse | null>(null);
-  let loading = $state(false);
-  let showFilters = $state(false);
+let searchResponse = $state<SearchResponse | null>(null);
+let loading = $state(false);
+let showFilters = $state(false);
 
-  let folders = $state<string[]>([]);
-  let tags = $state<string[]>([]);
+let folders = $state<string[]>([]);
+let tags = $state<string[]>([]);
 
-  const PAGE_SIZE = 5;
+const PAGE_SIZE = 5;
 
-  // --- Derived -----------------------------------------------------------------
-  let totalPages = $derived(
-    searchResponse ? Math.ceil(searchResponse.total / PAGE_SIZE) : 0,
-  );
+// --- Derived -----------------------------------------------------------------
+const totalPages = $derived(
+	searchResponse ? Math.ceil(searchResponse.total / PAGE_SIZE) : 0,
+);
 
-  let hasActiveFilters = $derived(
-    activeFolder !== "" ||
-      activeTags.length > 0 ||
-      dateFrom !== "" ||
-      dateTo !== "",
-  );
+const hasActiveFilters = $derived(
+	activeFolder !== "" ||
+		activeTags.length > 0 ||
+		dateFrom !== "" ||
+		dateTo !== "",
+);
 
-  // --- Effects -----------------------------------------------------------------
+// --- Effects -----------------------------------------------------------------
 
-  // Load filter options on mount
-  $effect(() => {
-    getFilterOptions().then((opts) => {
-      folders = opts.folders;
-      tags = opts.tags;
-    });
-  });
+// Load filter options on mount
+$effect(() => {
+	getFilterOptions().then((opts) => {
+		folders = opts.folders;
+		tags = opts.tags;
+	});
+});
 
-  // Run search when query or filters change
-  $effect(() => {
-    const q = data.query;
-    const p = data.page;
+// Run search when query or filters change
+$effect(() => {
+	const q = data.query;
+	const p = data.page;
 
-    if (!q) {
-      searchResponse = null;
-      loading = false;
-      return;
-    }
+	if (!q) {
+		searchResponse = null;
+		loading = false;
+		return;
+	}
 
-    loading = true;
+	loading = true;
 
-    search(q, p, PAGE_SIZE).then((res) => {
-      searchResponse = res;
-      loading = false;
-    });
-  });
+	search(q, p, PAGE_SIZE).then((res) => {
+		searchResponse = res;
+		loading = false;
+	});
+});
 
-  // --- Helpers -----------------------------------------------------------------
+// --- Helpers -----------------------------------------------------------------
 
-  function buildUrl(overrides: Record<string, string | undefined>) {
-    const params = new URLSearchParams();
+function buildUrl(overrides: Record<string, string | undefined>) {
+	const params = new URLSearchParams();
 
-    const q = overrides.q ?? query;
-    const folder = overrides.folder ?? activeFolder;
-    const t = overrides.tags ?? activeTags.join(",");
-    const df = overrides.dateFrom ?? dateFrom;
-    const dt = overrides.dateTo ?? dateTo;
-    const p = overrides.page ?? String(currentPage);
+	const q = overrides.q ?? query;
+	const folder = overrides.folder ?? activeFolder;
+	const t = overrides.tags ?? activeTags.join(",");
+	const df = overrides.dateFrom ?? dateFrom;
+	const dt = overrides.dateTo ?? dateTo;
+	const p = overrides.page ?? String(currentPage);
 
-    if (q) params.set("q", q);
-    if (folder) params.set("folder", folder);
-    if (t) params.set("tags", t);
-    if (df) params.set("dateFrom", df);
-    if (dt) params.set("dateTo", dt);
-    if (p && p !== "1") params.set("page", p);
+	if (q) params.set("q", q);
+	if (folder) params.set("folder", folder);
+	if (t) params.set("tags", t);
+	if (df) params.set("dateFrom", df);
+	if (dt) params.set("dateTo", dt);
+	if (p && p !== "1") params.set("page", p);
 
-    return `/search?${params.toString()}`;
-  }
+	return `/search?${params.toString()}`;
+}
 
-  function handleSubmit(e: SubmitEvent) {
-    e.preventDefault();
-    currentPage = 1;
-    goto(buildUrl({ q: query, page: "1" }), { replaceState: true });
-  }
+function handleSubmit(e: SubmitEvent) {
+	e.preventDefault();
+	currentPage = 1;
+	goto(buildUrl({ q: query, page: "1" }), { replaceState: true });
+}
 
-  function clearSearch() {
-    query = "";
-    activeFolder = "";
-    activeTags = [];
-    dateFrom = "";
-    dateTo = "";
-    currentPage = 1;
-    goto("/search", { replaceState: true });
-  }
+function clearSearch() {
+	query = "";
+	activeFolder = "";
+	activeTags = [];
+	dateFrom = "";
+	dateTo = "";
+	currentPage = 1;
+	goto("/search", { replaceState: true });
+}
 
-  function toggleFolder(folder: string) {
-    activeFolder = activeFolder === folder ? "" : folder;
-    currentPage = 1;
-    goto(buildUrl({ folder: activeFolder, page: "1" }), { replaceState: true });
-  }
+function toggleFolder(folder: string) {
+	activeFolder = activeFolder === folder ? "" : folder;
+	currentPage = 1;
+	goto(buildUrl({ folder: activeFolder, page: "1" }), { replaceState: true });
+}
 
-  function toggleTag(tag: string) {
-    activeTags = activeTags.includes(tag)
-      ? activeTags.filter((t) => t !== tag)
-      : [...activeTags, tag];
-    currentPage = 1;
-    goto(buildUrl({ tags: activeTags.join(","), page: "1" }), {
-      replaceState: true,
-    });
-  }
+function toggleTag(tag: string) {
+	activeTags = activeTags.includes(tag)
+		? activeTags.filter((t) => t !== tag)
+		: [...activeTags, tag];
+	currentPage = 1;
+	goto(buildUrl({ tags: activeTags.join(","), page: "1" }), {
+		replaceState: true,
+	});
+}
 
-  function applyDateRange() {
-    currentPage = 1;
-    goto(buildUrl({ dateFrom, dateTo, page: "1" }), { replaceState: true });
-  }
+function applyDateRange() {
+	currentPage = 1;
+	goto(buildUrl({ dateFrom, dateTo, page: "1" }), { replaceState: true });
+}
 
-  function clearFilters() {
-    activeFolder = "";
-    activeTags = [];
-    dateFrom = "";
-    dateTo = "";
-    currentPage = 1;
-    goto(buildUrl({ folder: undefined, tags: undefined, dateFrom: undefined, dateTo: undefined, page: "1" }), {
-      replaceState: true,
-    });
-  }
+function clearFilters() {
+	activeFolder = "";
+	activeTags = [];
+	dateFrom = "";
+	dateTo = "";
+	currentPage = 1;
+	goto(
+		buildUrl({
+			folder: undefined,
+			tags: undefined,
+			dateFrom: undefined,
+			dateTo: undefined,
+			page: "1",
+		}),
+		{
+			replaceState: true,
+		},
+	);
+}
 
-  function goToPage(page: number) {
-    currentPage = page;
-    goto(buildUrl({ page: String(page) }), { replaceState: true });
-  }
+function goToPage(page: number) {
+	currentPage = page;
+	goto(buildUrl({ page: String(page) }), { replaceState: true });
+}
 </script>
 
 <svelte:head>

@@ -1,67 +1,70 @@
 <script lang="ts">
-  import * as m from "$lib/paraglide/messages.js";
+import * as m from "$lib/paraglide/messages.js";
 
-  let { documentId = "", onUpload }: {
-    documentId?: string;
-    onUpload?: (file: File) => void;
-  } = $props();
+const {
+	documentId = "",
+	onUpload,
+}: {
+	documentId?: string;
+	onUpload?: (file: File) => void;
+} = $props();
 
-  let dragOver = $state(false);
-  let uploadedFile = $state<File | null>(null);
-  let error = $state("");
-  let inputRef: HTMLInputElement | undefined = $state();
+let dragOver = $state(false);
+let uploadedFile = $state<File | null>(null);
+let error = $state("");
+let inputRef: HTMLInputElement | undefined = $state();
 
-  const maxSize = 10 * 1024 * 1024; // 10MB
-  const accept = ".jpg,.jpeg,.png,.gif,.webp,.pdf,.md,.txt,.csv,.json";
+const maxSize = 10 * 1024 * 1024; // 10MB
+const accept = ".jpg,.jpeg,.png,.gif,.webp,.pdf,.md,.txt,.csv,.json";
 
-  function formatSize(bytes: number): string {
-    if (bytes < 1024) return `${bytes} B`;
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-  }
+function formatSize(bytes: number): string {
+	if (bytes < 1024) return `${bytes} B`;
+	if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+	return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
 
-  function validateFile(file: File): boolean {
-    if (file.size > maxSize) {
-      error = m.attachment_file_too_large({ size: formatSize(file.size) });
-      return false;
-    }
-    error = "";
-    return true;
-  }
+function validateFile(file: File): boolean {
+	if (file.size > maxSize) {
+		error = m.attachment_file_too_large({ size: formatSize(file.size) });
+		return false;
+	}
+	error = "";
+	return true;
+}
 
-  function handleFiles(files: FileList | null) {
-    if (!files?.[0]) return;
-    const file = files[0];
-    if (validateFile(file)) {
-      uploadedFile = file;
-      onUpload?.(file);
-    }
-  }
+function handleFiles(files: FileList | null) {
+	if (!files?.[0]) return;
+	const file = files[0];
+	if (validateFile(file)) {
+		uploadedFile = file;
+		onUpload?.(file);
+	}
+}
 
-  function handleDrop(e: DragEvent) {
-    e.preventDefault();
-    dragOver = false;
-    handleFiles(e.dataTransfer?.files ?? null);
-  }
+function handleDrop(e: DragEvent) {
+	e.preventDefault();
+	dragOver = false;
+	handleFiles(e.dataTransfer?.files ?? null);
+}
 
-  function handleDragOver(e: DragEvent) {
-    e.preventDefault();
-    dragOver = true;
-  }
+function handleDragOver(e: DragEvent) {
+	e.preventDefault();
+	dragOver = true;
+}
 
-  function handleDragLeave() {
-    dragOver = false;
-  }
+function handleDragLeave() {
+	dragOver = false;
+}
 
-  function openPicker() {
-    inputRef?.click();
-  }
+function openPicker() {
+	inputRef?.click();
+}
 
-  function removeFile() {
-    uploadedFile = null;
-    error = "";
-    if (inputRef) inputRef.value = "";
-  }
+function removeFile() {
+	uploadedFile = null;
+	error = "";
+	if (inputRef) inputRef.value = "";
+}
 </script>
 
 <div class="space-y-2">

@@ -1,36 +1,59 @@
 <script lang="ts">
-  import * as m from "$lib/paraglide/messages.js";
+import { apiFetch } from "$lib/api/client";
+import * as m from "$lib/paraglide/messages.js";
 
-  let { token = "", expiresAt = "", hasPassword = false, guestEmails = [], onRevoke }: {
-    token?: string;
-    expiresAt?: string;
-    hasPassword?: boolean;
-    guestEmails?: string[];
-    onRevoke?: () => void;
-  } = $props();
+const {
+	token = "",
+	expiresAt = "",
+	hasPassword = false,
+	guestEmails = [],
+	linkId = "",
+	onRevoke,
+}: {
+	token?: string;
+	expiresAt?: string;
+	hasPassword?: boolean;
+	guestEmails?: string[];
+	linkId?: string;
+	onRevoke?: () => void;
+} = $props();
 
-  let copied = $state(false);
-  let confirmRevoke = $state(false);
+let copied = $state(false);
+let confirmRevoke = $state(false);
 
-  const shareUrl = $derived(`${typeof window !== "undefined" ? window.location.origin : ""}/s/${token}`);
+const shareUrl = $derived(
+	`${typeof window !== "undefined" ? window.location.origin : ""}/s/${token}`,
+);
 
-  async function copyLink() {
-    await navigator.clipboard.writeText(shareUrl);
-    copied = true;
-    setTimeout(() => { copied = false; }, 2000);
-  }
+async function copyLink() {
+	await navigator.clipboard.writeText(shareUrl);
+	copied = true;
+	setTimeout(() => {
+		copied = false;
+	}, 2000);
+}
 
-  function formatExpiry(dateStr: string): string {
-    if (!dateStr) return m.share_never_expires();
-    const date = new Date(dateStr);
-    const now = new Date();
-    if (date < now) return m.share_expired_label();
-    return m.share_expires_date({ date: date.toLocaleDateString() });
-  }
+function formatExpiry(dateStr: string): string {
+	if (!dateStr) return m.share_never_expires();
+	const date = new Date(dateStr);
+	const now = new Date();
+	if (date < now) return m.share_expired_label();
+	return m.share_expires_date({ date: date.toLocaleDateString() });
+}
 
-  function removeGuest(_email: string) {
-    // placeholder
-  }
+function removeGuest(email: string) {
+	if (!linkId) {
+		console.error("removeGuest called without linkId");
+		return;
+	}
+	apiFetch(`/api/share/${linkId}/guests/${encodeURIComponent(email)}`, {
+		method: "DELETE",
+	})
+		.then(() => {
+			// Backend already removed the row; consumer should re-fetch guest list
+		})
+		.catch((e: unknown) => console.error("Failed to remove guest", e));
+}
 </script>
 
 <div class="rounded-lg border border-border bg-card p-4">

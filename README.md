@@ -22,7 +22,7 @@ A modern, lightweight, self-hosted knowledge base with built-in vector embedding
 
 ## Quick Start
 
-### Docker (Recommended)
+### Docker (Production-style)
 
 ```bash
 git clone https://github.com/hiai-gg/hiai-docs.git
@@ -35,24 +35,53 @@ docker compose up -d
 
 Open http://localhost:50701
 
-### Local Development
+### Local Development (Recommended for hacking)
+
+Two equivalent workflows — pick one. Both give you live-reload at http://localhost:50701.
+
+#### Option A — Hybrid (infra in Docker, api+web on host)
+
+This is the fastest dev loop. `bun run dev` runs `vite dev` (port 50701) and `bun --watch` for the api in parallel; both auto-reload on file changes.
 
 ```bash
-# Install dependencies
+# 1. Install JS deps once
 bun install
 
-# Start database + services
-docker compose -f docker-compose.dev.yml up -d postgres redis ollama minio
+# 2. Start infrastructure in Docker
+bun run docker:dev          # brings up postgres, redis, ollama, minio
 
-# Push database schema
-cd packages/db && bun run db:push && cd ../..
+# 3. Push DB schema (one-time, or after schema changes)
+bun run db:push
 
-# Start backend
-cd backend && bun run dev &
-
-# Start frontend
-cd frontend && bun run dev
+# 4. Start api + web on the host, with live reload
+bun run dev
+# vite dev → http://localhost:50701
+# api      → http://localhost:50700
 ```
+
+Stop the infra when done: `bun run stop`
+
+#### Option B — Full Docker with live-reload bind mounts
+
+`docker-compose.dev.yml` mounts the source into the api/web containers, so editing a file on the host is picked up inside the container (vite HMR + bun --watch). Useful when you want everything isolated in Docker.
+
+```bash
+bun run docker:dev
+# Open http://localhost:50701
+```
+
+> The `web` and `api` services in `docker-compose.dev.yml` bind `./:/app`, so any edit on the host is reflected inside the container without rebuilding.
+
+### Why is port 50701 special?
+
+The frontend dev server is pinned to port 50701 in `frontend/vite.config.ts` with `strictPort: true`. That last flag is important: if 50701 is already taken (e.g. a stale container from a previous run), vite will **fail loudly** instead of silently falling back to 5173 — which would leave you staring at an old build at http://localhost:50701. If you see "port 50701 in use", run `docker compose down` (or `bun run stop`) and retry.
+
+### Troubleshooting
+
+- **Port 50701 already in use** — `docker compose down` to stop stale containers, then retry `bun run dev` or `bun run docker:dev`.
+- **Changes not showing up** — `bun run dev` already wires HMR. If running via Docker, confirm the bind mount is in `docker-compose.dev.yml` (not the prod `docker-compose.yml`, which builds an immutable image).
+- **`bun install` complains about the lockfile** — ensure `bun.lock` is in sync: `bun install`.
+- **Docker `web` build fails on `@inlang/sdk` / `NameTooLong`** — Handled in `frontend/Dockerfile` via a `sed` patch on `@inlang/sdk@0.37.0`'s `resolve-modules/import.js` (the SDK is pulled in by `@inlang/paraglide-sveltekit@0.16.1` and emits `data:` URLs that exceed bun's package-name length limit). The patch swaps in a `blob:` URL under `process.versions.bun`. Do not remove the patch block; it will be replaced when paraglide-sveltekit is bumped to `1.0.0` (breaking upgrade, not yet planned).
 
 ---
 
@@ -140,7 +169,7 @@ Key endpoints:
 - `POST /api/share` — Create share link
 - `GET /api/share/:token` — Access shared content
 
-Full OpenAPI docs available at `/api/docs` (Phase 3).
+Full API documentation available in [docs/API.md](docs/API.md).
 
 ---
 

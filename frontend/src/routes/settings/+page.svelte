@@ -1,76 +1,94 @@
 <script lang="ts">
-  import { onMount } from "svelte";
-  import { getProfile, updateProfile, getEmbeddingConfig, updateEmbeddingConfig, deleteAccount } from "$lib/api/settings";
-  import { goto } from "$app/navigation";
-  import * as m from "$lib/paraglide/messages.js";
+import { goto } from "$app/navigation";
+import {
+	deleteAccount,
+	getEmbeddingConfig,
+	getProfile,
+	updateEmbeddingConfig,
+	updateProfile,
+} from "$lib/api/settings";
+import * as m from "$lib/paraglide/messages.js";
+import { onMount } from "svelte";
 
-  let activeTab = $state<"profile" | "embedding" | "appearance" | "danger">("profile");
-  let saveStatus = $state<"idle" | "saving" | "saved" | "error">("idle");
+let activeTab = $state<"profile" | "embedding" | "appearance" | "danger">(
+	"profile",
+);
+let saveStatus = $state<"idle" | "saving" | "saved" | "error">("idle");
 
-  let name = $state("User");
-  let email = $state("user@example.com");
-  let embeddingProvider = $state("ollama");
-  let embeddingModel = $state("nomic-embed-text");
-  let darkMode = $state(false);
-  let deleteConfirm = $state(false);
+let name = $state("User");
+let email = $state("user@example.com");
+let embeddingProvider = $state("ollama");
+let embeddingModel = $state("nomic-embed-text");
+let darkMode = $state(false);
+let deleteConfirm = $state(false);
 
-  onMount(async () => {
-    try {
-      const profile = await getProfile();
-      if (profile.name) name = profile.name;
-      if (profile.email) email = profile.email;
-    } catch {
-      // Use defaults
-    }
+onMount(async () => {
+	try {
+		const profile = await getProfile();
+		if (profile.name) name = profile.name;
+		if (profile.email) email = profile.email;
+	} catch {
+		// Use defaults
+	}
 
-    const config = getEmbeddingConfig();
-    embeddingProvider = config.provider;
-    embeddingModel = config.model;
+	const config = getEmbeddingConfig();
+	embeddingProvider = config.provider;
+	embeddingModel = config.model;
 
-    // Restore dark mode from localStorage
-    const saved = localStorage.getItem("theme");
-    if (saved === "dark" || (!saved && window.matchMedia("(prefers-color-scheme: dark)").matches)) {
-      document.documentElement.classList.add("dark");
-    }
-    darkMode = document.documentElement.classList.contains("dark");
-  });
+	// Restore dark mode from localStorage
+	const saved = localStorage.getItem("theme");
+	if (
+		saved === "dark" ||
+		(!saved && window.matchMedia("(prefers-color-scheme: dark)").matches)
+	) {
+		document.documentElement.classList.add("dark");
+	}
+	darkMode = document.documentElement.classList.contains("dark");
+});
 
-  function toggleDark() {
-    darkMode = !darkMode;
-    document.documentElement.classList.toggle("dark", darkMode);
-    localStorage.setItem("theme", darkMode ? "dark" : "light");
-  }
+function toggleDark() {
+	darkMode = !darkMode;
+	document.documentElement.classList.toggle("dark", darkMode);
+	localStorage.setItem("theme", darkMode ? "dark" : "light");
+}
 
-  async function saveProfile() {
-    saveStatus = "saving";
-    try {
-      await updateProfile({ name, email });
-      saveStatus = "saved";
-      setTimeout(() => { saveStatus = "idle"; }, 2000);
-    } catch {
-      saveStatus = "error";
-    }
-  }
+async function saveProfile() {
+	saveStatus = "saving";
+	try {
+		await updateProfile({ name, email });
+		saveStatus = "saved";
+		setTimeout(() => {
+			saveStatus = "idle";
+		}, 2000);
+	} catch {
+		saveStatus = "error";
+	}
+}
 
-  function saveEmbedding() {
-    saveStatus = "saving";
-    try {
-      updateEmbeddingConfig({ provider: embeddingProvider as "ollama" | "openrouter" | "voyage", model: embeddingModel });
-      saveStatus = "saved";
-      setTimeout(() => { saveStatus = "idle"; }, 2000);
-    } catch {
-      saveStatus = "error";
-    }
-  }
+function saveEmbedding() {
+	saveStatus = "saving";
+	try {
+		updateEmbeddingConfig({
+			provider: embeddingProvider as "ollama" | "openrouter" | "voyage",
+			model: embeddingModel,
+		});
+		saveStatus = "saved";
+		setTimeout(() => {
+			saveStatus = "idle";
+		}, 2000);
+	} catch {
+		saveStatus = "error";
+	}
+}
 
-  async function handleDeleteAccount() {
-    try {
-      await deleteAccount();
-      goto("/login");
-    } catch {
-      alert(m.settings_delete_failed());
-    }
-  }
+async function handleDeleteAccount() {
+	try {
+		await deleteAccount();
+		goto("/login");
+	} catch {
+		alert(m.settings_delete_failed());
+	}
+}
 </script>
 
 <svelte:head>

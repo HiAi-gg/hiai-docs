@@ -1,11 +1,11 @@
 <script lang="ts">
-  import { DropdownMenu as DropdownMenuPrimitive } from "bits-ui";
-  import type { Snippet } from "svelte";
+import { DropdownMenu as DropdownMenuPrimitive } from "bits-ui";
+import type { Snippet } from "svelte";
 
-  let {
-    children,
-    ...restProps
-  }: DropdownMenuPrimitive.RootProps & { children?: Snippet } = $props();
+const {
+	children,
+	...restProps
+}: DropdownMenuPrimitive.RootProps & { children?: Snippet } = $props();
 </script>
 
 <DropdownMenuPrimitive.Root {...restProps}>

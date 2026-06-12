@@ -1,41 +1,52 @@
 <script lang="ts">
-  import { goto } from "$app/navigation";
-  import { Card, CardContent, CardHeader } from "$lib/components/ui/card/index.js";
-  import { Badge } from "$lib/components/ui/badge/index.js";
-  import {
-    DropdownMenu,
-    DropdownMenuTrigger,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuSeparator,
-  } from "$lib/components/ui/dropdown-menu/index.js";
-  import { FileText, MoreVertical, ArrowUpRight, Copy, Trash2, FolderInput } from "lucide-svelte";
-  import { formatRelativeTime } from "$lib/utils.js";
-  import type { Document } from "$lib/types.js";
-  import * as m from "$lib/paraglide/messages.js";
+import { goto } from "$app/navigation";
+import { Badge } from "$lib/components/ui/badge/index.js";
+import {
+	Card,
+	CardContent,
+	CardHeader,
+} from "$lib/components/ui/card/index.js";
+import {
+	DropdownMenu,
+	DropdownMenuContent,
+	DropdownMenuItem,
+	DropdownMenuSeparator,
+	DropdownMenuTrigger,
+} from "$lib/components/ui/dropdown-menu/index.js";
+import * as m from "$lib/paraglide/messages.js";
+import type { Document } from "$lib/types.js";
+import { formatRelativeTime } from "$lib/utils.js";
+import {
+	ArrowUpRight,
+	Copy,
+	FileText,
+	FolderInput,
+	MoreVertical,
+	Trash2,
+} from "lucide-svelte";
 
-  let {
-    document: doc,
-    onDelete,
-    onDuplicate,
-  }: {
-    document: Document;
-    onDelete?: (id: string) => void;
-    onDuplicate?: (id: string) => void;
-  } = $props();
+const {
+	document: doc,
+	onDelete,
+	onDuplicate,
+}: {
+	document: Document;
+	onDelete?: (id: string) => void;
+	onDuplicate?: (id: string) => void;
+} = $props();
 
-  function navigateToDoc() {
-    goto(`/docs/${doc.id}`);
-  }
+function navigateToDoc() {
+	goto(`/docs/${doc.id}`);
+}
 
-  function handleKeydown(e: KeyboardEvent) {
-    if (e.key === "Enter" || e.key === " ") {
-      e.preventDefault();
-      navigateToDoc();
-    }
-  }
+function handleKeydown(e: KeyboardEvent) {
+	if (e.key === "Enter" || e.key === " ") {
+		e.preventDefault();
+		navigateToDoc();
+	}
+}
 
-  let preview = $derived(doc.excerpt || doc.content?.slice(0, 100) || "");
+const preview = $derived(doc.excerpt || doc.content?.slice(0, 100) || "");
 </script>
 
 <Card

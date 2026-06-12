@@ -1,38 +1,43 @@
 <script lang="ts">
-  import { onMount } from "svelte";
-  import { Folder, ChevronRight, Plus } from "lucide-svelte";
-  import { cn } from "$lib/utils";
-  import { listFolders } from "$lib/api/folders";
-  import * as m from "$lib/paraglide/messages.js";
+import { listFolders } from "$lib/api/folders";
+import * as m from "$lib/paraglide/messages.js";
+import { cn } from "$lib/utils";
+import { ChevronRight, Folder, Plus } from "lucide-svelte";
+import { onMount } from "svelte";
 
-  interface FolderItem {
-    id: string;
-    name: string;
-    children?: FolderItem[];
-    open?: boolean;
-  }
+interface FolderItem {
+	id: string;
+	name: string;
+	children?: FolderItem[];
+	open?: boolean;
+}
 
-  let activeId = $state<string | null>(null);
-  let folders = $state<FolderItem[]>([]);
+let activeId = $state<string | null>(null);
+let folders = $state<FolderItem[]>([]);
+let loadError = $state<string | null>(null);
 
-  onMount(async () => {
-    try {
-      const result = await listFolders(null);
-      if (result.length > 0 && result[0].children) {
-        folders = result[0].children as FolderItem[];
-      }
-    } catch (err) {
-      console.error("Failed to load folders:", err);
-    }
-  });
+onMount(async () => {
+	try {
+		const result = await listFolders(null);
+		if (result.length > 0 && result[0].children) {
+			folders = result[0].children as FolderItem[];
+		}
+	} catch (e) {
+		console.error("FolderTree: failed to load folders", e);
+		loadError = "Failed to load folders";
+	}
+});
 
-  function toggle(folder: FolderItem) {
-    folder.open = !folder.open;
-  }
+function toggle(folder: FolderItem) {
+	folder.open = !folder.open;
+}
 </script>
 
 <div class="space-y-1">
   <h3 class="mb-2 px-2 text-xs font-medium uppercase tracking-wider text-muted-foreground">{m.sidebar_folders()}</h3>
+  {#if loadError}
+    <p class="px-2 text-xs text-destructive">{loadError}</p>
+  {/if}
   {#each folders as folder (folder.id)}
     <div>
       <button

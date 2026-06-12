@@ -1,96 +1,123 @@
-<!-- TipexEditor.svelte — TipTap WYSIWYG editor wrapper with toolbar -->
 <script lang="ts">
-  import { onMount, onDestroy } from "svelte";
-  import { createEditor, EditorContent } from "svelte-tiptap";
-  import type { Editor } from "svelte-tiptap";
-  import StarterKit from "@tiptap/starter-kit";
-  import { Markdown } from "@tiptap/markdown";
-  import Link from "@tiptap/extension-link";
-  import Highlight from "@tiptap/extension-highlight";
-  import CodeBlockLowlight from "@tiptap/extension-code-block-lowlight";
-  import { common, createLowlight } from "lowlight";
-  import EditorToolbar from "./EditorToolbar.svelte";
-  import * as m from "$lib/paraglide/messages.js";
+import type { CollaborationSession } from "$lib/collaboration";
+import * as m from "$lib/paraglide/messages.js";
+import CodeBlockLowlight from "@tiptap/extension-code-block-lowlight";
+import Collaboration from "@tiptap/extension-collaboration";
+import CollaborationCursor from "@tiptap/extension-collaboration-cursor";
+import Highlight from "@tiptap/extension-highlight";
+import Link from "@tiptap/extension-link";
+import { Markdown } from "@tiptap/markdown";
+import StarterKit from "@tiptap/starter-kit";
+import { common, createLowlight } from "lowlight";
+import { onDestroy, onMount } from "svelte";
+import { EditorContent, createEditor } from "svelte-tiptap";
+import type { Editor } from "svelte-tiptap";
+import EditorToolbar from "./EditorToolbar.svelte";
 
-  let {
-    content = "",
-    placeholder = m.doc_content_placeholder(),
-    onUpdate = (_md: string) => {},
-    editable = true,
-  }: {
-    content?: string;
-    placeholder?: string;
-    onUpdate?: (markdown: string) => void;
-    editable?: boolean;
-  } = $props();
+const {
+	content = "",
+	placeholder = m.doc_content_placeholder(),
+	onUpdate = (_md: string) => {},
+	editable = true,
+	collaboration = null,
+}: {
+	content?: string;
+	placeholder?: string;
+	onUpdate?: (markdown: string) => void;
+	editable?: boolean;
+	collaboration?: CollaborationSession | null;
+} = $props();
 
-  const lowlight = createLowlight(common);
+const lowlight = createLowlight(common);
 
-  let editorStore: ReturnType<typeof createEditor> | null = null;
-  let editor = $state<Editor | null>(null);
-  let ready = $state(false);
-  let suppressNextUpdate = false;
+let editorStore: ReturnType<typeof createEditor> | null = null;
+let editor = $state<Editor | null>(null);
+let ready = $state(false);
+let suppressNextUpdate = false;
 
-  onMount(() => {
-    editorStore = createEditor({
-      extensions: [
-        StarterKit.configure({
-          heading: { levels: [1, 2, 3] },
-          codeBlock: false,
-        }),
-        Markdown.configure({}),
-        Link.configure({
-          openOnClick: false,
-          HTMLAttributes: { class: "doc-link" },
-        }),
-        Highlight,
-        CodeBlockLowlight.configure({ lowlight }),
-      ],
-      content,
-      editable,
-      editorProps: {
-        attributes: {
-          "aria-label": m.editor_content_label(),
-          "aria-multiline": "true",
-          role: "textbox",
-          class: "tiptap-editor",
-        },
-      },
-      onUpdate: ({ editor: ed }) => {
-        if (suppressNextUpdate) {
-          suppressNextUpdate = false;
-          return;
-        }
-        const mdExtension = ed.storage.markdown as { getMarkdown?: () => string } | undefined;
-        const md = mdExtension?.getMarkdown?.() ?? ed.getText();
-        onUpdate(md);
-      },
-    });
+onMount(() => {
+	const extensions = [
+		StarterKit.configure({
+			heading: { levels: [1, 2, 3] },
+			codeBlock: false,
+			link: false,
+		}),
+		Markdown.configure({}),
+		Link.configure({
+			openOnClick: false,
+			HTMLAttributes: { class: "doc-link" },
+		}),
+		Highlight.configure({ multicolor: true }),
+		CodeBlockLowlight.configure({ lowlight }),
+	];
 
-    const unsubscribe = editorStore.subscribe((ed) => {
-      editor = ed;
-      if (ed && !ready) {
-        ready = true;
-      }
-    });
+	if (collaboration?.doc) {
+		extensions.push(
+			Collaboration.configure({
+				document: collaboration.doc,
+			}) as unknown as (typeof extensions)[number],
+			CollaborationCursor.configure({
+				provider: collaboration.provider,
+				user: {
+					name: "Anonymous",
+					color: `#${Math.floor(Math.random() * 16777215)
+						.toString(16)
+						.padStart(6, "0")}`,
+				},
+			}) as unknown as (typeof extensions)[number],
+		);
+	}
 
-    return () => unsubscribe();
-  });
+	editorStore = createEditor({
+		extensions,
+		content: collaboration?.doc ? undefined : content,
+		editable,
+		editorProps: {
+			attributes: {
+				"aria-label": m.editor_content_label(),
+				"aria-multiline": "true",
+				role: "textbox",
+				class: "tiptap-editor",
+			},
+		},
+		onUpdate: ({ editor: ed }) => {
+			if (suppressNextUpdate) {
+				suppressNextUpdate = false;
+				return;
+			}
+			if (!collaboration) {
+				const mdExtension = ed.storage.markdown as
+					| { getMarkdown?: () => string }
+					| undefined;
+				const md = mdExtension?.getMarkdown?.() ?? ed.getText();
+				onUpdate(md);
+			}
+		},
+	});
 
-  // Sync external content changes into the editor
-  let prevContent = $state("");
-  $effect(() => {
-    if (!editor) return;
-    if (content !== prevContent) {
-      prevContent = content;
-      suppressNextUpdate = true;
-      editor.commands.setContent(content, { emitUpdate: false });
-    }
-  });
+	const unsubscribe = editorStore.subscribe((ed) => {
+		editor = ed;
+		if (ed && !ready) {
+			ready = true;
+		}
+	});
 
-  onDestroy(() => {
-    editor?.destroy?.();
-  });
+	return () => unsubscribe();
+});
+
+let prevContent = $state("");
+$effect(() => {
+	if (!editor || collaboration?.doc) return;
+	if (content !== prevContent) {
+		prevContent = content;
+		suppressNextUpdate = true;
+		editor.commands.setContent(content, { emitUpdate: false });
+	}
+});
+
+onDestroy(() => {
+	editor?.destroy?.();
+});
 </script>
 
 <div class="tipex-wrapper">
@@ -270,7 +297,9 @@
   }
 
   .editor-content :global(.tiptap mark) {
-    background-color: #fde68a;
+    /* Inline `style="background-color: ..."` set by TipTap (multicolor mode)
+       wins via specificity; this is the fallback for marks without a color. */
+    background-color: var(--highlight-default, #fde68a);
     border-radius: 2px;
     padding: 0 2px;
   }

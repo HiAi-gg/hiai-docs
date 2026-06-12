@@ -136,6 +136,13 @@ Hybrid search: `0.4 * full_text + 0.6 * semantic_cosine` (configurable weights)
 }
 ```
 
+### Dev Quirks & Known Workarounds
+
+These are non-obvious project decisions pinned in `package.json` / Dockerfiles. Do not "clean up" without first understanding the constraint.
+
+- **`@sinclair/typebox@^0.34.0` (root devDependency)** — Forces a single Typebox version across the workspace to resolve a peer-dep conflict with Elysia 1.4.28. Required for `bun install` to succeed; do not remove.
+- **`bun test --path-ignore-patterns='*node_modules*'`** — Bun 1.3's smart test discovery walks into hoisted `node_modules` and tries to run upstream library tests, which fail on missing fixtures. The path-ignore flag scopes test discovery to our own `src/` and `tests/` directories. Keep this flag on every `test` script.
+
 ### Svelte Rules
 
 - Svelte 5 runes enforced globally (`runes: true`)

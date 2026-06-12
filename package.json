@@ -25,10 +25,12 @@
     "docker:up": "docker compose up -d",
     "docker:down": "docker compose down",
     "docker:dev": "docker compose -f docker-compose.dev.yml up -d",
+    "stop": "docker compose -f docker-compose.dev.yml down",
     "setup": "bun install && bun run docker:dev && bun run db:push",
     "export:openapi": "bun run scripts/export-openapi.ts"
   },
   "devDependencies": {
+    "@sinclair/typebox": "^0.34.0",
     "pino-pretty": "^13.1.3"
   }
 }

@@ -19,12 +19,19 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    networks:
+      - hiai-docs-net
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: "2"
 
   redis:
     image: redis:8-alpine
     restart: unless-stopped
     ports:
-      - "6380:6379"
+      - "${REDIS_PORT:-6384}:6379"
     volumes:
       - redis_data:/data
     healthcheck:
@@ -32,21 +39,43 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    networks:
+      - hiai-docs-net
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: "0.5"
 
   ollama:
     image: ollama/ollama
     restart: unless-stopped
+    # 11435 host: avoids conflict with primary Ollama on 11434
     ports:
-      - "11434:11434"
+      - "11435:11434"
     volumes:
       - ollama_data:/root/.ollama
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    networks:
+      - hiai-docs-net
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: "2"
 
   minio:
     image: minio/minio
     restart: unless-stopped
+    # 9021 host: avoids conflict with webs-minio (9001) and ai-shared-minio (9011)
     ports:
       - "9000:9000"
-      - "9001:9001"
+      - "9021:9001"
     volumes:
       - minio_data:/data
     command: server /data --console-address ":9001"
@@ -58,11 +87,18 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    networks:
+      - hiai-docs-net
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: "0.5"
 
   api:
     build:
       context: .
-      dockerfile: backend/Dockerfile
+      dockerfile: Dockerfile.backend
     restart: unless-stopped
     ports:
       - "${API_PORT:-50700}:50700"
@@ -72,7 +108,9 @@ services:
       redis:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:50700/api/health"]
+      # $$ escapes compose interpolation so API_PORT is resolved at runtime
+      # inside the container (not baked in at compose-parse time).
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:$${API_PORT}/api/health || exit 1"]
       interval: 15s
       timeout: 5s
       retries: 3
@@ -87,15 +125,23 @@ services:
       MINIO_BUCKET: ${MINIO_BUCKET:-hiai-docs}
       BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET}
       BETTER_AUTH_URL: ${BETTER_AUTH_URL:-http://localhost:50700}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:50701,http://127.0.0.1:50701}
       EMBEDDING_PROVIDER: ${EMBEDDING_PROVIDER:-ollama}
       EMBEDDING_MODEL: ${EMBEDDING_MODEL:-nomic-embed-text}
       EMBEDDING_OLLAMA_URL: http://ollama:11434
       EMBEDDING_FALLBACK_PROVIDER: ${EMBEDDING_FALLBACK_PROVIDER:-openrouter}
       EMBEDDING_FALLBACK_MODEL: ${EMBEDDING_FALLBACK_MODEL:-openai/text-embedding-3-small}
       OPENROUTER_API_KEY: ${OPENROUTER_API_KEY}
-      API_PORT: 50700
+      API_PORT: ${API_PORT:-50700}
       NODE_ENV: production
       LOG_LEVEL: ${LOG_LEVEL:-info}
+    networks:
+      - hiai-docs-net
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: "1"
 
   web:
     build:
@@ -108,21 +154,32 @@ services:
       api:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:50701/"]
+      # $$ escapes compose interpolation so WEB_PORT is resolved at runtime
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:$${WEB_PORT}/ || exit 1"]
       interval: 15s
       timeout: 5s
       retries: 3
       start_period: 10s
     environment:
-      API_URL: http://api:50700
-      WEB_PORT: 50701
+      API_URL: http://api:${API_PORT:-50700}
+      PORT: ${WEB_PORT:-50701}
+      WEB_PORT: ${WEB_PORT:-50701}
+    networks:
+      - hiai-docs-net
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: "1"
 
   caddy:
     image: caddy:2-alpine
     restart: unless-stopped
+    profiles:
+      - caddy
     ports:
-      - "80:80"
-      - "443:443"
+      - "50708:80"
+      - "50709:443"
     depends_on:
       api:
         condition: service_healthy
@@ -132,6 +189,17 @@ services:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
       - caddy_config:/config
+    networks:
+      - hiai-docs-net
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: "0.5"
+
+networks:
+  hiai-docs-net:
+    driver: bridge
 
 volumes:
   pgdata:

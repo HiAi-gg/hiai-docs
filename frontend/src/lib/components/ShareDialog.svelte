@@ -1,71 +1,77 @@
 <script lang="ts">
-  import { createShareLink } from "$lib/api/share";
-  import * as m from "$lib/paraglide/messages.js";
+import { createShareLink } from "$lib/api/share";
+import * as m from "$lib/paraglide/messages.js";
 
-  let { open = $bindable(false), documentId = "", documentTitle = "" }: {
-    open?: boolean;
-    documentId?: string;
-    documentTitle?: string;
-  } = $props();
+let {
+	open = $bindable(false),
+	documentId = "",
+	documentTitle = "",
+}: {
+	open?: boolean;
+	documentId?: string;
+	documentTitle?: string;
+} = $props();
 
-  let usePassword = $state(false);
-  let password = $state("");
-  let expiresIn = $state<"1h" | "1d" | "7d" | "30d" | "never">("7d");
-  let guestEmail = $state("");
-  let guestEmails = $state<string[]>([]);
-  let shareUrl = $state("");
-  let copied = $state(false);
-  let creating = $state(false);
-  let error = $state("");
+let usePassword = $state(false);
+let password = $state("");
+let expiresIn = $state<"1h" | "1d" | "7d" | "30d" | "never">("7d");
+let guestEmail = $state("");
+let guestEmails = $state<string[]>([]);
+let shareUrl = $state("");
+let copied = $state(false);
+let creating = $state(false);
+let error = $state("");
 
-  function addGuest() {
-    const email = guestEmail.trim();
-    if (email && email.includes("@") && !guestEmails.includes(email)) {
-      guestEmails = [...guestEmails, email];
-      guestEmail = "";
-    }
-  }
+function addGuest() {
+	const email = guestEmail.trim();
+	if (email?.includes("@") && !guestEmails.includes(email)) {
+		guestEmails = [...guestEmails, email];
+		guestEmail = "";
+	}
+}
 
-  function removeGuest(email: string) {
-    guestEmails = guestEmails.filter((e) => e !== email);
-  }
+function removeGuest(email: string) {
+	guestEmails = guestEmails.filter((e) => e !== email);
+}
 
-  async function createLink() {
-    creating = true;
-    error = "";
-    try {
-      const result = await createShareLink({
-        documentId: documentId || undefined,
-        password: usePassword ? password : undefined,
-        expiresIn,
-        guestEmails: guestEmails.length > 0 ? guestEmails : undefined,
-      });
-      shareUrl = `${window.location.origin}/s/${result.token}`;
-    } catch (e) {
-      // Fallback: generate local mock token
-      shareUrl = `${window.location.origin}/s/${Math.random().toString(36).slice(2, 8)}`;
-    } finally {
-      creating = false;
-    }
-  }
+async function createLink() {
+	creating = true;
+	error = "";
+	try {
+		const result = await createShareLink({
+			documentId: documentId || undefined,
+			password: usePassword ? password : undefined,
+			expiresIn,
+			guestEmails: guestEmails.length > 0 ? guestEmails : undefined,
+		});
+		shareUrl = `${window.location.origin}/s/${result.token}`;
+	} catch (e) {
+		error = e instanceof Error ? e.message : "Failed to create share link";
+		console.error("ShareDialog: createShareLink failed", e);
+	} finally {
+		creating = false;
+	}
+}
 
-  async function copyLink() {
-    if (shareUrl) {
-      await navigator.clipboard.writeText(shareUrl);
-      copied = true;
-      setTimeout(() => { copied = false; }, 2000);
-    }
-  }
+async function copyLink() {
+	if (shareUrl) {
+		await navigator.clipboard.writeText(shareUrl);
+		copied = true;
+		setTimeout(() => {
+			copied = false;
+		}, 2000);
+	}
+}
 
-  function close() {
-    open = false;
-    shareUrl = "";
-    usePassword = false;
-    password = "";
-    expiresIn = "7d";
-    guestEmails = [];
-    error = "";
-  }
+function close() {
+	open = false;
+	shareUrl = "";
+	usePassword = false;
+	password = "";
+	expiresIn = "7d";
+	guestEmails = [];
+	error = "";
+}
 </script>
 
 {#if open}

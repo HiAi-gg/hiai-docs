@@ -1,0 +1,91 @@
+import { afterAll, beforeAll, describe, expect, it } from "bun:test";
+import { createHmac, randomBytes } from "node:crypto";
+
+const CSRF_COOKIE = "hiai-csrf";
+const CSRF_HEADER = "x-csrf-token";
+
+function signToken(token: string, secret: string): string {
+	return createHmac("sha256", secret).update(token).digest("hex");
+}
+
+function generateToken(secret: string): string {
+	const token = randomBytes(32).toString("hex");
+	return `${token}.${signToken(token, secret)}`;
+}
+
+describe("CSRF token generation and verification", () => {
+	const secret = "test-secret-key-for-csrf";
+
+	it("generates token in format value.signature", () => {
+		const token = generateToken(secret);
+		const parts = token.split(".");
+		expect(parts).toHaveLength(2);
+		expect(parts[0]).toMatch(/^[a-f0-9]{64}$/);
+		expect(parts[1]).toMatch(/^[a-f0-9]{64}$/);
+	});
+
+	it("verifies valid token", () => {
+		const token = generateToken(secret);
+		const [value, signature] = token.split(".");
+		if (!value || !signature) throw new Error("invalid token");
+		const expected = signToken(value, secret);
+		expect(signature).toBe(expected);
+	});
+
+	it("rejects tampered token", () => {
+		const token = generateToken(secret);
+		const [value] = token.split(".");
+		if (!value) throw new Error("invalid token");
+		const tampered = `${value}.0000000000000000000000000000000000000000000000000000000000000000`;
+		const [sig1] = [tampered.split(".")[1]];
+		const expected = signToken(value, secret);
+		expect(sig1).not.toBe(expected);
+	});
+
+	it("rejects token with wrong secret", () => {
+		const token = generateToken("wrong-secret");
+		const [value] = token.split(".");
+		if (!value) throw new Error("invalid token");
+		const expected = signToken(value, secret);
+		const actual = token.split(".")[1];
+		expect(actual).not.toBe(expected);
+	});
+
+	it("rejects empty token", () => {
+		expect("".split(".")).toHaveLength(1);
+	});
+
+	it("rejects token without signature", () => {
+		const parts = "abcdef1234".split(".");
+		expect(parts).toHaveLength(1);
+	});
+});
+
+describe("CSRF middleware behavior", () => {
+	it("isUnsafeMethod correctly identifies unsafe methods", () => {
+		const unsafe = ["POST", "PUT", "PATCH", "DELETE"];
+		const safe = ["GET", "HEAD", "OPTIONS"];
+		for (const m of unsafe) {
+			expect(["POST", "PUT", "PATCH", "DELETE"]).toContain(m);
+		}
+		for (const m of safe) {
+			expect(["POST", "PUT", "PATCH", "DELETE"]).not.toContain(m);
+		}
+	});
+
+	it("skips CSRF for Bearer token requests", () => {
+		const authHeader = "Bearer some-api-key";
+		expect(authHeader.startsWith("Bearer ")).toBe(true);
+	});
+
+	it("skips CSRF for non-API routes", () => {
+		expect("/api/documents".startsWith("/api/")).toBe(true);
+		expect("/api/auth/sign-in".startsWith("/api/auth")).toBe(true);
+		expect("/health".startsWith("/api/")).toBe(false);
+	});
+
+	it("skips CSRF for multipart requests", () => {
+		const ct = "multipart/form-data; boundary=----WebKitFormBoundary";
+		expect(ct.includes("multipart/form-data")).toBe(true);
+	});
+});

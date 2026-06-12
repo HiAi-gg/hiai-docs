@@ -1,33 +1,33 @@
 <!-- MarkdownToggle.svelte — Raw Markdown editing view -->
 <script lang="ts">
-	import * as m from "$lib/paraglide/messages.js";
+import * as m from "$lib/paraglide/messages.js";
 
-	let {
-		content = '',
-		onUpdate = (_md: string) => {}
-	}: {
-		content?: string;
-		onUpdate?: (markdown: string) => void;
-	} = $props();
+const {
+	content = "",
+	onUpdate = (_md: string) => {},
+}: {
+	content?: string;
+	onUpdate?: (markdown: string) => void;
+} = $props();
 
-	let textarea = $state<HTMLTextAreaElement | null>(null);
+let textarea = $state<HTMLTextAreaElement | null>(null);
 
-	function handleInput(e: Event) {
+function handleInput(e: Event) {
+	const target = e.target as HTMLTextAreaElement;
+	onUpdate(target.value);
+}
+
+function handleKeydown(e: KeyboardEvent) {
+	if (e.key === "Tab") {
+		e.preventDefault();
 		const target = e.target as HTMLTextAreaElement;
+		const start = target.selectionStart;
+		const end = target.selectionEnd;
+		target.value = `${target.value.substring(0, start)}\t${target.value.substring(end)}`;
+		target.selectionStart = target.selectionEnd = start + 1;
 		onUpdate(target.value);
 	}
-
-	function handleKeydown(e: KeyboardEvent) {
-		if (e.key === 'Tab') {
-			e.preventDefault();
-			const target = e.target as HTMLTextAreaElement;
-			const start = target.selectionStart;
-			const end = target.selectionEnd;
-			target.value = target.value.substring(0, start) + '\t' + target.value.substring(end);
-			target.selectionStart = target.selectionEnd = start + 1;
-			onUpdate(target.value);
-		}
-	}
+}
 </script>
 
 <div class="markdown-toggle">

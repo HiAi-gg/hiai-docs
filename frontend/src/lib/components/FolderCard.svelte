@@ -1,38 +1,44 @@
 <script lang="ts">
-  import { goto } from "$app/navigation";
-  import { Card, CardContent } from "$lib/components/ui/card/index.js";
-  import {
-    DropdownMenu,
-    DropdownMenuTrigger,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuSeparator,
-  } from "$lib/components/ui/dropdown-menu/index.js";
-  import { Folder, MoreVertical, Pencil, FolderInput, Trash2 } from "lucide-svelte";
-  import { formatRelativeTime } from "$lib/utils.js";
-  import type { Folder as FolderType } from "$lib/types.js";
-  import * as m from "$lib/paraglide/messages.js";
+import { goto } from "$app/navigation";
+import { Card, CardContent } from "$lib/components/ui/card/index.js";
+import {
+	DropdownMenu,
+	DropdownMenuContent,
+	DropdownMenuItem,
+	DropdownMenuSeparator,
+	DropdownMenuTrigger,
+} from "$lib/components/ui/dropdown-menu/index.js";
+import * as m from "$lib/paraglide/messages.js";
+import type { Folder as FolderType } from "$lib/types.js";
+import { formatRelativeTime } from "$lib/utils.js";
+import {
+	Folder,
+	FolderInput,
+	MoreVertical,
+	Pencil,
+	Trash2,
+} from "lucide-svelte";
 
-  let {
-    folder,
-    onDelete,
-    onRename,
-  }: {
-    folder: FolderType;
-    onDelete?: (id: string) => void;
-    onRename?: (id: string) => void;
-  } = $props();
+const {
+	folder,
+	onDelete,
+	onRename,
+}: {
+	folder: FolderType;
+	onDelete?: (id: string) => void;
+	onRename?: (id: string) => void;
+} = $props();
 
-  function navigateToFolder() {
-    goto(`/folders/${folder.id}`);
-  }
+function navigateToFolder() {
+	goto(`/folders/${folder.id}`);
+}
 
-  function handleKeydown(e: KeyboardEvent) {
-    if (e.key === "Enter" || e.key === " ") {
-      e.preventDefault();
-      navigateToFolder();
-    }
-  }
+function handleKeydown(e: KeyboardEvent) {
+	if (e.key === "Enter" || e.key === " ") {
+		e.preventDefault();
+		navigateToFolder();
+	}
+}
 </script>
 
 <Card

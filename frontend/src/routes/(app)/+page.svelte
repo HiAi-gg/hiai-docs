@@ -1,57 +1,96 @@
 <script lang="ts">
-  import { onMount } from "svelte";
-  import { FileText, Plus, Clock, Tag } from "lucide-svelte";
-  import SearchBar from "$lib/components/SearchBar.svelte";
-  import Sidebar from "$lib/components/sidebar/Sidebar.svelte";
-  import { listDocuments, type Document } from "$lib/api/documents";
-  import * as m from "$lib/paraglide/messages.js";
+import { goto } from "$app/navigation";
+import {
+	type Document,
+	createDocument,
+	importDocument,
+	listDocuments,
+} from "$lib/api/documents";
+import SearchBar from "$lib/components/SearchBar.svelte";
+import * as m from "$lib/paraglide/messages.js";
+import { Clock, FileText, Plus, Tag, Upload } from "lucide-svelte";
+import { onMount } from "svelte";
 
-  let recentDocs = $state<Document[]>([]);
-  let loading = $state(true);
-  let error = $state<string | null>(null);
+let recentDocs = $state<Document[]>([]);
+let loading = $state(true);
+let error = $state<string | null>(null);
+let importInput = $state<HTMLInputElement | undefined>(undefined);
 
-  onMount(async () => {
-    try {
-      const res = await listDocuments({ limit: 5 });
-      recentDocs = res.items;
-    } catch (err) {
-      error = err instanceof Error ? err.message : m.doc_load_error();
-    } finally {
-      loading = false;
-    }
-  });
+onMount(async () => {
+	try {
+		const res = await listDocuments({ limit: 5 });
+		recentDocs = res.items;
+	} catch (err) {
+		error = err instanceof Error ? err.message : m.doc_load_error();
+	} finally {
+		loading = false;
+	}
+});
 
-  function relativeTime(iso: string): string {
-    const diff = Date.now() - new Date(iso).getTime();
-    const mins = Math.floor(diff / 60000);
-    if (mins < 60) return m.time_minutes_ago({ count: mins });
-    const hrs = Math.floor(mins / 60);
-    if (hrs < 24) return m.time_hours_ago({ count: hrs });
-    return m.time_days_ago({ count: Math.floor(hrs / 24) });
-  }
+function triggerImport() {
+	importInput?.click();
+}
 
-  const hasDocs = $derived(recentDocs.length > 0);
+async function handleNewDocument() {
+	try {
+		const doc = await createDocument({
+			title: "Untitled Document",
+			content: "",
+		});
+		goto(`/docs/${doc.id}`);
+	} catch (err) {
+		error = err instanceof Error ? err.message : "Failed to create document";
+	}
+}
+
+async function handleImportFile(e: Event) {
+	const input = e.target as HTMLInputElement;
+	const file = input.files?.[0];
+	if (!file) return;
+	try {
+		await importDocument(file);
+		const res = await listDocuments({ limit: 5 });
+		recentDocs = res.items;
+	} catch (err) {
+		error = err instanceof Error ? err.message : "Import failed";
+	}
+	input.value = "";
+}
+
+function relativeTime(iso: string): string {
+	const diff = Date.now() - new Date(iso).getTime();
+	const mins = Math.floor(diff / 60000);
+	if (mins < 60) return m.time_minutes_ago({ count: mins });
+	const hrs = Math.floor(mins / 60);
+	if (hrs < 24) return m.time_hours_ago({ count: hrs });
+	return m.time_days_ago({ count: Math.floor(hrs / 24) });
+}
+
+const hasDocs = $derived(recentDocs.length > 0);
 </script>
 
 <svelte:head>
   <title>{m.dashboard_page_title()}</title>
 </svelte:head>
 
-<div class="flex h-screen">
-  <Sidebar />
-
-  <main class="flex-1 overflow-y-auto">
-    <div class="mx-auto max-w-5xl px-6 py-8">
+<div class="mx-auto max-w-5xl px-6 py-8">
       <!-- Header -->
       <div class="mb-8 flex items-center justify-between">
         <div>
           <h1 class="text-2xl font-semibold tracking-tight">{m.dashboard_title()}</h1>
           <p class="text-sm text-muted-foreground">{m.dashboard_subtitle()}</p>
         </div>
-        <button class="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow transition-colors hover:bg-primary/90">
-          <Plus class="size-4" />
-          {m.dashboard_new_document()}
-        </button>
+        <div class="flex items-center gap-2">
+          <input type="file" accept=".md,.txt,.json,.markdown" class="hidden" bind:this={importInput} onchange={handleImportFile} />
+          <button onclick={triggerImport} class="inline-flex items-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-medium text-muted-foreground shadow-sm transition-colors hover:bg-accent hover:text-accent-foreground">
+            <Upload class="size-4" />
+            Import
+          </button>
+          <button onclick={handleNewDocument} class="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow transition-colors hover:bg-primary/90">
+            <Plus class="size-4" />
+            {m.dashboard_new_document()}
+          </button>
+        </div>
       </div>
 
       <!-- Search -->
@@ -76,7 +115,7 @@
           <h2 class="mb-2 text-lg font-semibold">{m.dashboard_error_title()}</h2>
           <p class="mb-6 max-w-sm text-sm text-muted-foreground">{error}</p>
           <button
-            onclick={() => { loading = true; error = null; onMount(async () => { try { const res = await listDocuments({ limit: 5 }); recentDocs = res.items; } catch (e) { error = e instanceof Error ? e.message : m.doc_load_error(); } finally { loading = false; } }); }}
+            onclick={async () => { loading = true; error = null; try { const res = await listDocuments({ limit: 5 }); recentDocs = res.items; } catch (e) { error = e instanceof Error ? e.message : m.doc_load_error(); } finally { loading = false; } }}
             class="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow transition-colors hover:bg-primary/90"
           >
             {m.dashboard_error_retry()}
@@ -125,12 +164,10 @@
           <p class="mb-6 max-w-sm text-sm text-muted-foreground">
             {m.dashboard_empty_description()}
           </p>
-          <button class="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow transition-colors hover:bg-primary/90">
+          <button onclick={handleNewDocument} class="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow transition-colors hover:bg-primary/90">
             <Plus class="size-4" />
             {m.dashboard_new_document()}
           </button>
         </div>
       {/if}
     </div>
-  </main>
-</div>
