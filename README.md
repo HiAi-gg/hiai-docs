@@ -81,7 +81,7 @@ The frontend dev server is pinned to port 50701 in `frontend/vite.config.ts` wit
 - **Port 50701 already in use** — `docker compose down` to stop stale containers, then retry `bun run dev` or `bun run docker:dev`.
 - **Changes not showing up** — `bun run dev` already wires HMR. If running via Docker, confirm the bind mount is in `docker-compose.dev.yml` (not the prod `docker-compose.yml`, which builds an immutable image).
 - **`bun install` complains about the lockfile** — ensure `bun.lock` is in sync: `bun install`.
-- **Docker `web` build fails on `@inlang/sdk` / `NameTooLong`** — Handled in `frontend/Dockerfile` via a `sed` patch on `@inlang/sdk@0.37.0`'s `resolve-modules/import.js` (the SDK is pulled in by `@inlang/paraglide-sveltekit@0.16.1` and emits `data:` URLs that exceed bun's package-name length limit). The patch swaps in a `blob:` URL under `process.versions.bun`. Do not remove the patch block; it will be replaced when paraglide-sveltekit is bumped to `1.0.0` (breaking upgrade, not yet planned).
+- **Docker `web` build works without paraglide patches** — As of `@inlang/paraglide-js@2.x`, the `@inlang/sdk@2.x` rewrite no longer emits the `data:` URLs that triggered Bun's `NameTooLong` error. The old `sed` patch on `frontend/Dockerfile` was removed. i18n is now driven by `@inlang/paraglide-js@2.x` directly (the SvelteKit adapter is deprecated) via `paraglideVitePlugin` in `vite.config.ts` and `paraglideMiddleware` in `src/hooks.server.ts`.
 
 ---
 

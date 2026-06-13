@@ -1,4 +1,19 @@
-import { i18n } from "$lib/i18n";
+import type { Handle } from "@sveltejs/kit";
+import { getTextDirection } from "$lib/paraglide/runtime";
+import { paraglideMiddleware } from "$lib/paraglide/server";
 
-export const reroute = i18n.reroute();
-export const handle = i18n.handle();
+const paraglideHandle: Handle = ({ event, resolve }) =>
+	paraglideMiddleware(
+		event.request,
+		({ request: localizedRequest, locale }) => {
+			event.request = localizedRequest;
+			return resolve(event, {
+				transformPageChunk: ({ html }) =>
+					html
+						.replace("%lang%", locale)
+						.replace("%dir%", getTextDirection(locale)),
+			});
+		},
+	);
+
+export const handle: Handle = paraglideHandle;

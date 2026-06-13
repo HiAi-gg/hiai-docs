@@ -1,14 +1,12 @@
 <script lang="ts">
 import { goto } from "$app/navigation";
-import { type SearchResponse, getFilterOptions, search } from "$lib/api/search";
-import SearchResult from "$lib/components/SearchResult.svelte";
-import { Badge } from "$lib/components/ui/badge";
 import * as m from "$lib/paraglide/messages.js";
+import SearchResult from "$lib/components/SearchResult.svelte";
+import { getFilterOptions, type SearchResponse, search } from "$lib/api/search";
 import {
 	Calendar,
 	ChevronLeft,
 	ChevronRight,
-	FileSearch,
 	Folder,
 	Loader2,
 	RotateCcw,

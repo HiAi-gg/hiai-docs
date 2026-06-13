@@ -1,4 +1,5 @@
 <script lang="ts">
+import { onMount } from "svelte";
 import { goto } from "$app/navigation";
 import {
 	deleteAccount,
@@ -8,7 +9,6 @@ import {
 	updateProfile,
 } from "$lib/api/settings";
 import * as m from "$lib/paraglide/messages.js";
-import { onMount } from "svelte";
 
 let activeTab = $state<"profile" | "embedding" | "appearance" | "danger">(
 	"profile",

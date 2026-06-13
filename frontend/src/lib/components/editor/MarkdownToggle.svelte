@@ -1,7 +1,5 @@
 <!-- MarkdownToggle.svelte — Raw Markdown editing view -->
 <script lang="ts">
-import * as m from "$lib/paraglide/messages.js";
-
 const {
 	content = "",
 	onUpdate = (_md: string) => {},

@@ -1,9 +1,6 @@
 <script lang="ts">
-import { type Document, listDocuments } from "$lib/api/documents";
-import * as m from "$lib/paraglide/messages.js";
-import { cn } from "$lib/utils";
-import { FileText } from "lucide-svelte";
 import { onMount } from "svelte";
+import { type Document, listDocuments } from "$lib/api/documents";
 
 let recentDocs = $state<Document[]>([]);
 let activeId = $state<string | null>(null);

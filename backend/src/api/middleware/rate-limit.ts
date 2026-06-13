@@ -1,5 +1,3 @@
-import { Elysia } from "elysia";
-import { logger } from "../../lib/logger";
 import { redis } from "../../lib/redis";
 
 interface RateLimitConfig {
@@ -8,7 +6,7 @@ interface RateLimitConfig {
 	keyPrefix: string;
 }
 
-function getClientIp(request: Request): string {
+function _getClientIp(request: Request): string {
 	return (
 		request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
 		request.headers.get("x-real-ip") ??

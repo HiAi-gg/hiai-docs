@@ -1,6 +1,4 @@
 <script lang="ts">
-import type { CollaborationSession } from "$lib/collaboration";
-import * as m from "$lib/paraglide/messages.js";
 import CodeBlockLowlight from "@tiptap/extension-code-block-lowlight";
 import Collaboration from "@tiptap/extension-collaboration";
 import CollaborationCursor from "@tiptap/extension-collaboration-cursor";
@@ -10,9 +8,10 @@ import { Markdown } from "@tiptap/markdown";
 import StarterKit from "@tiptap/starter-kit";
 import { common, createLowlight } from "lowlight";
 import { onDestroy, onMount } from "svelte";
-import { EditorContent, createEditor } from "svelte-tiptap";
 import type { Editor } from "svelte-tiptap";
-import EditorToolbar from "./EditorToolbar.svelte";
+import { createEditor } from "svelte-tiptap";
+import type { CollaborationSession } from "$lib/collaboration";
+import * as m from "$lib/paraglide/messages.js";
 
 const {
 	content = "",

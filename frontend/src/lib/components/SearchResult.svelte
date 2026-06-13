@@ -1,6 +1,4 @@
 <script lang="ts">
-import { Calendar, Folder, Tag } from "lucide-svelte";
-
 interface Props {
 	id: string;
 	title: string;
@@ -39,11 +37,11 @@ function highlightText(text: string, q: string): string {
 	return safe.replace(new RegExp(`(${escapedQuery})`, "gi"), "<mark>$1</mark>");
 }
 
-const highlightedSnippet = $derived(highlightText(snippet, query));
+const _highlightedSnippet = $derived(highlightText(snippet, query));
 
 const scorePercent = $derived(Math.round(score * 100));
 
-const scoreColor = $derived(
+const _scoreColor = $derived(
 	scorePercent >= 90
 		? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300"
 		: scorePercent >= 75
@@ -51,7 +49,7 @@ const scoreColor = $derived(
 			: "bg-muted text-muted-foreground",
 );
 
-const formattedDate = $derived(
+const _formattedDate = $derived(
 	new Date(createdAt).toLocaleDateString("en-US", {
 		year: "numeric",
 		month: "short",

@@ -1,6 +1,5 @@
 <!-- EditorToolbar.svelte — Formatting toolbar for TipTap editor -->
 <script lang="ts">
-import * as m from "$lib/paraglide/messages.js";
 import type { Editor } from "@tiptap/core";
 import {
 	Bold,
@@ -8,13 +7,12 @@ import {
 	Heading1,
 	Heading2,
 	Heading3,
-	Highlighter,
 	Italic,
 	Link as LinkIcon,
 	List,
 	ListOrdered,
 } from "lucide-svelte";
-import LinkDialog from "./LinkDialog.svelte";
+import * as m from "$lib/paraglide/messages.js";
 
 const {
 	editor = null,

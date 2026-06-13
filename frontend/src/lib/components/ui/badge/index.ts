@@ -1,4 +1,4 @@
-import { type VariantProps, tv } from "tailwind-variants";
+import { tv, type VariantProps } from "tailwind-variants";
 import Root from "./badge.svelte";
 
 const badgeVariants = tv({
@@ -20,4 +20,4 @@ const badgeVariants = tv({
 type Variant = VariantProps<typeof badgeVariants>["variant"];
 
 export type BadgeVariant = Variant;
-export { Root as Badge, badgeVariants };
+export { badgeVariants, Root as Badge };

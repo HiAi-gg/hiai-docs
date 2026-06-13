@@ -5,7 +5,7 @@ import { z } from "zod";
 import { getSessionUserId } from "../../lib/auth-helpers";
 import { db } from "../../lib/db";
 import { logger } from "../../lib/logger";
-import { rateLimitHeaders, writeRateLimiter } from "../middleware/rate-limit";
+import { writeRateLimiter } from "../middleware/rate-limit";
 
 const createFolderSchema = z.object({
 	name: z.string().min(1).max(255),

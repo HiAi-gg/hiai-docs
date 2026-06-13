@@ -1,15 +1,5 @@
 <script lang="ts">
-import { type Tag, createTag, createTagInputSchema } from "$lib/api/tags";
-import { Button } from "$lib/components/ui/button";
-import {
-	Dialog,
-	DialogDescription,
-	DialogFooter,
-	DialogHeader,
-	DialogTitle,
-} from "$lib/components/ui/dialog";
-import { Input } from "$lib/components/ui/input";
-import { Label } from "$lib/components/ui/label";
+import { createTag, createTagInputSchema, type Tag } from "$lib/api/tags";
 import * as m from "$lib/paraglide/messages.js";
 
 let {

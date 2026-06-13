@@ -142,6 +142,12 @@ These are non-obvious project decisions pinned in `package.json` / Dockerfiles. 
 
 - **`@sinclair/typebox@^0.34.0` (root devDependency)** — Forces a single Typebox version across the workspace to resolve a peer-dep conflict with Elysia 1.4.28. Required for `bun install` to succeed; do not remove.
 - **`bun test --path-ignore-patterns='*node_modules*'`** — Bun 1.3's smart test discovery walks into hoisted `node_modules` and tries to run upstream library tests, which fail on missing fixtures. The path-ignore flag scopes test discovery to our own `src/` and `tests/` directories. Keep this flag on every `test` script.
+- **Paraglide v2 SvelteKit integration** — i18n is driven by `@inlang/paraglide-js@2.x` directly. The deprecated `@inlang/paraglide-sveltekit` adapter is NOT used. Setup:
+  - `frontend/vite.config.ts` registers `paraglideVitePlugin({ project, outdir, strategy })`.
+  - `frontend/src/hooks.ts` exports a `reroute` hook calling `deLocalizeUrl(request.url).pathname`.
+  - `frontend/src/hooks.server.ts` exports `handle` wrapping `paraglideMiddleware()` from the generated `$lib/paraglide/server.js`.
+  - Components use `import * as m from "$lib/paraglide/messages.js"` and `import { getLocale } from "$lib/paraglide/runtime"`.
+  - The `frontend/Dockerfile` does NOT need any `sed` patch — `@inlang/sdk@2.x` no longer triggers Bun's `NameTooLong` error.
 
 ### Svelte Rules
 

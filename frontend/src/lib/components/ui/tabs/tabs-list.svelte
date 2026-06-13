@@ -1,6 +1,7 @@
 <script lang="ts">
-import { cn } from "$lib/utils.js";
 import type { Snippet } from "svelte";
+import { cn } from "$lib/utils";
+
 
 const {
 	class: className,

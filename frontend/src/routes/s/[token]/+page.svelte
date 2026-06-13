@@ -1,7 +1,6 @@
 <script lang="ts">
 import { page } from "$app/state";
 import * as m from "$lib/paraglide/messages.js";
-import { Check, Copy, FileText, Folder, Lock } from "lucide-svelte";
 
 const token = $derived(page.params.token);
 
@@ -41,7 +40,7 @@ async function fetchShare() {
 			return;
 		}
 		shareData = data;
-	} catch (e) {
+	} catch (_e) {
 		error = m.share_network_error();
 	}
 	loading = false;

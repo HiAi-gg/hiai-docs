@@ -1,5 +1,4 @@
-<script lang="ts">
-import { cn } from "$lib/utils.js";
+<script lang="ts">import { cn } from "$lib/utils";
 
 let {
 	checked = $bindable(false),

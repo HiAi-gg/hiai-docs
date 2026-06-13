@@ -1,8 +1,8 @@
-import { afterAll, beforeAll, describe, expect, it } from "bun:test";
+import { describe, expect, it } from "bun:test";
 import { createHmac, randomBytes } from "node:crypto";
 
-const CSRF_COOKIE = "hiai-csrf";
-const CSRF_HEADER = "x-csrf-token";
+const _CSRF_COOKIE = "hiai-csrf";
+const _CSRF_HEADER = "x-csrf-token";
 
 function signToken(token: string, secret: string): string {
 	return createHmac("sha256", secret).update(token).digest("hex");

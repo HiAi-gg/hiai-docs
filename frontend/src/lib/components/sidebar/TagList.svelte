@@ -1,10 +1,6 @@
 <script lang="ts">
-import { type Tag, listTags } from "$lib/api/tags";
-import TagCreateDialog from "$lib/components/TagCreateDialog.svelte";
-import * as m from "$lib/paraglide/messages.js";
-import { cn } from "$lib/utils";
-import { Plus } from "lucide-svelte";
 import { onMount } from "svelte";
+import { listTags, type Tag } from "$lib/api/tags";
 
 let tags = $state<Tag[]>([]);
 let activeId = $state<string | null>(null);

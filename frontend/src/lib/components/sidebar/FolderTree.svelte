@@ -1,9 +1,6 @@
 <script lang="ts">
-import { listFolders } from "$lib/api/folders";
-import * as m from "$lib/paraglide/messages.js";
-import { cn } from "$lib/utils";
-import { ChevronRight, Folder, Plus } from "lucide-svelte";
 import { onMount } from "svelte";
+import { listFolders } from "$lib/api/folders";
 
 interface FolderItem {
 	id: string;

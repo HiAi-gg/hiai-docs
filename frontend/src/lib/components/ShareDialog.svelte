@@ -1,6 +1,5 @@
 <script lang="ts">
 import { createShareLink } from "$lib/api/share";
-import * as m from "$lib/paraglide/messages.js";
 
 let {
 	open = $bindable(false),

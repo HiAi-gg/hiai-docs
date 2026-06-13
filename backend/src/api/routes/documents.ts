@@ -1,4 +1,4 @@
-import { documentTags, documents, tags, versions } from "@hiai-docs/db/schema";
+import { documents, documentTags, tags, versions } from "@hiai-docs/db/schema";
 import { and, count, desc, eq, sql } from "drizzle-orm";
 import { Elysia } from "elysia";
 import { z } from "zod";

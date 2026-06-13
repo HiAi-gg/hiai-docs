@@ -1,14 +1,5 @@
 <!-- LinkDialog.svelte — Modal dialog to set/edit a link on the active Tiptap selection -->
 <script lang="ts">
-import { Button } from "$lib/components/ui/button";
-import {
-	Dialog,
-	DialogFooter,
-	DialogHeader,
-	DialogTitle,
-} from "$lib/components/ui/dialog";
-import { Input } from "$lib/components/ui/input";
-import * as m from "$lib/paraglide/messages.js";
 import type { Editor } from "@tiptap/core";
 
 let {
@@ -37,7 +28,7 @@ function close() {
 	open = false;
 }
 
-function handleCancel() {
+function _handleCancel() {
 	close();
 }
 
@@ -60,7 +51,7 @@ function handleApply() {
 	close();
 }
 
-function handleKeydown(e: KeyboardEvent) {
+function _handleKeydown(e: KeyboardEvent) {
 	if (e.key === "Enter") {
 		e.preventDefault();
 		handleApply();

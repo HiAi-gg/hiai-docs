@@ -1,15 +1,13 @@
 <script lang="ts">
+import { onMount } from "svelte";
 import { goto } from "$app/navigation";
 import {
-	type Document,
 	createDocument,
+	type Document,
 	importDocument,
 	listDocuments,
 } from "$lib/api/documents";
-import SearchBar from "$lib/components/SearchBar.svelte";
 import * as m from "$lib/paraglide/messages.js";
-import { Clock, FileText, Plus, Tag, Upload } from "lucide-svelte";
-import { onMount } from "svelte";
 
 let recentDocs = $state<Document[]>([]);
 let loading = $state(true);

@@ -1,25 +1,9 @@
 <!-- Document editor page -->
 <script lang="ts">
+import { onMount } from "svelte";
 import { goto } from "$app/navigation";
 import { deleteDocument, updateDocument } from "$lib/api/documents";
-import ShareDialog from "$lib/components/ShareDialog.svelte";
-import DocumentTitle from "$lib/components/editor/DocumentTitle.svelte";
-import MarkdownToggle from "$lib/components/editor/MarkdownToggle.svelte";
-import TipexEditor from "$lib/components/editor/TipexEditor.svelte";
 import * as m from "$lib/paraglide/messages.js";
-import {
-	Check,
-	ChevronRight,
-	Code,
-	Download,
-	FileText,
-	Loader2,
-	MoreHorizontal,
-	Pencil,
-	Share2,
-	Trash2,
-} from "lucide-svelte";
-import { onMount } from "svelte";
 
 const { data } = $props();
 
@@ -70,7 +54,7 @@ async function saveContent(newContent: string) {
 	try {
 		await updateDocument(data.document.id, { content: newContent });
 		saveStatus = "saved";
-	} catch (e) {
+	} catch (_e) {
 		saveStatus = "unsaved";
 		error = m.doc_save_content_error();
 	}
@@ -82,7 +66,7 @@ async function handleTitleUpdate(newTitle: string) {
 	try {
 		await updateDocument(data.document.id, { title: newTitle });
 		saveStatus = "saved";
-	} catch (e) {
+	} catch (_e) {
 		saveStatus = "unsaved";
 		error = m.doc_save_title_error();
 	}
@@ -94,7 +78,7 @@ async function handleDelete() {
 	try {
 		await deleteDocument(data.document.id);
 		goto("/");
-	} catch (e) {
+	} catch (_e) {
 		error = m.doc_delete_error();
 	}
 }

@@ -4,7 +4,6 @@ import { Elysia } from "elysia";
 import { getSessionUserId } from "../../lib/auth-helpers";
 import { db } from "../../lib/db";
 import { logger } from "../../lib/logger";
-import { rateLimitHeaders, writeRateLimiter } from "../middleware/rate-limit";
 
 export const versionRoutes = new Elysia({
 	prefix: "/api/documents/:id/versions",

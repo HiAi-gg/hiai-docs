@@ -1,11 +1,11 @@
-import { documentTags, documents, tags } from "@hiai-docs/db/schema";
+import { documents, documentTags, tags } from "@hiai-docs/db/schema";
 import { and, count, eq } from "drizzle-orm";
 import { Elysia } from "elysia";
 import { z } from "zod";
 import { getSessionUserId } from "../../lib/auth-helpers";
 import { db } from "../../lib/db";
 import { logger } from "../../lib/logger";
-import { rateLimitHeaders, writeRateLimiter } from "../middleware/rate-limit";
+import { writeRateLimiter } from "../middleware/rate-limit";
 
 const createTagSchema = z.object({
 	name: z.string().min(1).max(100),

@@ -1,34 +1,20 @@
 <script lang="ts">
 import { goto } from "$app/navigation";
-import SearchBar from "$lib/components/SearchBar.svelte";
-import * as m from "$lib/paraglide/messages.js";
-import { cn } from "$lib/utils";
-import {
-	Clock,
-	Folder,
-	PanelLeftClose,
-	PanelLeftOpen,
-	Search,
-	Tag,
-} from "lucide-svelte";
-import FolderTree from "./FolderTree.svelte";
-import RecentDocs from "./RecentDocs.svelte";
-import TagList from "./TagList.svelte";
 
 let collapsed = $state(false);
 type PanelMode = "all" | "recent" | "tags";
 let activePanel = $state<PanelMode>("all");
 
-function openSearch() {
+function _openSearch() {
 	goto("/search");
 }
 
-function togglePanel(mode: PanelMode) {
+function _togglePanel(mode: PanelMode) {
 	activePanel = activePanel === mode ? "all" : mode;
 	collapsed = false;
 }
 
-function toggleCollapse() {
+function _toggleCollapse() {
 	collapsed = !collapsed;
 	if (collapsed) {
 		activePanel = "all";
