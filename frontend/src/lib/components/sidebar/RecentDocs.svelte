@@ -14,7 +14,7 @@ let copyTimer: ReturnType<typeof setTimeout> | null = null;
 
 onMount(async () => {
 	try {
-		const res = await listDocuments({ limit: 5 });
+		const res = await listDocuments({ limit: 6 });
 		recentDocs = res.items;
 	} catch (e) {
 		console.error("RecentDocs: failed to load recent documents", e);
@@ -29,12 +29,18 @@ onDestroy(() => {
 	}
 });
 
-async function handleCopyLink(e: MouseEvent, docId: string) {
+async function handleCopyContent(e: MouseEvent, docId: string) {
 	e.preventDefault();
 	e.stopPropagation();
 	if (typeof window === "undefined") return;
-	const url = `${window.location.origin}/docs/${docId}`;
-	const ok = await copyToClipboard(url);
+	// Copy the document's markdown source so the user pastes the actual
+	// text, not a URL. The list endpoint returns the full content field
+	// (truncated to 200 chars at the SQL level — see documents route); we
+	// still prefer `excerpt` first as a faster, more focused snippet.
+	const doc = recentDocs.find((d) => d.id === docId);
+	const text = (doc?.excerpt as string | undefined) || doc?.content || "";
+	if (!text) return;
+	const ok = await copyToClipboard(text);
 	if (!ok) return;
 	copiedDocId = docId;
 	if (copyTimer) clearTimeout(copyTimer);
@@ -51,27 +57,27 @@ async function handleCopyLink(e: MouseEvent, docId: string) {
     <p class="px-2 text-xs text-destructive">{loadError}</p>
   {/if}
   {#each recentDocs as doc (doc.id)}
-    <div class="group/doc flex items-center gap-1">
+    <div class="group/doc flex min-w-0 items-center gap-1">
       <a
         href={`/docs/${doc.id}`}
         onclick={() => { activeId = doc.id; }}
         class={cn(
-          "flex flex-1 items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors hover:bg-accent hover:text-accent-foreground",
+          "flex min-w-0 flex-1 items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors hover:bg-accent hover:text-accent-foreground",
           activeId === doc.id && "bg-accent text-accent-foreground"
         )}
       >
         <FileText class="size-4 shrink-0 text-muted-foreground" />
         <div class="min-w-0 flex-1">
-          <p class="truncate">{doc.title}</p>
+          <p class="truncate min-w-0">{doc.title}</p>
           <p class="text-xs text-muted-foreground">{doc.updatedAt}</p>
         </div>
       </a>
       <button
         type="button"
         class="inline-flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground opacity-0 transition-opacity hover:bg-accent hover:text-accent-foreground group-hover/doc:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring {copiedDocId === doc.id ? 'opacity-100' : ''}"
-        aria-label={m.action_copy_link()}
-        title={m.action_copy_link()}
-        onclick={(e: MouseEvent) => void handleCopyLink(e, doc.id)}
+        aria-label={m.action_copy_content()}
+        title={m.action_copy_content()}
+        onclick={(e: MouseEvent) => void handleCopyContent(e, doc.id)}
       >
         {#if copiedDocId === doc.id}
           <Check class="size-3.5" />

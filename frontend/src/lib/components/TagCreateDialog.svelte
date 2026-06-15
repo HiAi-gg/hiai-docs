@@ -179,6 +179,15 @@ function handleInputKeydown(e: KeyboardEvent) {
 		handleSubmit(new Event("submit"));
 	}
 }
+
+$effect(() => {
+	if (open && mode === "edit" && tag) {
+		name = tag.name;
+		color = tag.color ?? DEFAULT_COLOR;
+		nameError = null;
+		submitError = null;
+	}
+});
 </script>
 
 <Dialog bind:open onOpenChange={handleOpenChange}>

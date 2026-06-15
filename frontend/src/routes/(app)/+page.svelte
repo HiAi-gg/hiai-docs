@@ -10,7 +10,6 @@ import {
 } from "$lib/api/documents";
 import * as m from "$lib/paraglide/messages.js";
 import SearchBar from "$lib/components/SearchBar.svelte";
-import ScrollToTop from "$lib/components/ScrollToTop.svelte";
 import { stripMarkdown } from "$lib/utils/strip-markdown";
 
 let recentDocs = $state<Document[]>([]);
@@ -20,7 +19,7 @@ let importInput = $state<HTMLInputElement | undefined>(undefined);
 
 onMount(async () => {
 	try {
-		const res = await listDocuments({ limit: 5 });
+		const res = await listDocuments({ limit: 6 });
 		recentDocs = res.items;
 	} catch (err) {
 		error = err instanceof Error ? err.message : m.doc_load_error();
@@ -51,7 +50,7 @@ async function handleImportFile(e: Event) {
 	if (!file) return;
 	try {
 		await importDocument(file);
-		const res = await listDocuments({ limit: 5 });
+		const res = await listDocuments({ limit: 6 });
 		recentDocs = res.items;
 	} catch (err) {
 		error = err instanceof Error ? err.message : "Import failed";
@@ -117,7 +116,7 @@ const hasDocs = $derived(recentDocs.length > 0);
           <h2 class="mb-2 text-lg font-semibold">{m.dashboard_error_title()}</h2>
           <p class="mb-6 max-w-sm text-sm text-muted-foreground">{error}</p>
           <button
-            onclick={async () => { loading = true; error = null; try { const res = await listDocuments({ limit: 5 }); recentDocs = res.items; } catch (e) { error = e instanceof Error ? e.message : m.doc_load_error(); } finally { loading = false; } }}
+            onclick={async () => { loading = true; error = null; try { const res = await listDocuments({ limit: 6 }); recentDocs = res.items; } catch (e) { error = e instanceof Error ? e.message : m.doc_load_error(); } finally { loading = false; } }}
             class="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow transition-colors hover:bg-primary/90"
           >
             {m.dashboard_error_retry()}
@@ -173,5 +172,3 @@ const hasDocs = $derived(recentDocs.length > 0);
         </div>
       {/if}
     </div>
-
-<ScrollToTop />

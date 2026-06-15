@@ -11,11 +11,17 @@ export function stripMarkdown(markdown: string): string {
 	// Inline code
 	text = text.replace(/`([^`]+)`/g, "$1");
 
-	// Images → alt text
-	text = text.replace(/!\[([^\]]*)\]\([^)]*\)/g, "$1");
+	// Images → drop entirely (alt text included)
+	text = text.replace(/!\[([^\]]*)\]\([^)]*\)/g, "");
+
+	// Truncated image markdown (no closing paren)
+	text = text.replace(/!\[[^\]]*\]\([^)]*$/g, "");
 
 	// Links → link text
 	text = text.replace(/\[([^\]]*)\]\([^)]*\)/g, "$1");
+
+	// Truncated link markdown (no closing paren)
+	text = text.replace(/\[[^\]]*\]\([^)]*$/g, "");
 
 	// Bold (both flavors)
 	text = text.replace(/\*\*([^*]+)\*\*/g, "$1");

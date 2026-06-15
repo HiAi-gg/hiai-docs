@@ -6,6 +6,22 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.embed.tiptap.dev; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https: http://localhost:9020 http://minio:9000; connect-src 'self' http://localhost:* ws://localhost:*; frame-src 'self';" />
     %sveltekit.head%
+    <script>
+      (function () {
+        try {
+          var stored = localStorage.getItem("hiai-docs-theme");
+          var prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+          var isDark = stored === "dark" || ((stored === null || stored === "system") && prefersDark);
+          if (isDark) {
+            document.documentElement.classList.add("dark");
+          } else {
+            document.documentElement.classList.remove("dark");
+          }
+        } catch (_) {
+          /* no-op: localStorage may be unavailable (e.g. private mode) */
+        }
+      })();
+    </script>
   </head>
   <body data-sveltekit-preload-data="hover">
     <div style="display: contents">%sveltekit.body%</div>

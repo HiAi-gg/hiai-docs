@@ -50,19 +50,24 @@ function handleKeydown(e: KeyboardEvent) {
 	}
 }
 
-let linkCopied = $state(false);
+let contentCopied = $state(false);
 let copyTimer: ReturnType<typeof setTimeout> | null = null;
 
-async function handleCopyLink(e: Event) {
+async function handleCopyContent(e: Event) {
 	e.stopPropagation();
 	if (typeof window === "undefined") return;
-	const url = `${window.location.origin}/docs/${doc.id}`;
-	const ok = await copyToClipboard(url);
+	// Copy the document's markdown source (or the preview excerpt as a
+	// fallback). The user wants the actual text in their clipboard, not a
+	// URL — copying the markdown preserves formatting, headings, lists,
+	// etc. when pasted into another editor.
+	const text = doc.excerpt || doc.content || "";
+	if (!text) return;
+	const ok = await copyToClipboard(text);
 	if (!ok) return;
-	linkCopied = true;
+	contentCopied = true;
 	if (copyTimer) clearTimeout(copyTimer);
 	copyTimer = setTimeout(() => {
-		linkCopied = false;
+		contentCopied = false;
 		copyTimer = null;
 	}, 2000);
 }
@@ -95,13 +100,13 @@ const preview = $derived(stripMarkdown(doc.excerpt || doc.content || "").slice(0
           <ArrowUpRight class="size-4" />
           {m.doc_open()}
         </DropdownMenuItem>
-        <DropdownMenuItem onclick={handleCopyLink}>
-          {#if linkCopied}
+        <DropdownMenuItem onclick={handleCopyContent}>
+          {#if contentCopied}
             <Check class="size-4" />
             {m.share_copied()}
           {:else}
             <Copy class="size-4" />
-            {m.action_copy_link()}
+            {m.action_copy_content()}
           {/if}
         </DropdownMenuItem>
         <DropdownMenuItem onclick={(e: Event) => { e.stopPropagation(); onDuplicate?.(doc.id); }}>

@@ -1,4 +1,5 @@
 <script lang="ts">
+import type { JSONContent } from "@tiptap/core";
 import Collaboration from "@tiptap/extension-collaboration";
 import CollaborationCursor from "@tiptap/extension-collaboration-cursor";
 import { onDestroy, onMount } from "svelte";
@@ -7,6 +8,7 @@ import type { CollaborationSession } from "$lib/collaboration";
 import * as m from "$lib/paraglide/messages.js";
 import EditorToolbar from "./EditorToolbar.svelte";
 import { editorExtensions } from "./editorExtensions";
+import { markdownToJson } from "./markdown";
 
 export type TipexEditorOutput = { markdown: string; json: object };
 
@@ -34,6 +36,35 @@ let ready = $state(false);
 let suppressNextUpdate = false;
 let internalUpdate = false;
 
+/**
+ * Resolve the initial editor content. Prefer the persisted ProseMirror JSON
+ * when it is present. When it is missing but the markdown source is
+ * non-empty, parse the markdown into JSON in the browser so the wysiwyg
+ * view shows formatted content rather than the raw markdown source. An
+ * older version of the project did this server-side via
+ * `backend/src/lib/markdown-to-tipex.ts`, but the markdown→JSON helper here
+ * uses the same TipTap extension set as the editor itself, so the result
+ * round-trips through `setContent` without node-mismatch errors. If the
+ * parsed JSON does not match the editor schema on some edge case, the
+ * `try/catch` falls back to rendering the raw markdown string — better
+ * than showing nothing.
+ */
+function resolveInitialContent(): string | JSONContent {
+	if (contentTipex) return contentTipex as JSONContent;
+	if (content && content.trim().length > 0) {
+		try {
+			return markdownToJson(content);
+		} catch (err) {
+			console.warn(
+				"TipexEditor: markdownToJson failed, falling back to raw markdown",
+				err,
+			);
+			return content;
+		}
+	}
+	return content;
+}
+
 onMount(() => {
 	const extensions = [...editorExtensions];
 
@@ -56,7 +87,7 @@ onMount(() => {
 
 	editorStore = createEditor({
 		extensions,
-		content: collaboration?.doc ? undefined : content,
+		content: collaboration?.doc ? undefined : resolveInitialContent(),
 		editable,
 		editorProps: {
 			attributes: {
@@ -101,9 +132,17 @@ $effect(() => {
 	if (!editor || collaboration?.doc) return;
 	// Prefer the persisted ProseMirror JSON when available — the markdown
 	// view keeps it in sync on every keystroke, so we avoid re-parsing
-	// the markdown back into JSON on every mount.
-	const nextSource = contentTipex ?? content;
-	const nextSerialized = contentTipex ? JSON.stringify(contentTipex) : content;
+	// the markdown back into JSON on every mount. When the JSON is
+	// missing but the markdown source is present, parse the markdown
+	// client-side so the wysiwyg view still shows formatted content for
+	// documents that were saved via the regular (non-TipTap) save path.
+	const hasTipex = contentTipex != null;
+	const nextSource: string | JSONContent = hasTipex
+		? (contentTipex as JSONContent)
+		: content && content.trim().length > 0
+			? markdownToJson(content)
+			: content;
+	const nextSerialized = hasTipex ? JSON.stringify(contentTipex) : content;
 	if (internalUpdate) {
 		internalUpdate = false;
 		prevContent = nextSerialized;

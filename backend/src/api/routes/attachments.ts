@@ -5,7 +5,7 @@ import { nanoid } from "nanoid";
 import { getSessionUserId } from "../../lib/auth-helpers";
 import { db } from "../../lib/db";
 import { logger } from "../../lib/logger";
-import { BUCKET, minio } from "../../lib/minio";
+import { BUCKET, minio, minioPublic } from "../../lib/minio";
 import { rateLimitHeaders, writeRateLimiter } from "../middleware/rate-limit";
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
@@ -16,28 +16,6 @@ async function getClientIp(request: Request): Promise<string> {
 		request.headers.get("x-real-ip") ??
 		"unknown"
 	);
-}
-
-/**
- * Convert an internal MinIO presigned URL into a URL the browser can fetch.
- *
- * In Docker dev, the MinIO client is configured with the Docker-internal
- * endpoint `minio:9000`, so the URLs it generates are not resolvable from
- * the host browser. Rewrite the authority to `localhost:9020` (the host
- * port mapped via docker-compose) so the browser can reach the same
- * presigned object via the published port.
- */
-function makePublicUrl(presignedUrl: string): string {
-	try {
-		const parsed = new URL(presignedUrl);
-		if (parsed.hostname === "minio" && parsed.port === "9000") {
-			parsed.hostname = "localhost";
-			parsed.port = "9020";
-		}
-		return parsed.toString();
-	} catch {
-		return presignedUrl;
-	}
 }
 
 export const attachmentRoutes = new Elysia({ prefix: "/api" })
@@ -128,8 +106,9 @@ export const attachmentRoutes = new Elysia({ prefix: "/api" })
 				return { error: "Failed to save attachment record" };
 			}
 
-			// Generate presigned GET URL (24h expiry)
-			const presignedUrl = await minio.presignedGetObject(
+			// Generate presigned GET URL (24h expiry) — signed against the
+			// public host/port so the browser can fetch it directly.
+			const presignedUrl = await minioPublic.presignedGetObject(
 				BUCKET,
 				key,
 				24 * 60 * 60,
@@ -141,7 +120,7 @@ export const attachmentRoutes = new Elysia({ prefix: "/api" })
 				filename: created.filename,
 				mimeType: created.mimeType,
 				size: created.size,
-				url: makePublicUrl(presignedUrl),
+				url: presignedUrl,
 			};
 		} catch (err) {
 			logger.error({ err }, "Failed to upload attachment");
@@ -178,10 +157,11 @@ export const attachmentRoutes = new Elysia({ prefix: "/api" })
 				.from(attachments)
 				.where(eq(attachments.documentId, documentId));
 
-			// Generate presigned URLs for each attachment
+			// Generate presigned URLs for each attachment — signed against
+			// the public host/port so the browser can fetch directly.
 			const result = await Promise.all(
 				rows.map(async (row) => {
-					const presignedUrl = await minio.presignedGetObject(
+					const presignedUrl = await minioPublic.presignedGetObject(
 						BUCKET,
 						row.minioKey,
 						24 * 60 * 60,
@@ -191,7 +171,7 @@ export const attachmentRoutes = new Elysia({ prefix: "/api" })
 						filename: row.filename,
 						mimeType: row.mimeType,
 						size: row.size,
-						url: makePublicUrl(presignedUrl),
+						url: presignedUrl,
 					};
 				}),
 			);

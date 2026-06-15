@@ -6,6 +6,7 @@ import { getSessionUserId } from "../../lib/auth-helpers";
 import { db } from "../../lib/db";
 import { enqueueEmbedding } from "../../lib/embedding-queue";
 import { logger } from "../../lib/logger";
+import { markdownToTipexJson } from "../../lib/markdown-to-tipex";
 import {
 	documentRateLimiter,
 	rateLimitHeaders,
@@ -154,12 +155,25 @@ export const documentRoutes = new Elysia({ prefix: "/api" })
 			return { error: "Invalid input", details: body.error.flatten() };
 		}
 		try {
+			// If the client posts raw markdown without the TipTap JSON view
+			// (e.g. an import, a script, or any path that bypasses the
+			// editor), generate the JSON server-side so the editor opens
+			// with formatted content rather than the raw markdown source
+			// the next time the document is opened. `markdownToTipexJson`
+			// returns `null` for empty input or on parse failure, in which
+			// case we simply persist the markdown without a JSON view — the
+			// frontend's `markdownToJson` helper will recover on load.
+			const initialContent = body.data.content ?? "";
+			const initialTipex = initialContent
+				? await markdownToTipexJson(initialContent)
+				: null;
 			const [created] = await db
 				.insert(documents)
 				.values({
 					ownerId: userId,
 					title: body.data.title,
-					content: body.data.content ?? "",
+					content: initialContent,
+					contentTipex: initialTipex,
 					folderId: body.data.folderId ?? null,
 				})
 				.returning();
@@ -170,7 +184,8 @@ export const documentRoutes = new Elysia({ prefix: "/api" })
 
 			await db.insert(versions).values({
 				documentId: created.id,
-				content: body.data.content ?? "",
+				content: initialContent,
+				contentTipex: initialTipex,
 				createdBy: userId,
 			});
 
@@ -296,6 +311,18 @@ export const documentRoutes = new Elysia({ prefix: "/api" })
 				createdBy: userId,
 			});
 
+			// When the client sends new `content` but no `contentTipex`,
+			// generate the JSON view server-side so the editor can render
+			// formatted content on the next open. When the client sends
+			// both fields (the editor's normal save path), prefer the
+			// client-supplied JSON — it reflects the user's live edits.
+			let resolvedTipex: unknown | undefined = body.data.contentTipex;
+			if (resolvedTipex === undefined && body.data.content !== undefined) {
+				resolvedTipex = body.data.content
+					? await markdownToTipexJson(body.data.content)
+					: null;
+			}
+
 			const [updated] = await db
 				.update(documents)
 				.set({
@@ -303,8 +330,8 @@ export const documentRoutes = new Elysia({ prefix: "/api" })
 					...(body.data.content !== undefined && {
 						content: body.data.content,
 					}),
-					...(body.data.contentTipex !== undefined && {
-						contentTipex: body.data.contentTipex,
+					...(resolvedTipex !== undefined && {
+						contentTipex: resolvedTipex,
 					}),
 					...(body.data.metadata !== undefined && {
 						metadata: body.data.metadata,

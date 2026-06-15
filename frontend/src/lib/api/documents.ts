@@ -8,6 +8,7 @@ export interface Document {
 	folderId?: string | null;
 	folderName?: string;
 	tags?: Array<{ id: string; name: string; color: string }>;
+	excerpt?: string;
 	createdAt: string;
 	updatedAt: string;
 }

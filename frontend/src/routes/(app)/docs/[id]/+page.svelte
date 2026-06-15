@@ -30,7 +30,7 @@ import MarkdownToggle from "$lib/components/editor/MarkdownToggle.svelte";
 import type { TipexEditorOutput } from "$lib/components/editor/TipexEditor.svelte";
 import TipexEditor from "$lib/components/editor/TipexEditor.svelte";
 import ShareDialog from "$lib/components/ShareDialog.svelte";
-import ScrollToTop from "$lib/components/ScrollToTop.svelte";
+import { refreshTags } from "$lib/stores/tag-store.svelte";
 import {
 	DropdownMenu,
 	DropdownMenuContent,
@@ -250,6 +250,8 @@ async function handleTagCreated(newTag: Tag) {
 	if (!assignedTagIds.has(newTag.id)) {
 		await handleAddTag(newTag.id);
 	}
+	// Notify other components (e.g. sidebar TagList) to reload.
+	refreshTags();
 }
 
 async function handleRemoveTag(tagId: string) {
@@ -506,7 +508,6 @@ async function handleRemoveTag(tagId: string) {
       onConfirm={confirmDelete}
       onCancel={cancelDelete}
     />
-    <ScrollToTop />
   </div>
 {/if}
 

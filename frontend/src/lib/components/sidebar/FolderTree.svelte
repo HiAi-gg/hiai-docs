@@ -60,10 +60,16 @@ let pendingExpandFolderId = $state<string | null>(null);
 let copiedDocId = $state<string | null>(null);
 let copyTimer: ReturnType<typeof setTimeout> | null = null;
 
-async function handleCopyLink(docId: string) {
+async function handleCopyContent(docId: string) {
 	if (typeof window === "undefined") return;
-	const url = `${window.location.origin}/docs/${docId}`;
-	const ok = await copyToClipboard(url);
+	// Copy the document's markdown source instead of its URL — the user
+	// wants the text in the clipboard. The list endpoint returns the
+	// `content` field (truncated to 200 chars via SQL), which is enough
+	// for the typical paste-into-another-doc workflow.
+	const doc = documents.find((d) => d.id === docId);
+	const text = (doc?.excerpt as string | undefined) || doc?.content || "";
+	if (!text) return;
+	const ok = await copyToClipboard(text);
 	if (!ok) return;
 	copiedDocId = docId;
 	if (copyTimer) clearTimeout(copyTimer);
@@ -300,9 +306,9 @@ async function persistZoneChanges(
         <button
           type="button"
           class="inline-flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground opacity-0 transition-opacity hover:bg-accent hover:text-accent-foreground group-hover/doc:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring {copiedDocId === doc.id ? 'opacity-100' : ''}"
-          aria-label={m.action_copy_link()}
-          title={m.action_copy_link()}
-          onclick={(e: MouseEvent) => { e.preventDefault(); e.stopPropagation(); void handleCopyLink(doc.id); }}
+          aria-label={m.action_copy_content()}
+          title={m.action_copy_content()}
+          onclick={(e: MouseEvent) => { e.preventDefault(); e.stopPropagation(); void handleCopyContent(doc.id); }}
         >
           {#if copiedDocId === doc.id}
             <Check class="size-3.5" />
@@ -366,9 +372,9 @@ async function persistZoneChanges(
                 <button
                   type="button"
                   class="inline-flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground opacity-0 transition-opacity hover:bg-accent hover:text-accent-foreground group-hover/doc:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring {copiedDocId === doc.id ? 'opacity-100' : ''}"
-                  aria-label={m.action_copy_link()}
-                  title={m.action_copy_link()}
-                  onclick={(e: MouseEvent) => { e.preventDefault(); e.stopPropagation(); void handleCopyLink(doc.id); }}
+                  aria-label={m.action_copy_content()}
+                  title={m.action_copy_content()}
+                  onclick={(e: MouseEvent) => { e.preventDefault(); e.stopPropagation(); void handleCopyContent(doc.id); }}
                 >
                   {#if copiedDocId === doc.id}
                     <Check class="size-3.5" />

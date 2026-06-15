@@ -3,6 +3,7 @@
 import { Loader2, MoreVertical, Plus } from "lucide-svelte";
 import { onMount } from "svelte";
 import { listTags, deleteTag, type Tag } from "$lib/api/tags";
+import { getTagRefreshNonce, refreshTags } from "$lib/stores/tag-store.svelte";
 import TagCreateDialog from "$lib/components/TagCreateDialog.svelte";
 import {
 	DropdownMenu,
@@ -36,15 +37,24 @@ onMount(() => {
 	void refresh();
 });
 
+// React to the global refresh nonce so tag mutations from other parts of
+// the app (e.g. the document editor) reflect here without a page reload.
+$effect(() => {
+	getTagRefreshNonce();
+	void refresh();
+});
+
 function handleCreated(created: Tag) {
 	// Optimistically add the new tag to the list so the user sees it
 	// appear immediately. The next listTags() roundtrip will reconcile.
 	tags = [...tags, created];
+	refreshTags();
 	void refresh();
 }
 
 function handleUpdated(updated: Tag) {
 	tags = tags.map((t) => (t.id === updated.id ? updated : t));
+	refreshTags();
 }
 
 function startEdit(t: Tag) {
@@ -78,6 +88,7 @@ async function confirmDelete() {
 		if (activeId === t.id) activeId = null;
 		showDeleteDialog = false;
 		deleteTarget = null;
+		refreshTags();
 	} catch (e) {
 		console.error("TagList: deleteTag failed", e);
 		loadError = m.error_generic();

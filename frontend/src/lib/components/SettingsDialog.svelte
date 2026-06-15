@@ -1,0 +1,228 @@
+<script lang="ts">
+import { Loader2, Save } from "lucide-svelte";
+import { onMount } from "svelte";
+import { apiFetch } from "$lib/api/client";
+import { getProfile, updateProfile } from "$lib/api/settings";
+import * as m from "$lib/paraglide/messages.js";
+import { themeStore, type Theme } from "$lib/stores/theme";
+import { Button } from "$lib/components/ui/button";
+import * as Dialog from "$lib/components/ui/dialog";
+import { Input } from "$lib/components/ui/input";
+import { Label } from "$lib/components/ui/label";
+import * as Tabs from "$lib/components/ui/tabs";
+
+let {
+	open = $bindable(false),
+}: {
+	open?: boolean;
+} = $props();
+
+let activeTab = $state("profile");
+
+// Profile
+let name = $state("");
+let email = $state("");
+let profileStatus = $state<"idle" | "saving" | "saved" | "error">("idle");
+let profileError = $state("");
+
+// Password
+let currentPassword = $state("");
+let newPassword = $state("");
+let confirmPassword = $state("");
+let passwordStatus = $state<"idle" | "saving" | "saved" | "error">("idle");
+let passwordError = $state("");
+
+onMount(async () => {
+	try {
+		const profile = await getProfile();
+		if (profile.name) name = profile.name;
+		if (profile.email) email = profile.email;
+	} catch {
+		// use defaults
+	}
+});
+
+async function saveProfile() {
+	profileStatus = "saving";
+	profileError = "";
+	try {
+		await updateProfile({ name, email });
+		profileStatus = "saved";
+		setTimeout(() => {
+			profileStatus = "idle";
+		}, 2000);
+	} catch (e) {
+		profileStatus = "error";
+		profileError = e instanceof Error ? e.message : "Failed to save profile";
+	}
+}
+
+async function changePassword() {
+	passwordError = "";
+	if (newPassword !== confirmPassword) {
+		passwordStatus = "error";
+		passwordError = m.auth_password_mismatch();
+		return;
+	}
+	if (newPassword.length < 8) {
+		passwordStatus = "error";
+		passwordError = m.auth_password_min();
+		return;
+	}
+	passwordStatus = "saving";
+	try {
+		// Better Auth's update-user endpoint accepts `password` (current) and
+		// `newPassword` (desired) to rotate the credential.
+		// TODO: confirm endpoint shape against the deployed Better Auth version;
+		// fall back to `authClient.changePassword` if available.
+		await apiFetch("/api/auth/update-user", {
+			method: "POST",
+			body: JSON.stringify({
+				password: currentPassword,
+				newPassword,
+			}),
+		});
+		passwordStatus = "saved";
+		currentPassword = "";
+		newPassword = "";
+		confirmPassword = "";
+		setTimeout(() => {
+			passwordStatus = "idle";
+		}, 2000);
+	} catch (e) {
+		passwordStatus = "error";
+		passwordError = e instanceof Error ? e.message : "Failed to change password";
+	}
+}
+
+function pickTheme(value: Theme) {
+	themeStore.set(value);
+}
+
+const themeOptions: Array<{ value: Theme; label: string; key: string }> = [
+	{ value: "light", label: m.theme_light(), key: "light" },
+	{ value: "dark", label: m.theme_dark(), key: "dark" },
+	{ value: "system", label: m.theme_system(), key: "system" },
+];
+
+function close() {
+	open = false;
+}
+</script>
+
+<Dialog.Dialog bind:open>
+	<Dialog.DialogHeader>
+		<Dialog.DialogTitle>{m.settings_title()}</Dialog.DialogTitle>
+		<Dialog.DialogDescription>
+			{m.settings_account()}
+		</Dialog.DialogDescription>
+	</Dialog.DialogHeader>
+
+	<Tabs.Tabs bind:value={activeTab} class="w-full">
+		<Tabs.TabsList class="grid w-full grid-cols-3">
+			<Tabs.TabsTrigger value="profile" onclick={(v) => (activeTab = v)}>
+				{m.settings_profile()}
+			</Tabs.TabsTrigger>
+			<Tabs.TabsTrigger value="password" onclick={(v) => (activeTab = v)}>
+				{m.password_label()}
+			</Tabs.TabsTrigger>
+			<Tabs.TabsTrigger value="appearance" onclick={(v) => (activeTab = v)}>
+				{m.settings_appearance()}
+			</Tabs.TabsTrigger>
+		</Tabs.TabsList>
+
+		<Tabs.TabsContent value="profile" currentValue={activeTab}>
+			<div class="space-y-4">
+				<div class="space-y-2">
+					<Label for="settings-name">{m.settings_name()}</Label>
+					<Input id="settings-name" type="text" bind:value={name} autocomplete="name" />
+				</div>
+				<div class="space-y-2">
+					<Label for="settings-email">{m.settings_email()}</Label>
+					<Input id="settings-email" type="email" bind:value={email} autocomplete="email" />
+				</div>
+				{#if profileError}
+					<p class="text-sm text-destructive">{profileError}</p>
+				{/if}
+				<Button onclick={saveProfile} disabled={profileStatus === "saving"}>
+					{#if profileStatus === "saving"}
+						<Loader2 class="mr-2 size-4 animate-spin" />
+					{:else}
+						<Save class="mr-2 size-4" />
+					{/if}
+					{profileStatus === "saved" ? m.settings_saved_status() : m.settings_save()}
+				</Button>
+			</div>
+		</Tabs.TabsContent>
+
+		<Tabs.TabsContent value="password" currentValue={activeTab}>
+			<div class="space-y-4">
+				<div class="space-y-2">
+					<Label for="settings-current-password">{m.auth_password()}</Label>
+					<Input
+						id="settings-current-password"
+						type="password"
+						bind:value={currentPassword}
+						autocomplete="current-password"
+					/>
+				</div>
+				<div class="space-y-2">
+					<Label for="settings-new-password">{m.new_password()}</Label>
+					<Input
+						id="settings-new-password"
+						type="password"
+						bind:value={newPassword}
+						autocomplete="new-password"
+					/>
+				</div>
+				<div class="space-y-2">
+					<Label for="settings-confirm-password">{m.confirm_password()}</Label>
+					<Input
+						id="settings-confirm-password"
+						type="password"
+						bind:value={confirmPassword}
+						autocomplete="new-password"
+					/>
+				</div>
+				{#if passwordError}
+					<p class="text-sm text-destructive">{passwordError}</p>
+				{/if}
+				<Button onclick={changePassword} disabled={passwordStatus === "saving"}>
+					{#if passwordStatus === "saving"}
+						<Loader2 class="mr-2 size-4 animate-spin" />
+					{/if}
+					{passwordStatus === "saved" ? m.settings_saved_status() : m.change_password()}
+				</Button>
+			</div>
+		</Tabs.TabsContent>
+
+		<Tabs.TabsContent value="appearance" currentValue={activeTab}>
+			<div class="space-y-4">
+				<div class="space-y-2">
+					<Label>{m.settings_theme()}</Label>
+					<p class="text-xs text-muted-foreground">{m.settings_appearance()}</p>
+				</div>
+				<div class="grid grid-cols-3 gap-2">
+					{#each themeOptions as opt (opt.key)}
+						<button
+							type="button"
+							onclick={() => pickTheme(opt.value)}
+							class={[
+								"rounded-md border px-3 py-2 text-sm font-medium transition-colors",
+								themeStore.value === opt.value
+									? "border-primary bg-primary text-primary-foreground"
+									: "border-border text-muted-foreground hover:bg-accent hover:text-accent-foreground",
+							].join(" ")}
+						>
+							{opt.label}
+						</button>
+					{/each}
+				</div>
+			</div>
+		</Tabs.TabsContent>
+	</Tabs.Tabs>
+
+	<Dialog.DialogFooter>
+		<Button variant="outline" onclick={close}>{m.action_close()}</Button>
+	</Dialog.DialogFooter>
+</Dialog.Dialog>

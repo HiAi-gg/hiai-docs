@@ -9,7 +9,10 @@ import { writeRateLimiter } from "../middleware/rate-limit";
 
 const createFolderSchema = z.object({
 	name: z.string().min(1).max(255),
-	parentId: z.string().uuid().optional(),
+	// Accept string, null, or undefined so the frontend can explicitly send
+	// `parentId: null` for root-level folders (the previous `.optional()`
+	// rejected `null` with a 400).
+	parentId: z.string().uuid().nullish(),
 });
 
 const updateFolderSchema = z.object({

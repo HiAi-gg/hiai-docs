@@ -1,28 +1,61 @@
 <script lang="ts">
-import { onMount, onDestroy } from "svelte";
+import { onDestroy } from "svelte";
 import { ArrowUp } from "lucide-svelte";
 
 const SCROLL_THRESHOLD = 300;
 
+let { scrollTarget }: { scrollTarget?: HTMLElement | null } = $props();
+
 let visible = $state(false);
-let scrollHandler: (() => void) | null = null;
+let activeTarget: HTMLElement | null = null;
 
 function handleScroll() {
-	visible = window.scrollY > SCROLL_THRESHOLD;
+	visible = (activeTarget ? activeTarget.scrollTop : window.scrollY) > SCROLL_THRESHOLD;
 }
 
 function scrollToTop() {
-	window.scrollTo({ top: 0, behavior: "smooth" });
+	if (activeTarget) {
+		activeTarget.scrollTo({ top: 0, behavior: "smooth" });
+	} else {
+		window.scrollTo({ top: 0, behavior: "smooth" });
+	}
 }
 
-onMount(() => {
+function attach(target: HTMLElement | null | undefined) {
+	detach();
+	if (!target) return;
+	activeTarget = target;
+	target.addEventListener("scroll", handleScroll, { passive: true });
 	handleScroll();
-	scrollHandler = handleScroll;
-	window.addEventListener("scroll", scrollHandler, { passive: true });
+}
+
+function detach() {
+	if (activeTarget) {
+		activeTarget.removeEventListener("scroll", handleScroll);
+	}
+	activeTarget = null;
+}
+
+// React to changes in scrollTarget so we always listen on the right element.
+// When scrollTarget is undefined, fall back to window-level scroll.
+$effect(() => {
+	const target = scrollTarget;
+	attach(target);
+	if (!target) {
+		window.addEventListener("scroll", handleScroll, { passive: true });
+		handleScroll();
+		return () => {
+			window.removeEventListener("scroll", handleScroll);
+		};
+	}
+	return () => {
+		detach();
+	};
 });
 
 onDestroy(() => {
-	if (scrollHandler) window.removeEventListener("scroll", scrollHandler);
+	detach();
+	visible = false;
 });
 </script>
 

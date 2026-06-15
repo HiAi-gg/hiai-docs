@@ -8,11 +8,10 @@ import {
 	AlignRight,
 	Bold,
 	Check,
+	ChevronDown,
 	Code2,
 	Copy,
 	Heading1,
-	Heading2,
-	Heading3,
 	Highlighter,
 	Image as ImageIcon,
 	Italic,
@@ -22,6 +21,8 @@ import {
 	Loader2,
 	Redo,
 	Smile,
+	Type,
+	Underline,
 	Undo,
 } from "lucide-svelte";
 import {
@@ -47,7 +48,6 @@ interface ToolbarAction {
 	// read a fresh boolean without calling `editor.isActive(...)` itself
 	// (which would skip Svelte's reactive graph).
 	key: string;
-	isActive: () => boolean;
 	onClick: () => void;
 }
 
@@ -94,11 +94,18 @@ const EMOJIS = [
 
 type TextAlignValue = "left" | "center" | "right" | "justify";
 
+// Dropdown open flags + popover roots (one per dropdown).
 let linkDialogOpen = $state(false);
 let highlightPickerOpen = $state(false);
 let highlightPickerRoot = $state<HTMLDivElement | null>(null);
 let emojiPickerOpen = $state(false);
 let emojiPickerRoot = $state<HTMLDivElement | null>(null);
+let headingDropdownOpen = $state(false);
+let headingDropdownRoot = $state<HTMLDivElement | null>(null);
+let listDropdownOpen = $state(false);
+let listDropdownRoot = $state<HTMLDivElement | null>(null);
+let alignDropdownOpen = $state(false);
+let alignDropdownRoot = $state<HTMLDivElement | null>(null);
 let copyConfirmation = $state(false);
 
 // TipTap mutates its internal state during transactions but doesn't bump
@@ -138,6 +145,7 @@ const activeStates = $derived.by<ActiveStates>(() => {
 	return {
 		bold: editor.isActive("bold"),
 		italic: editor.isActive("italic"),
+		underline: editor.isActive("underline"),
 		heading1: editor.isActive("heading", { level: 1 }),
 		heading2: editor.isActive("heading", { level: 2 }),
 		heading3: editor.isActive("heading", { level: 3 }),
@@ -153,6 +161,28 @@ const activeStates = $derived.by<ActiveStates>(() => {
 	};
 });
 
+// Resolve the current heading level (1/2/3) or null if the selection is in
+// a paragraph. Used to drive the Heading dropdown trigger label and icon.
+const activeHeadingLevel = $derived.by<1 | 2 | 3 | null>(() => {
+	void readEditorRevision;
+	if (!editor) return null;
+	if (editor.isActive("heading", { level: 1 })) return 1;
+	if (editor.isActive("heading", { level: 2 })) return 2;
+	if (editor.isActive("heading", { level: 3 })) return 3;
+	return null;
+});
+
+// Resolve the current text alignment. Defaults to "left" because that's
+// the editor's default for new content.
+const activeAlignment = $derived.by<TextAlignValue>(() => {
+	void readEditorRevision;
+	if (!editor) return "left";
+	if (editor.isActive({ textAlign: "center" })) return "center";
+	if (editor.isActive({ textAlign: "right" })) return "right";
+	if (editor.isActive({ textAlign: "justify" })) return "justify";
+	return "left";
+});
+
 // Resolve the active highlight color from the current selection, if any.
 const activeHighlightColor = $derived.by<HighlightColor | null>(() => {
 	if (!editor) return null;
@@ -164,80 +194,6 @@ const activeHighlightColor = $derived.by<HighlightColor | null>(() => {
 	const color = (attrs.color ?? "") as string;
 	const match = HIGHLIGHT_COLORS.find((c) => c.value === color);
 	return (match?.value as HighlightColor) ?? null;
-});
-
-const actions = $derived.by<ToolbarAction[]>(() => {
-	if (!editor) return [];
-	// Reference the revision so the derived recomputes whenever the editor
-	// state changes. The value itself is unused; only the dependency matters.
-	void readEditorRevision;
-	return [
-		{
-			icon: Bold,
-			label: m.editor_toolbar_bold(),
-			key: "bold",
-			isActive: () => editor?.isActive("bold"),
-			onClick: () => editor?.chain().focus().toggleBold().run(),
-		},
-		{
-			icon: Italic,
-			label: m.editor_toolbar_italic(),
-			key: "italic",
-			isActive: () => editor?.isActive("italic"),
-			onClick: () => editor?.chain().focus().toggleItalic().run(),
-		},
-		{
-			icon: Heading1,
-			label: m.editor_toolbar_heading_1(),
-			key: "heading1",
-			isActive: () => editor?.isActive("heading", { level: 1 }),
-			onClick: () => editor?.chain().focus().toggleHeading({ level: 1 }).run(),
-		},
-		{
-			icon: Heading2,
-			label: m.editor_toolbar_heading_2(),
-			key: "heading2",
-			isActive: () => editor?.isActive("heading", { level: 2 }),
-			onClick: () => editor?.chain().focus().toggleHeading({ level: 2 }).run(),
-		},
-		{
-			icon: Heading3,
-			label: m.editor_toolbar_heading_3(),
-			key: "heading3",
-			isActive: () => editor?.isActive("heading", { level: 3 }),
-			onClick: () => editor?.chain().focus().toggleHeading({ level: 3 }).run(),
-		},
-		{
-			icon: List,
-			label: m.editor_toolbar_bullet_list(),
-			key: "bulletList",
-			isActive: () => editor?.isActive("bulletList"),
-			onClick: () => editor?.chain().focus().toggleBulletList().run(),
-		},
-		{
-			icon: ListOrdered,
-			label: m.editor_toolbar_ordered_list(),
-			key: "orderedList",
-			isActive: () => editor?.isActive("orderedList"),
-			onClick: () => editor?.chain().focus().toggleOrderedList().run(),
-		},
-		{
-			icon: Code2,
-			label: m.editor_toolbar_code_block(),
-			key: "codeBlock",
-			isActive: () => editor?.isActive("codeBlock"),
-			onClick: () => editor?.chain().focus().toggleCodeBlock().run(),
-		},
-		{
-			icon: LinkIcon,
-			label: m.editor_toolbar_link(),
-			key: "link",
-			isActive: () => editor?.isActive("link"),
-			onClick: () => {
-				linkDialogOpen = true;
-			},
-		},
-	];
 });
 
 function isDisabled(): boolean {
@@ -271,9 +227,42 @@ function insertEmoji(emoji: string) {
 	emojiPickerOpen = false;
 }
 
+function toggleHeadingDropdown() {
+	headingDropdownOpen = !headingDropdownOpen;
+}
+
+function applyHeading(level: 1 | 2 | 3 | null) {
+	if (!editor) return;
+	if (level === null) {
+		editor.chain().focus().setParagraph().run();
+	} else {
+		editor.chain().focus().toggleHeading({ level }).run();
+	}
+	headingDropdownOpen = false;
+}
+
+function toggleListDropdown() {
+	listDropdownOpen = !listDropdownOpen;
+}
+
+function applyList(kind: "bullet" | "ordered") {
+	if (!editor) return;
+	if (kind === "bullet") {
+		editor.chain().focus().toggleBulletList().run();
+	} else {
+		editor.chain().focus().toggleOrderedList().run();
+	}
+	listDropdownOpen = false;
+}
+
+function toggleAlignDropdown() {
+	alignDropdownOpen = !alignDropdownOpen;
+}
+
 function applyAlignment(value: TextAlignValue) {
 	if (!editor) return;
 	editor.chain().focus().setTextAlign(value).run();
+	alignDropdownOpen = false;
 }
 
 function undo() {
@@ -360,12 +349,19 @@ async function handleImageSelected(event: Event) {
 	}
 }
 
-// Close the highlight + emoji pickers when clicking outside their root
-// element. Both popovers share the same outside-pointer + Escape
-// dismissal logic; the only difference is which open flag and root
-// element they read.
+// Close all popovers/dropdowns when clicking outside their root element.
+// Each popover shares the same outside-pointer + Escape dismissal logic;
+// the only difference is which open flag and root element they read.
 $effect(() => {
-	if (!highlightPickerOpen && !emojiPickerOpen) return;
+	if (
+		!highlightPickerOpen &&
+		!emojiPickerOpen &&
+		!headingDropdownOpen &&
+		!listDropdownOpen &&
+		!alignDropdownOpen
+	) {
+		return;
+	}
 	function onDocPointer(e: PointerEvent) {
 		const target = e.target as Node | null;
 		if (!target) return;
@@ -381,11 +377,32 @@ $effect(() => {
 				emojiPickerOpen = false;
 			}
 		}
+		if (headingDropdownOpen) {
+			const root = headingDropdownRoot;
+			if (root && !root.contains(target)) {
+				headingDropdownOpen = false;
+			}
+		}
+		if (listDropdownOpen) {
+			const root = listDropdownRoot;
+			if (root && !root.contains(target)) {
+				listDropdownOpen = false;
+			}
+		}
+		if (alignDropdownOpen) {
+			const root = alignDropdownRoot;
+			if (root && !root.contains(target)) {
+				alignDropdownOpen = false;
+			}
+		}
 	}
 	function onKey(e: KeyboardEvent) {
 		if (e.key === "Escape") {
 			highlightPickerOpen = false;
 			emojiPickerOpen = false;
+			headingDropdownOpen = false;
+			listDropdownOpen = false;
+			alignDropdownOpen = false;
 		}
 	}
 	document.addEventListener("pointerdown", onDocPointer);
@@ -399,26 +416,219 @@ $effect(() => {
 
 {#if editor}
 	<div class="toolbar" role="toolbar" aria-label={m.editor_toolbar_text_formatting()}>
-		{#each actions as action, i}
-			{#if i === 2 || i === 5 || i === 7 || i === 8}
-				<div class="toolbar-divider" aria-hidden="true"></div>
-			{/if}
-			<button
-				class="toolbar-btn"
-				class:active={activeStates[action.key] ?? false}
-				disabled={isDisabled()}
-				onclick={action.onClick}
-				title={action.label}
-				aria-label={action.label}
-				aria-pressed={activeStates[action.key] ?? false}
-				type="button"
-			>
-				<action.icon size={16} />
-			</button>
-		{/each}
+		<!-- Undo / Redo (leftmost) -->
+		<button
+			class="toolbar-btn"
+			disabled={isDisabled()}
+			onclick={undo}
+			title={m.editor_toolbar_undo()}
+			aria-label={m.editor_toolbar_undo()}
+			type="button"
+		>
+			<Undo size={16} />
+		</button>
+		<button
+			class="toolbar-btn"
+			disabled={isDisabled()}
+			onclick={redo}
+			title={m.editor_toolbar_redo()}
+			aria-label={m.editor_toolbar_redo()}
+			type="button"
+		>
+			<Redo size={16} />
+		</button>
 
 		<div class="toolbar-divider" aria-hidden="true"></div>
 
+		<!-- Inline marks: Bold, Italic, Underline -->
+		<button
+			class="toolbar-btn"
+			class:active={activeStates.bold ?? false}
+			disabled={isDisabled()}
+			onclick={() => editor?.chain().focus().toggleBold().run()}
+			title={m.editor_toolbar_bold()}
+			aria-label={m.editor_toolbar_bold()}
+			aria-pressed={activeStates.bold ?? false}
+			type="button"
+		>
+			<Bold size={16} />
+		</button>
+		<button
+			class="toolbar-btn"
+			class:active={activeStates.italic ?? false}
+			disabled={isDisabled()}
+			onclick={() => editor?.chain().focus().toggleItalic().run()}
+			title={m.editor_toolbar_italic()}
+			aria-label={m.editor_toolbar_italic()}
+			aria-pressed={activeStates.italic ?? false}
+			type="button"
+		>
+			<Italic size={16} />
+		</button>
+		<button
+			class="toolbar-btn"
+			class:active={activeStates.underline ?? false}
+			disabled={isDisabled()}
+			onclick={() => editor?.chain().focus().toggleUnderline().run()}
+			title={m.editor_toolbar_underline()}
+			aria-label={m.editor_toolbar_underline()}
+			aria-pressed={activeStates.underline ?? false}
+			type="button"
+		>
+			<Underline size={16} />
+		</button>
+
+		<div class="toolbar-divider" aria-hidden="true"></div>
+
+		<!-- Heading dropdown: Paragraph / Heading 1 / Heading 2 / Heading 3 -->
+		<div class="dropdown" bind:this={headingDropdownRoot}>
+			<button
+				class="toolbar-btn dropdown-trigger"
+				class:active={activeHeadingLevel !== null}
+				disabled={isDisabled()}
+				onclick={toggleHeadingDropdown}
+				title={m.editor_toolbar_heading()}
+				aria-label={m.editor_toolbar_heading()}
+				aria-haspopup="true"
+				aria-expanded={headingDropdownOpen}
+				type="button"
+			>
+				{#if activeHeadingLevel !== null}
+					<Heading1 size={16} />
+					<span class="dropdown-trigger-label">
+						{m.editor_toolbar_heading()} {activeHeadingLevel}
+					</span>
+				{:else}
+					<Type size={16} />
+					<span class="dropdown-trigger-label">
+						{m.editor_toolbar_paragraph()}
+					</span>
+				{/if}
+				<ChevronDown size={14} class="dropdown-chevron" />
+			</button>
+
+			{#if headingDropdownOpen}
+				<div class="dropdown-popover" role="menu" aria-label={m.editor_toolbar_heading()}>
+					<button
+						type="button"
+						class="dropdown-item"
+						class:selected={activeHeadingLevel === null}
+						role="menuitem"
+						onclick={() => applyHeading(null)}
+					>
+						<Type size={16} />
+						<span>{m.editor_toolbar_paragraph()}</span>
+					</button>
+					<button
+						type="button"
+						class="dropdown-item"
+						class:selected={activeHeadingLevel === 1}
+						role="menuitem"
+						onclick={() => applyHeading(1)}
+					>
+						<Heading1 size={16} />
+						<span>{m.editor_toolbar_heading_1()}</span>
+					</button>
+					<button
+						type="button"
+						class="dropdown-item"
+						class:selected={activeHeadingLevel === 2}
+						role="menuitem"
+						onclick={() => applyHeading(2)}
+					>
+						<Heading1 size={16} />
+						<span>{m.editor_toolbar_heading_2()}</span>
+					</button>
+					<button
+						type="button"
+						class="dropdown-item"
+						class:selected={activeHeadingLevel === 3}
+						role="menuitem"
+						onclick={() => applyHeading(3)}
+					>
+						<Heading1 size={16} />
+						<span>{m.editor_toolbar_heading_3()}</span>
+					</button>
+				</div>
+			{/if}
+		</div>
+
+		<div class="toolbar-divider" aria-hidden="true"></div>
+
+		<!-- List dropdown: Bullet / Numbered -->
+		<div class="dropdown" bind:this={listDropdownRoot}>
+			<button
+				class="toolbar-btn dropdown-trigger"
+				class:active={(activeStates.bulletList ?? false) || (activeStates.orderedList ?? false)}
+				disabled={isDisabled()}
+				onclick={toggleListDropdown}
+				title={m.editor_toolbar_list()}
+				aria-label={m.editor_toolbar_list()}
+				aria-haspopup="true"
+				aria-expanded={listDropdownOpen}
+				type="button"
+			>
+				<List size={16} />
+				<ChevronDown size={14} class="dropdown-chevron" />
+			</button>
+
+			{#if listDropdownOpen}
+				<div class="dropdown-popover" role="menu" aria-label={m.editor_toolbar_list()}>
+					<button
+						type="button"
+						class="dropdown-item"
+						class:selected={activeStates.bulletList ?? false}
+						role="menuitem"
+						onclick={() => applyList("bullet")}
+					>
+						<List size={16} />
+						<span>{m.editor_toolbar_bullet_list()}</span>
+					</button>
+					<button
+						type="button"
+						class="dropdown-item"
+						class:selected={activeStates.orderedList ?? false}
+						role="menuitem"
+						onclick={() => applyList("ordered")}
+					>
+						<ListOrdered size={16} />
+						<span>{m.editor_toolbar_ordered_list()}</span>
+					</button>
+				</div>
+			{/if}
+		</div>
+
+		<div class="toolbar-divider" aria-hidden="true"></div>
+
+		<!-- Block marks: Code block, Link -->
+		<button
+			class="toolbar-btn"
+			class:active={activeStates.codeBlock ?? false}
+			disabled={isDisabled()}
+			onclick={() => editor?.chain().focus().toggleCodeBlock().run()}
+			title={m.editor_toolbar_code_block()}
+			aria-label={m.editor_toolbar_code_block()}
+			aria-pressed={activeStates.codeBlock ?? false}
+			type="button"
+		>
+			<Code2 size={16} />
+		</button>
+		<button
+			class="toolbar-btn"
+			class:active={activeStates.link ?? false}
+			disabled={isDisabled()}
+			onclick={() => (linkDialogOpen = true)}
+			title={m.editor_toolbar_link()}
+			aria-label={m.editor_toolbar_link()}
+			aria-pressed={activeStates.link ?? false}
+			type="button"
+		>
+			<LinkIcon size={16} />
+		</button>
+
+		<div class="toolbar-divider" aria-hidden="true"></div>
+
+		<!-- Highlight color picker -->
 		<div class="highlight-picker" bind:this={highlightPickerRoot}>
 			<button
 				class="toolbar-btn highlight-btn"
@@ -466,13 +676,87 @@ $effect(() => {
 						>
 							{m.action_cancel()}
 						</button>
+					{/if}
+				</div>
+			{/if}
+		</div>
+
+		<div class="toolbar-divider" aria-hidden="true"></div>
+
+		<!-- Align dropdown: Left / Center / Right / Justify -->
+		<div class="dropdown" bind:this={alignDropdownRoot}>
+			<button
+				class="toolbar-btn dropdown-trigger"
+				class:active={activeAlignment !== "left"}
+				disabled={isDisabled()}
+				onclick={toggleAlignDropdown}
+				title={m.editor_toolbar_align()}
+				aria-label={m.editor_toolbar_align()}
+				aria-haspopup="true"
+				aria-expanded={alignDropdownOpen}
+				type="button"
+			>
+				{#if activeAlignment === "center"}
+					<AlignCenter size={16} />
+				{:else if activeAlignment === "right"}
+					<AlignRight size={16} />
+				{:else if activeAlignment === "justify"}
+					<AlignJustify size={16} />
+				{:else}
+					<AlignLeft size={16} />
 				{/if}
-			</div>
-		{/if}
-	</div>
+				<ChevronDown size={14} class="dropdown-chevron" />
+			</button>
 
-	<div class="toolbar-divider" aria-hidden="true"></div>
+			{#if alignDropdownOpen}
+				<div class="dropdown-popover" role="menu" aria-label={m.editor_toolbar_align()}>
+					<button
+						type="button"
+						class="dropdown-item"
+						class:selected={activeAlignment === "left"}
+						role="menuitem"
+						onclick={() => applyAlignment("left")}
+					>
+						<AlignLeft size={16} />
+						<span>{m.editor_toolbar_align_left()}</span>
+					</button>
+					<button
+						type="button"
+						class="dropdown-item"
+						class:selected={activeAlignment === "center"}
+						role="menuitem"
+						onclick={() => applyAlignment("center")}
+					>
+						<AlignCenter size={16} />
+						<span>{m.editor_toolbar_align_center()}</span>
+					</button>
+					<button
+						type="button"
+						class="dropdown-item"
+						class:selected={activeAlignment === "right"}
+						role="menuitem"
+						onclick={() => applyAlignment("right")}
+					>
+						<AlignRight size={16} />
+						<span>{m.editor_toolbar_align_right()}</span>
+					</button>
+					<button
+						type="button"
+						class="dropdown-item"
+						class:selected={activeAlignment === "justify"}
+						role="menuitem"
+						onclick={() => applyAlignment("justify")}
+					>
+						<AlignJustify size={16} />
+						<span>{m.editor_toolbar_align_justify()}</span>
+					</button>
+				</div>
+			{/if}
+		</div>
 
+		<div class="toolbar-divider" aria-hidden="true"></div>
+
+		<!-- Image upload -->
 		<button
 			class="toolbar-btn image-btn"
 			class:uploading={imageUploading}
@@ -499,6 +783,7 @@ $effect(() => {
 
 		<div class="toolbar-divider" aria-hidden="true"></div>
 
+		<!-- Emoji picker -->
 		<div class="emoji-picker" bind:this={emojiPickerRoot}>
 			<button
 				class="toolbar-btn"
@@ -531,82 +816,6 @@ $effect(() => {
 				</div>
 			{/if}
 		</div>
-
-		<div class="toolbar-divider" aria-hidden="true"></div>
-
-		<div class="align-group" role="group" aria-label={m.editor_toolbar_align_left()}>
-			<button
-				class="toolbar-btn"
-				class:active={activeStates.alignLeft ?? false}
-				disabled={isDisabled()}
-				onclick={() => applyAlignment("left")}
-				title={m.editor_toolbar_align_left()}
-				aria-label={m.editor_toolbar_align_left()}
-				aria-pressed={activeStates.alignLeft ?? false}
-				type="button"
-			>
-				<AlignLeft size={16} />
-			</button>
-			<button
-				class="toolbar-btn"
-				class:active={activeStates.alignCenter ?? false}
-				disabled={isDisabled()}
-				onclick={() => applyAlignment("center")}
-				title={m.editor_toolbar_align_center()}
-				aria-label={m.editor_toolbar_align_center()}
-				aria-pressed={activeStates.alignCenter ?? false}
-				type="button"
-			>
-				<AlignCenter size={16} />
-			</button>
-			<button
-				class="toolbar-btn"
-				class:active={activeStates.alignRight ?? false}
-				disabled={isDisabled()}
-				onclick={() => applyAlignment("right")}
-				title={m.editor_toolbar_align_right()}
-				aria-label={m.editor_toolbar_align_right()}
-				aria-pressed={activeStates.alignRight ?? false}
-				type="button"
-			>
-				<AlignRight size={16} />
-			</button>
-			<button
-				class="toolbar-btn"
-				class:active={activeStates.alignJustify ?? false}
-				disabled={isDisabled()}
-				onclick={() => applyAlignment("justify")}
-				title={m.editor_toolbar_align_justify()}
-				aria-label={m.editor_toolbar_align_justify()}
-				aria-pressed={activeStates.alignJustify ?? false}
-				type="button"
-			>
-				<AlignJustify size={16} />
-			</button>
-		</div>
-
-		<div class="toolbar-divider" aria-hidden="true"></div>
-
-		<button
-			class="toolbar-btn"
-			disabled={isDisabled()}
-			onclick={undo}
-			title={m.editor_toolbar_undo()}
-			aria-label={m.editor_toolbar_undo()}
-			type="button"
-		>
-			<Undo size={16} />
-		</button>
-		<button
-			class="toolbar-btn"
-			disabled={isDisabled()}
-			onclick={redo}
-			title={m.editor_toolbar_redo()}
-			aria-label={m.editor_toolbar_redo()}
-			type="button"
-		>
-			<Redo size={16} />
-		</button>
 
 		<div class="toolbar-divider" aria-hidden="true"></div>
 
@@ -692,6 +901,74 @@ $effect(() => {
 	.toolbar-btn:disabled {
 		opacity: 0.4;
 		cursor: not-allowed;
+	}
+
+	/* Dropdown trigger (heading / list / align) — keeps the trigger aligned
+	   with regular toolbar buttons but adds a small chevron to signal that
+	   a menu will open. */
+	.dropdown {
+		position: relative;
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+	}
+
+	.dropdown-trigger {
+		gap: 4px;
+		padding: 0 8px;
+	}
+
+	.dropdown-trigger-label {
+		font-size: 0.8rem;
+		font-weight: 500;
+		line-height: 1;
+	}
+
+	:global(.dropdown-chevron) {
+		opacity: 0.6;
+	}
+
+	.dropdown-popover {
+		position: absolute;
+		top: calc(100% + 6px);
+		left: 0;
+		z-index: 20;
+		display: flex;
+		flex-direction: column;
+		gap: 2px;
+		padding: 6px;
+		background: var(--popover);
+		color: var(--popover-foreground);
+		border: 1px solid var(--border);
+		border-radius: 8px;
+		box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+		min-width: 180px;
+	}
+
+	.dropdown-item {
+		display: inline-flex;
+		align-items: center;
+		gap: 10px;
+		padding: 6px 10px;
+		min-height: 32px;
+		font-size: 0.875rem;
+		background: transparent;
+		border: none;
+		border-radius: 4px;
+		color: var(--popover-foreground);
+		cursor: pointer;
+		text-align: left;
+		transition: background 0.1s ease;
+	}
+
+	.dropdown-item:hover {
+		background: var(--accent);
+		color: var(--accent-foreground);
+	}
+
+	.dropdown-item.selected {
+		background: color-mix(in srgb, var(--primary) 18%, transparent);
+		color: var(--foreground);
 	}
 
 	/* Highlight popover trigger button + indicator */
@@ -900,14 +1177,6 @@ $effect(() => {
 	.emoji-button:focus-visible {
 		outline: 2px solid var(--ring);
 		outline-offset: 1px;
-	}
-
-	/* Text-align group: keeps the four buttons visually grouped together
-	   with a subtle shared background, so users see them as one control. */
-	.align-group {
-		display: inline-flex;
-		align-items: center;
-		gap: 2px;
 	}
 
 	/* Copy button — turn the icon green briefly when the clipboard write

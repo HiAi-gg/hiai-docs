@@ -99,3 +99,19 @@
 .tiptap p {
 	min-height: 1.5em;
 }
+
+/* Images inserted by the TipTap Image extension get the `doc-image` class
+   via the extension's HTMLAttributes option. Render them as block-level,
+   full-width, and gently rounded so the editor flow treats them as a
+   proper block rather than an inline replaced element. Without
+   `display: block` the image sits on the text baseline and can render
+   with zero visible height when the surrounding paragraph has no
+   adjacent text. */
+.ProseMirror .doc-image,
+.tiptap .doc-image {
+	display: block;
+	max-width: 100%;
+	height: auto;
+	margin: 0.5rem 0;
+	border-radius: 6px;
+}

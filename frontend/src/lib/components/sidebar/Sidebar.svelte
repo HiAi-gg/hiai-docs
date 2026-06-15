@@ -5,10 +5,12 @@ import {
 	PanelLeftClose,
 	PanelLeftOpen,
 	Search,
+	Settings as SettingsIcon,
 	Tag,
 } from "lucide-svelte";
 import { goto } from "$app/navigation";
 import SearchBar from "$lib/components/SearchBar.svelte";
+import SettingsDialog from "$lib/components/SettingsDialog.svelte";
 import FolderTree from "$lib/components/sidebar/FolderTree.svelte";
 import RecentDocs from "$lib/components/sidebar/RecentDocs.svelte";
 import TagList from "$lib/components/sidebar/TagList.svelte";
@@ -16,6 +18,7 @@ import * as m from "$lib/paraglide/messages.js";
 import { cn } from "$lib/utils";
 
 let collapsed = $state(false);
+let showSettings = $state(false);
 type PanelMode = "all" | "recent" | "tags";
 let activePanel = $state<PanelMode>("all");
 
@@ -115,7 +118,22 @@ function toggleCollapse() {
     </div>
   {/if}
 
-  <div class={cn("border-t border-border p-2", collapsed ? "flex justify-center" : "")}>
+  <div class={cn("border-t border-border p-2", collapsed ? "flex flex-col items-center gap-2" : "space-y-2")}>
+    <button
+      type="button"
+      onclick={() => { showSettings = true; }}
+      class={cn(
+        "flex items-center rounded-md text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground",
+        collapsed ? "size-8 justify-center" : "w-full gap-2 px-2 py-1.5"
+      )}
+      title={m.settings_title()}
+      aria-label={m.settings_title()}
+    >
+      <SettingsIcon class="size-4 shrink-0" />
+      {#if !collapsed}
+        <span class="truncate">{m.settings_title()}</span>
+      {/if}
+    </button>
     <a
       href="https://hiai.gg/docs"
       target="_blank"
@@ -131,3 +149,5 @@ function toggleCollapse() {
     </a>
   </div>
 </aside>
+
+<SettingsDialog bind:open={showSettings} />

@@ -7,6 +7,8 @@ const envSchema = z.object({
 	REDIS_URL: z.string().default("redis://localhost:6380"),
 	MINIO_ENDPOINT: z.string().default("localhost"),
 	MINIO_PORT: z.coerce.number().default(9010),
+	MINIO_PUBLIC_ENDPOINT: z.string().default("localhost"),
+	MINIO_PUBLIC_PORT: z.coerce.number().default(9020),
 	MINIO_ACCESS_KEY: z.string().default("minioadmin"),
 	MINIO_SECRET_KEY: z.string().default("change-me-to-random-32-chars"),
 	MINIO_BUCKET: z.string().default("hiai-docs"),
