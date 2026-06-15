@@ -1,4 +1,6 @@
 <script lang="ts">
+import { cn } from "$lib/utils.js";
+
 interface Props {
 	icon?: typeof import("lucide-svelte").FileText;
 	title: string;

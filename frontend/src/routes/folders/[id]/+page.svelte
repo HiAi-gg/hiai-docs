@@ -1,6 +1,28 @@
 <script lang="ts">
+import { goto } from "$app/navigation";
+import {
+	ArrowUpDown,
+	ChevronRight,
+	Clock,
+	File,
+	FileText,
+	FolderOpen,
+	FolderPlus,
+	Plus,
+	SortAsc,
+} from "lucide-svelte";
 import { apiFetch } from "$lib/api/client";
 import * as m from "$lib/paraglide/messages.js";
+import DocumentCard from "$lib/components/DocumentCard.svelte";
+import FolderCard from "$lib/components/FolderCard.svelte";
+import { Badge } from "$lib/components/ui/badge/index.js";
+import { Button } from "$lib/components/ui/button/index.js";
+import {
+	DropdownMenu,
+	DropdownMenuContent,
+	DropdownMenuItem,
+	DropdownMenuTrigger,
+} from "$lib/components/ui/dropdown-menu/index.js";
 import type { Document, Folder, SortOption } from "$lib/types.js";
 
 const { data } = $props();

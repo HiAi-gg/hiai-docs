@@ -1,7 +1,6 @@
 <script lang="ts">
-import type { CardProps } from "./card.svelte.js";
 import { cn } from "$lib/utils";
-
+import type { CardProps } from "./card.svelte.js";
 
 let {
 	ref = $bindable(null),

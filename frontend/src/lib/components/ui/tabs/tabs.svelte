@@ -2,7 +2,6 @@
 import type { Snippet } from "svelte";
 import { cn } from "$lib/utils";
 
-
 let {
 	value = $bindable(""),
 	class: className,

@@ -34,8 +34,11 @@ export function listDocuments(params?: {
 	return apiFetch(`/api/documents${qs ? `?${qs}` : ""}`);
 }
 
-export function getDocument(id: string): Promise<Document> {
-	return apiFetch(`/api/documents/${id}`);
+export function getDocument(
+	id: string,
+	fetcher?: typeof fetch,
+): Promise<Document> {
+	return apiFetch(`/api/documents/${id}`, {}, fetcher);
 }
 
 export function createDocument(data: {
@@ -51,7 +54,12 @@ export function createDocument(data: {
 
 export function updateDocument(
 	id: string,
-	data: { title?: string; content?: string; folderId?: string },
+	data: {
+		title?: string;
+		content?: string;
+		folderId?: string;
+		contentTipex?: unknown;
+	},
 ): Promise<Document> {
 	return apiFetch(`/api/documents/${id}`, {
 		method: "PATCH",

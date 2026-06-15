@@ -1,54 +1,41 @@
 <script lang="ts">
-import CodeBlockLowlight from "@tiptap/extension-code-block-lowlight";
 import Collaboration from "@tiptap/extension-collaboration";
 import CollaborationCursor from "@tiptap/extension-collaboration-cursor";
-import Highlight from "@tiptap/extension-highlight";
-import Link from "@tiptap/extension-link";
-import { Markdown } from "@tiptap/markdown";
-import StarterKit from "@tiptap/starter-kit";
-import { common, createLowlight } from "lowlight";
 import { onDestroy, onMount } from "svelte";
-import type { Editor } from "svelte-tiptap";
-import { createEditor } from "svelte-tiptap";
+import { createEditor, type Editor, EditorContent } from "svelte-tiptap";
 import type { CollaborationSession } from "$lib/collaboration";
 import * as m from "$lib/paraglide/messages.js";
+import EditorToolbar from "./EditorToolbar.svelte";
+import { editorExtensions } from "./editorExtensions";
+
+export type TipexEditorOutput = { markdown: string; json: object };
 
 const {
 	content = "",
+	contentTipex,
 	placeholder = m.doc_content_placeholder(),
-	onUpdate = (_md: string) => {},
+	onUpdate = (_output: TipexEditorOutput) => {},
 	editable = true,
 	collaboration = null,
+	documentId = "",
 }: {
 	content?: string;
+	contentTipex?: object;
 	placeholder?: string;
-	onUpdate?: (markdown: string) => void;
+	onUpdate?: (output: TipexEditorOutput) => void;
 	editable?: boolean;
 	collaboration?: CollaborationSession | null;
+	documentId?: string;
 } = $props();
-
-const lowlight = createLowlight(common);
 
 let editorStore: ReturnType<typeof createEditor> | null = null;
 let editor = $state<Editor | null>(null);
 let ready = $state(false);
 let suppressNextUpdate = false;
+let internalUpdate = false;
 
 onMount(() => {
-	const extensions = [
-		StarterKit.configure({
-			heading: { levels: [1, 2, 3] },
-			codeBlock: false,
-			link: false,
-		}),
-		Markdown.configure({}),
-		Link.configure({
-			openOnClick: false,
-			HTMLAttributes: { class: "doc-link" },
-		}),
-		Highlight.configure({ multicolor: true }),
-		CodeBlockLowlight.configure({ lowlight }),
-	];
+	const extensions = [...editorExtensions];
 
 	if (collaboration?.doc) {
 		extensions.push(
@@ -85,11 +72,16 @@ onMount(() => {
 				return;
 			}
 			if (!collaboration) {
-				const mdExtension = ed.storage.markdown as
-					| { getMarkdown?: () => string }
-					| undefined;
-				const md = mdExtension?.getMarkdown?.() ?? ed.getText();
-				onUpdate(md);
+				// The Markdown extension augments the editor with a `getMarkdown()`
+				// method at onBeforeCreate time (see @tiptap/markdown Extension.ts).
+				// The `markdown` storage is `{ manager }`, not a `getMarkdown`
+				// function, so reading it as one always returned undefined and the
+				// fallback path produced plain text.
+				const getMarkdown = (ed as { getMarkdown?: () => string }).getMarkdown;
+				const markdown = getMarkdown ? getMarkdown.call(ed) : ed.getText();
+				const json = ed.getJSON() as object;
+				internalUpdate = true;
+				onUpdate({ markdown, json });
 			}
 		},
 	});
@@ -107,10 +99,20 @@ onMount(() => {
 let prevContent = $state("");
 $effect(() => {
 	if (!editor || collaboration?.doc) return;
-	if (content !== prevContent) {
-		prevContent = content;
+	// Prefer the persisted ProseMirror JSON when available — the markdown
+	// view keeps it in sync on every keystroke, so we avoid re-parsing
+	// the markdown back into JSON on every mount.
+	const nextSource = contentTipex ?? content;
+	const nextSerialized = contentTipex ? JSON.stringify(contentTipex) : content;
+	if (internalUpdate) {
+		internalUpdate = false;
+		prevContent = nextSerialized;
+		return;
+	}
+	if (nextSerialized !== prevContent) {
+		prevContent = nextSerialized;
 		suppressNextUpdate = true;
-		editor.commands.setContent(content, { emitUpdate: false });
+		editor.commands.setContent(nextSource, { emitUpdate: false });
 	}
 });
 
@@ -121,7 +123,7 @@ onDestroy(() => {
 
 <div class="tipex-wrapper">
   {#if ready && editor}
-    <EditorToolbar {editor} />
+    <EditorToolbar {editor} {documentId} />
     <div class="editor-content">
       <EditorContent {editor} />
     </div>

@@ -1,5 +1,7 @@
 <!-- DocumentTitle.svelte — Editable title input with auto-save on blur -->
 <script lang="ts">
+import * as m from "$lib/paraglide/messages.js";
+
 const {
 	title = "",
 	onUpdate = (_title: string) => {},
@@ -21,14 +23,14 @@ $effect(() => {
 	}
 });
 
-function _handleBlur() {
+function handleBlur() {
 	focused = false;
 	if (localTitle !== title) {
 		onUpdate(localTitle);
 	}
 }
 
-function _handleKeydown(e: KeyboardEvent) {
+function handleKeydown(e: KeyboardEvent) {
 	if (e.key === "Enter") {
 		e.preventDefault();
 		(e.target as HTMLInputElement).blur();
@@ -39,7 +41,7 @@ function _handleKeydown(e: KeyboardEvent) {
 	}
 }
 
-function _handleFocus() {
+function handleFocus() {
 	focused = true;
 }
 </script>

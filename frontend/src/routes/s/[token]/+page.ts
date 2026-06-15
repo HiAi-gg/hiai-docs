@@ -1,3 +1,5 @@
-export const load = async ({ params }: { params: { token: string } }) => {
-	return { token: params.token };
+import type { PageLoad } from "./$types";
+
+export const load: PageLoad = async ({ params, fetch }) => {
+	return { token: params.token, fetch };
 };

@@ -1,9 +1,9 @@
 import { getDocument } from "$lib/api/documents";
 import type { PageLoad } from "./$types";
 
-export const load: PageLoad = async ({ params }) => {
+export const load: PageLoad = async ({ params, fetch }) => {
 	try {
-		const document = await getDocument(params.id);
+		const document = await getDocument(params.id, fetch);
 		return { document };
 	} catch {
 		// Fallback when backend unavailable
@@ -18,7 +18,7 @@ export const load: PageLoad = async ({ params }) => {
 				createdAt: new Date().toISOString(),
 				updatedAt: new Date().toISOString(),
 				excerpt: "",
-			},
+			} as Awaited<ReturnType<typeof getDocument>>,
 		};
 	}
 };

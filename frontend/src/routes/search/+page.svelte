@@ -1,12 +1,9 @@
 <script lang="ts">
-import { goto } from "$app/navigation";
-import * as m from "$lib/paraglide/messages.js";
-import SearchResult from "$lib/components/SearchResult.svelte";
-import { getFilterOptions, type SearchResponse, search } from "$lib/api/search";
 import {
 	Calendar,
 	ChevronLeft,
 	ChevronRight,
+	FileSearch,
 	Folder,
 	Loader2,
 	RotateCcw,
@@ -15,6 +12,10 @@ import {
 	Tag,
 	X,
 } from "lucide-svelte";
+import { goto } from "$app/navigation";
+import { getFilterOptions, type SearchResponse, search } from "$lib/api/search";
+import SearchResult from "$lib/components/SearchResult.svelte";
+import * as m from "$lib/paraglide/messages.js";
 
 const { data } = $props();
 

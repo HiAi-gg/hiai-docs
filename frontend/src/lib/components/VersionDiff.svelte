@@ -34,7 +34,7 @@ function computeDiff(oldText: string, newText: string): DiffLine[] {
 	return result;
 }
 
-const _diff = $derived(computeDiff(oldContent, newContent));
+const diff = $derived(computeDiff(oldContent, newContent));
 </script>
 
 <div class="overflow-auto rounded-md border border-border font-mono text-sm">

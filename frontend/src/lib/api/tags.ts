@@ -43,16 +43,19 @@ export function getTag(id: string): Promise<Tag> {
 	return apiFetch(`/api/tags/${id}`);
 }
 
-export function createTag(name: string): Promise<Tag> {
-	const input = createTagInputSchema.parse({ name });
+export function createTag(name: string, color?: string): Promise<Tag> {
+	const input = createTagInputSchema.parse({ name, color });
 	return apiFetch("/api/tags", {
 		method: "POST",
 		body: JSON.stringify(input),
 	});
 }
 
-export function updateTag(id: string, name: string): Promise<Tag> {
-	const input = updateTagInputSchema.parse({ name });
+export function updateTag(
+	id: string,
+	data: { name?: string; color?: string },
+): Promise<Tag> {
+	const input = updateTagInputSchema.parse(data);
 	return apiFetch(`/api/tags/${id}`, {
 		method: "PATCH",
 		body: JSON.stringify(input),
@@ -61,4 +64,24 @@ export function updateTag(id: string, name: string): Promise<Tag> {
 
 export function deleteTag(id: string): Promise<void> {
 	return apiFetch(`/api/tags/${id}`, { method: "DELETE" });
+}
+
+export function addTagToDocument(
+	documentId: string,
+	tagId: string,
+): Promise<void> {
+	const input = z.object({ tagId: z.string().uuid() }).parse({ tagId });
+	return apiFetch(`/api/documents/${documentId}/tags`, {
+		method: "POST",
+		body: JSON.stringify(input),
+	});
+}
+
+export function removeTagFromDocument(
+	documentId: string,
+	tagId: string,
+): Promise<void> {
+	return apiFetch(`/api/documents/${documentId}/tags/${tagId}`, {
+		method: "DELETE",
+	});
 }

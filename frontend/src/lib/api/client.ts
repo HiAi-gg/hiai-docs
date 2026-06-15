@@ -5,6 +5,10 @@ interface FetchOptions extends RequestInit {
 export async function apiFetch<T>(
 	path: string,
 	options: FetchOptions = {},
+	// Optional fetcher — pass SvelteKit's `load`/`fetch` to inherit cookies
+	// and bypass the `window.fetch` warning. Falls back to the global
+	// `fetch` when called from the browser outside SvelteKit.
+	fetcher: typeof fetch = fetch,
 ): Promise<T> {
 	const { timeout = 10000, body, ...fetchOptions } = options;
 	const controller = new AbortController();
@@ -16,7 +20,7 @@ export async function apiFetch<T>(
 	}
 
 	try {
-		const response = await fetch(path, {
+		const response = await fetcher(path, {
 			...fetchOptions,
 			body,
 			signal: controller.signal,

@@ -55,3 +55,6 @@ ollama_data/
 
 # Backup
 backup/
+
+# SvelteKit backup
+.svelte-kit.bak/

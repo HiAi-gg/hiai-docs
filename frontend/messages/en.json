@@ -256,6 +256,13 @@
   "doc_save_title_error": "Failed to save title",
   "doc_delete_error": "Failed to delete document",
   "doc_page_title": "{title} — hiai-docs",
+  "tags_load_error": "Failed to load tags",
+  "tag_add_error": "Failed to add tag",
+  "tag_remove_error": "Failed to remove tag",
+  "tag_add_label": "Add tag",
+  "tag_remove_label": "Remove tag",
+  "tag_no_tags_available": "No tags available",
+  "tag_drop_aria": "Tag menu",
 
   "folder_click_to_rename": "Click to rename",
   "folder_new_subfolder": "New Subfolder",

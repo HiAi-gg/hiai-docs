@@ -1,17 +1,51 @@
 <!-- Document editor page -->
 <script lang="ts">
+import {
+	Check,
+	ChevronRight,
+	Code,
+	Download,
+	FileText,
+	Loader2,
+	MoreHorizontal,
+	Pencil,
+	Plus,
+	Share2,
+	Trash2,
+	X,
+} from "lucide-svelte";
 import { onMount } from "svelte";
+import { onDestroy } from "svelte";
 import { goto } from "$app/navigation";
 import { deleteDocument, updateDocument } from "$lib/api/documents";
+import {
+	addTagToDocument,
+	listTags,
+	removeTagFromDocument,
+} from "$lib/api/tags";
+import DocumentTitle from "$lib/components/editor/DocumentTitle.svelte";
+import MarkdownToggle from "$lib/components/editor/MarkdownToggle.svelte";
+import type { TipexEditorOutput } from "$lib/components/editor/TipexEditor.svelte";
+import TipexEditor from "$lib/components/editor/TipexEditor.svelte";
+import ShareDialog from "$lib/components/ShareDialog.svelte";
+import {
+	DropdownMenu,
+	DropdownMenuContent,
+	DropdownMenuItem,
+	DropdownMenuTrigger,
+} from "$lib/components/ui/dropdown-menu";
 import * as m from "$lib/paraglide/messages.js";
 
 const { data } = $props();
 
 let title = $state("");
 let content = $state("");
+let contentTipex = $state<object | undefined>(undefined);
 $effect(() => {
 	title = data.document.title;
 	content = data.document.content ?? "";
+	contentTipex =
+		(data.document.contentTipex as object | null | undefined) ?? undefined;
 });
 let mode = $state<"wysiwyg" | "markdown">("wysiwyg");
 let saveStatus = $state<"saved" | "saving" | "unsaved">("saved");
@@ -20,11 +54,57 @@ let loading = $state(true);
 let error = $state<string | null>(null);
 let showShareDialog = $state(false);
 
+// Tag management
+type DocTag = { id: string; name: string; color: string };
+let tags = $state<DocTag[]>([]);
+let availableTags = $state<DocTag[]>([]);
+let tagsLoading = $state(false);
+let tagBusy = $state(false);
+
+$effect(() => {
+	tags = data.document.tags ?? [];
+});
+
+const assignedTagIds = $derived(new Set(tags.map((t) => t.id)));
+const assignableTags = $derived(
+	availableTags.filter((t) => !assignedTagIds.has(t.id)),
+);
+
+let errorTimer: ReturnType<typeof setTimeout> | null = null;
+
+function setError(msg: string | null) {
+	error = msg;
+	// Auto-dismiss the banner after 5s so transient errors don't linger
+	// forever. Clear any pending timer first to avoid races when several
+	// errors fire in quick succession.
+	if (errorTimer) {
+		clearTimeout(errorTimer);
+		errorTimer = null;
+	}
+	if (msg !== null) {
+		errorTimer = setTimeout(() => {
+			error = null;
+			errorTimer = null;
+		}, 5000);
+	}
+}
+
 // Initialize after mount
 onMount(() => {
 	title = data.document.title;
 	content = data.document.content;
+	contentTipex =
+		(data.document.contentTipex as object | null | undefined) ?? undefined;
 	loading = false;
+});
+
+onDestroy(() => {
+	// Clear any pending auto-dismiss timer so we don't write to a
+	// destroyed component's state if the user navigates away mid-delay.
+	if (errorTimer) {
+		clearTimeout(errorTimer);
+		errorTimer = null;
+	}
 });
 
 // Close dropdown on outside click
@@ -37,22 +117,31 @@ function handleWindowClick(e: MouseEvent) {
 	}
 }
 
-// Auto-save debounce for content
+// Auto-save debounce for content.
+// Accepts a TipexEditorOutput (`{ markdown, json }`) from either editor
+// so that edits in the raw-markdown view keep the server-side
+// `contentTipex` in sync — the wysiwyg editor reuses that field to avoid
+// re-parsing on every load.
+type ContentUpdate = TipexEditorOutput;
 let contentSaveTimer: ReturnType<typeof setTimeout> | null = null;
 
-function debounceContentSave(newContent: string) {
-	content = newContent;
+function debounceContentSave(update: ContentUpdate) {
+	content = update.markdown;
+	contentTipex = update.json;
 	saveStatus = "unsaved";
 	if (contentSaveTimer) clearTimeout(contentSaveTimer);
 	contentSaveTimer = setTimeout(async () => {
-		await saveContent(newContent);
+		await saveContent(update);
 	}, 1000);
 }
 
-async function saveContent(newContent: string) {
+async function saveContent(update: ContentUpdate) {
 	saveStatus = "saving";
 	try {
-		await updateDocument(data.document.id, { content: newContent });
+		await updateDocument(data.document.id, {
+			content: update.markdown,
+			contentTipex: update.json,
+		});
 		saveStatus = "saved";
 	} catch (_e) {
 		saveStatus = "unsaved";
@@ -96,6 +185,53 @@ function handleExport() {
 
 function handleShare() {
 	showShareDialog = true;
+}
+
+async function loadAvailableTags() {
+	if (availableTags.length > 0 || tagsLoading) return;
+	tagsLoading = true;
+	try {
+		const all = await listTags();
+		availableTags = all.map((t) => ({
+			id: t.id,
+			name: t.name,
+			color: t.color ?? "#888",
+		}));
+	} catch (_e) {
+		setError(m.tags_load_error());
+	} finally {
+		tagsLoading = false;
+	}
+}
+
+async function handleAddTag(tagId: string) {
+	if (tagBusy) return;
+	tagBusy = true;
+	const tag = availableTags.find((t) => t.id === tagId);
+	try {
+		await addTagToDocument(data.document.id, tagId);
+		if (tag) tags = [...tags, { id: tag.id, name: tag.name, color: tag.color }];
+		availableTags = availableTags.filter((t) => t.id !== tagId);
+	} catch (_e) {
+		setError(m.tag_add_error());
+	} finally {
+		tagBusy = false;
+	}
+}
+
+async function handleRemoveTag(tagId: string) {
+	if (tagBusy) return;
+	tagBusy = true;
+	const tag = tags.find((t) => t.id === tagId);
+	try {
+		await removeTagFromDocument(data.document.id, tagId);
+		tags = tags.filter((t) => t.id !== tagId);
+		if (tag) availableTags = [...availableTags, tag];
+	} catch (_e) {
+		setError(m.tag_remove_error());
+	} finally {
+		tagBusy = false;
+	}
 }
 </script>
 
@@ -222,7 +358,7 @@ function handleShare() {
     {#if error}
       <div class="error-banner" role="alert">
         <span>{error}</span>
-        <button class="error-dismiss" onclick={() => (error = null)} aria-label={m.error_dismiss()}>
+        <button class="error-dismiss" onclick={() => setError(null)} aria-label={m.error_dismiss()}>
           &times;
         </button>
       </div>
@@ -234,23 +370,78 @@ function handleShare() {
       <DocumentTitle {title} onUpdate={handleTitleUpdate} />
 
       <!-- Tags -->
-      {#if (data.document.tags?.length ?? 0) > 0}
-        <div class="tag-row">
-          {#each data.document.tags as tag (tag.name)}
-            <span
-              class="tag-badge"
-              style="background-color: {tag.color}20; color: {tag.color}; border-color: {tag.color}40"
+      <div class="tag-row">
+        {#each tags as tag (tag.id)}
+          <span
+            class="tag-badge"
+            style="background-color: {tag.color}20; color: {tag.color}; border-color: {tag.color}40"
+          >
+            {tag.name}
+            <button
+              type="button"
+              class="tag-remove"
+              onclick={() => handleRemoveTag(tag.id)}
+              disabled={tagBusy}
+              aria-label={m.tag_remove_label()}
+              title={m.tag_remove_label()}
             >
-              {tag.name}
-            </span>
-          {/each}
-        </div>
-      {/if}
+              <X size={12} />
+            </button>
+          </span>
+        {/each}
+        <DropdownMenu onOpenChange={(open) => open && void loadAvailableTags()}>
+          <DropdownMenuTrigger>
+            {#snippet child({ props })}
+              <button
+                {...props}
+                type="button"
+                class="tag-add-btn"
+                disabled={tagBusy}
+                aria-label={m.tag_add_label()}
+                title={m.tag_add_label()}
+              >
+                {#if tagsLoading}
+                  <Loader2 size={12} class="animate-spin" />
+                {:else}
+                  <Plus size={12} />
+                {/if}
+                {m.tag_add_label()}
+              </button>
+            {/snippet}
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start">
+            {#if assignableTags.length === 0}
+              <div class="tag-empty">
+                {m.tag_no_tags_available()}
+              </div>
+            {:else}
+              {#each assignableTags as tag (tag.id)}
+                <DropdownMenuItem
+                  disabled={tagBusy}
+                  onSelect={() => handleAddTag(tag.id)}
+                >
+                  <span
+                    class="tag-swatch"
+                    style="background-color: {tag.color}"
+                  ></span>
+                  {tag.name}
+                </DropdownMenuItem>
+              {/each}
+            {/if}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
 
       <!-- Editor -->
       <div class="editor-container">
         {#if mode === "wysiwyg"}
-          <TipexEditor {content} onUpdate={debounceContentSave} editable={true} />
+          <TipexEditor
+            {content}
+            {contentTipex}
+            onUpdate={debounceContentSave}
+            editable={true}
+            documentId={data.document.id}
+          />
         {:else}
           <MarkdownToggle {content} onUpdate={debounceContentSave} />
         {/if}
@@ -539,16 +730,84 @@ function handleShare() {
     gap: 6px;
     margin-bottom: 16px;
     flex-wrap: wrap;
+    align-items: center;
   }
 
   .tag-badge {
     display: inline-flex;
     align-items: center;
-    padding: 2px 8px;
+    gap: 4px;
+    padding: 2px 4px 2px 8px;
     border-radius: 4px;
     font-size: 12px;
     font-weight: 500;
     border: 1px solid;
+  }
+
+  .tag-remove {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
+    padding: 0;
+    border: none;
+    border-radius: 3px;
+    background: transparent;
+    color: inherit;
+    cursor: pointer;
+    opacity: 0.6;
+    transition: opacity 0.15s, background 0.15s;
+  }
+
+  .tag-remove:hover {
+    opacity: 1;
+    background: color-mix(in srgb, currentColor 20%, transparent);
+  }
+
+  .tag-remove:disabled {
+    cursor: not-allowed;
+    opacity: 0.3;
+  }
+
+  .tag-add-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 500;
+    border: 1px dashed var(--border);
+    background: transparent;
+    color: var(--muted-foreground);
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
+  }
+
+  .tag-add-btn:hover {
+    background: var(--muted);
+    color: var(--foreground);
+    border-color: var(--muted-foreground);
+  }
+
+  .tag-add-btn:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+  }
+
+  .tag-swatch {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .tag-empty {
+    padding: 8px 12px;
+    font-size: 12px;
+    color: var(--muted-foreground);
   }
 
   .editor-container {

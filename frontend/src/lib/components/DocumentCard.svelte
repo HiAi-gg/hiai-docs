@@ -1,6 +1,29 @@
 <script lang="ts">
 import { goto } from "$app/navigation";
+import {
+	ArrowUpRight,
+	Copy,
+	FileText,
+	FolderInput,
+	MoreVertical,
+	Trash2,
+} from "lucide-svelte";
+import * as m from "$lib/paraglide/messages.js";
 import type { Document } from "$lib/types.js";
+import { cn, formatRelativeTime } from "$lib/utils.js";
+import {
+	Card,
+	CardContent,
+	CardHeader,
+} from "$lib/components/ui/card/index.js";
+import {
+	DropdownMenu,
+	DropdownMenuContent,
+	DropdownMenuItem,
+	DropdownMenuSeparator,
+	DropdownMenuTrigger,
+} from "$lib/components/ui/dropdown-menu/index.js";
+import { Badge } from "$lib/components/ui/badge/index.js";
 
 const {
 	document: doc,
@@ -16,14 +39,14 @@ function navigateToDoc() {
 	goto(`/docs/${doc.id}`);
 }
 
-function _handleKeydown(e: KeyboardEvent) {
+function handleKeydown(e: KeyboardEvent) {
 	if (e.key === "Enter" || e.key === " ") {
 		e.preventDefault();
 		navigateToDoc();
 	}
 }
 
-const _preview = $derived(doc.excerpt || doc.content?.slice(0, 100) || "");
+const preview = $derived(doc.excerpt || doc.content?.slice(0, 100) || "");
 </script>
 
 <Card

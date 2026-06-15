@@ -2,7 +2,6 @@
 import type { HTMLAttributes } from "svelte/elements";
 import { cn } from "$lib/utils";
 
-
 const {
 	class: className,
 	children,

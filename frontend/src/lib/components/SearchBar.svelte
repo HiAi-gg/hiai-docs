@@ -1,10 +1,13 @@
 <script lang="ts">
 import { goto } from "$app/navigation";
+import { Search } from "lucide-svelte";
+import * as m from "$lib/paraglide/messages.js";
+import { cn } from "$lib/utils.js";
 
 const { class: className }: { class?: string } = $props();
 let query = $state("");
 
-function _handleKeydown(e: KeyboardEvent) {
+function handleKeydown(e: KeyboardEvent) {
 	if (e.key === "Enter" && query.trim()) {
 		goto(`/search?q=${encodeURIComponent(query.trim())}`);
 	}

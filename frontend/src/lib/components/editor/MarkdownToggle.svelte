@@ -1,18 +1,33 @@
 <!-- MarkdownToggle.svelte — Raw Markdown editing view -->
 <script lang="ts">
+import * as m from "$lib/paraglide/messages.js";
+import { markdownToJson } from "./markdown";
+import type { TipexEditorOutput } from "./TipexEditor.svelte";
+
 const {
 	content = "",
-	onUpdate = (_md: string) => {},
+	onUpdate = (_output: TipexEditorOutput) => {},
 }: {
 	content?: string;
-	onUpdate?: (markdown: string) => void;
+	onUpdate?: (output: TipexEditorOutput) => void;
 } = $props();
 
 let textarea = $state<HTMLTextAreaElement | null>(null);
 
+// Persist + parse the new markdown into a ProseMirror doc so the
+// `contentTipex` field stays in sync. Without this the wysiwyg editor
+// would show stale content the next time the user switches modes.
+// Parsing happens synchronously on every keystroke — the underlying
+// `marked` tokenizer is fast and `generateJSON` is cheap for the
+// document sizes we expect in the editor.
+function emitUpdate(markdown: string) {
+	const json = markdownToJson(markdown);
+	onUpdate({ markdown, json });
+}
+
 function handleInput(e: Event) {
 	const target = e.target as HTMLTextAreaElement;
-	onUpdate(target.value);
+	emitUpdate(target.value);
 }
 
 function handleKeydown(e: KeyboardEvent) {
@@ -23,7 +38,7 @@ function handleKeydown(e: KeyboardEvent) {
 		const end = target.selectionEnd;
 		target.value = `${target.value.substring(0, start)}\t${target.value.substring(end)}`;
 		target.selectionStart = target.selectionEnd = start + 1;
-		onUpdate(target.value);
+		emitUpdate(target.value);
 	}
 }
 </script>

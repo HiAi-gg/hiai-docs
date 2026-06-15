@@ -1,6 +1,23 @@
 <script lang="ts">
 import { goto } from "$app/navigation";
+import {
+	Folder,
+	FolderInput,
+	MoreVertical,
+	Pencil,
+	Trash2,
+} from "lucide-svelte";
+import * as m from "$lib/paraglide/messages.js";
 import type { Folder as FolderType } from "$lib/types.js";
+import { formatRelativeTime } from "$lib/utils.js";
+import { Card, CardContent } from "$lib/components/ui/card/index.js";
+import {
+	DropdownMenu,
+	DropdownMenuContent,
+	DropdownMenuItem,
+	DropdownMenuSeparator,
+	DropdownMenuTrigger,
+} from "$lib/components/ui/dropdown-menu/index.js";
 
 const {
 	folder,
@@ -16,7 +33,7 @@ function navigateToFolder() {
 	goto(`/folders/${folder.id}`);
 }
 
-function _handleKeydown(e: KeyboardEvent) {
+function handleKeydown(e: KeyboardEvent) {
 	if (e.key === "Enter" || e.key === " ") {
 		e.preventDefault();
 		navigateToFolder();
