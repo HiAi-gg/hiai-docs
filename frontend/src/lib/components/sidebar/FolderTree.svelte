@@ -30,6 +30,7 @@ import {
 import { Input } from "$lib/components/ui/input";
 import { Label } from "$lib/components/ui/label";
 import * as m from "$lib/paraglide/messages.js";
+import { getDocRefreshNonce } from "$lib/stores/tag-store.svelte";
 import { cn } from "$lib/utils";
 import { copyToClipboard } from "$lib/utils/clipboard.js";
 
@@ -190,6 +191,15 @@ async function refresh() {
 }
 
 onMount(() => {
+	void refresh();
+});
+
+// Re-fetch folders and documents whenever the global doc refresh nonce
+// changes (e.g. after a dashboard import or another component calls
+// refreshDocs()). Reading the nonce inside the effect registers it as
+// a reactive dependency.
+$effect(() => {
+	void getDocRefreshNonce();
 	void refresh();
 });
 

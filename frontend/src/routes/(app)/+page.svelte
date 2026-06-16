@@ -1,21 +1,35 @@
 <script lang="ts">
-import { onMount } from "svelte";
+import {
+	Check,
+	Clock,
+	Copy,
+	FileText,
+	Loader2,
+	Plus,
+	Tag,
+	Upload,
+} from "lucide-svelte";
+import { onDestroy, onMount } from "svelte";
 import { goto } from "$app/navigation";
-import { Clock, FileText, Plus, Tag, Upload } from "lucide-svelte";
 import {
 	createDocument,
 	type Document,
+	getDocument,
 	importDocument,
 	listDocuments,
 } from "$lib/api/documents";
-import * as m from "$lib/paraglide/messages.js";
 import SearchBar from "$lib/components/SearchBar.svelte";
+import * as m from "$lib/paraglide/messages.js";
+import { refreshDocs } from "$lib/stores/tag-store.svelte";
 import { stripMarkdown } from "$lib/utils/strip-markdown";
 
 let recentDocs = $state<Document[]>([]);
 let loading = $state(true);
 let error = $state<string | null>(null);
 let importInput = $state<HTMLInputElement | undefined>(undefined);
+let copiedDocId = $state<string | null>(null);
+let copyLoadingDocId = $state<string | null>(null);
+let copyTimer: ReturnType<typeof setTimeout> | null = null;
 
 onMount(async () => {
 	try {
@@ -27,6 +41,40 @@ onMount(async () => {
 		loading = false;
 	}
 });
+
+onDestroy(() => {
+	if (copyTimer) {
+		clearTimeout(copyTimer);
+		copyTimer = null;
+	}
+});
+
+async function handleCopyContent(e: MouseEvent, docId: string) {
+	e.preventDefault();
+	e.stopPropagation();
+	if (typeof window === "undefined") return;
+	const cached = recentDocs.find((d) => d.id === docId);
+	let text = "";
+	copyLoadingDocId = docId;
+	try {
+		const full = await getDocument(docId);
+		text = full.content ?? "";
+	} catch (err) {
+		console.error("Dashboard: failed to fetch full document for copy", err);
+		text = cached?.excerpt ?? cached?.content ?? "";
+	} finally {
+		copyLoadingDocId = null;
+	}
+	if (!text) return;
+	const ok = await copyToClipboard(text);
+	if (!ok) return;
+	copiedDocId = docId;
+	if (copyTimer) clearTimeout(copyTimer);
+	copyTimer = setTimeout(() => {
+		copiedDocId = null;
+		copyTimer = null;
+	}, 2000);
+}
 
 function triggerImport() {
 	importInput?.click();
@@ -52,6 +100,11 @@ async function handleImportFile(e: Event) {
 		await importDocument(file);
 		const res = await listDocuments({ limit: 6 });
 		recentDocs = res.items;
+		// Nudge sidebar components (RecentDocs, FolderTree) to refetch
+		// their document lists. They subscribe to the doc refresh nonce
+		// via $effect and re-load on change, so the imported document
+		// appears immediately without a page reload.
+		refreshDocs();
 	} catch (err) {
 		error = err instanceof Error ? err.message : "Import failed";
 	}
@@ -127,9 +180,25 @@ const hasDocs = $derived(recentDocs.length > 0);
           {#each recentDocs as doc (doc.id)}
             <a
               href={`/docs/${doc.id}`}
-              class="group rounded-lg border border-border bg-card p-4 shadow-sm transition-all hover:shadow-md hover:border-primary/30"
+              class="group relative rounded-lg border border-border bg-card p-4 shadow-sm transition-all hover:shadow-md hover:border-primary/30"
             >
-              <div class="mb-2 flex items-start justify-between">
+              <button
+                type="button"
+                class="absolute right-2 top-2 inline-flex size-7 items-center justify-center rounded-md text-muted-foreground opacity-0 transition-opacity hover:bg-accent hover:text-accent-foreground group-hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring {copiedDocId === doc.id || copyLoadingDocId === doc.id ? 'opacity-100' : ''}"
+                aria-label={m.action_copy_content()}
+                title={m.action_copy_content()}
+                disabled={copyLoadingDocId === doc.id}
+                onclick={(e: MouseEvent) => void handleCopyContent(e, doc.id)}
+              >
+                {#if copyLoadingDocId === doc.id}
+                  <Loader2 class="size-3.5 animate-spin" />
+                {:else if copiedDocId === doc.id}
+                  <Check class="size-3.5" />
+                {:else}
+                  <Copy class="size-3.5" />
+                {/if}
+              </button>
+              <div class="mb-2 flex items-start justify-between pr-8">
                 <div class="flex items-center gap-2">
                   <FileText class="size-4 shrink-0 text-muted-foreground" />
                   <h3 class="font-medium leading-tight group-hover:text-primary">{doc.title}</h3>

@@ -3,6 +3,7 @@ import { Check, Copy, FileText, Loader2 } from "lucide-svelte";
 import { onDestroy, onMount } from "svelte";
 import { type Document, getDocument, listDocuments } from "$lib/api/documents";
 import * as m from "$lib/paraglide/messages.js";
+import { getDocRefreshNonce } from "$lib/stores/tag-store.svelte";
 import { copyToClipboard } from "$lib/utils/clipboard.js";
 import { cn } from "$lib/utils.js";
 
@@ -13,14 +14,28 @@ let copiedDocId = $state<string | null>(null);
 let copyLoadingDocId = $state<string | null>(null);
 let copyTimer: ReturnType<typeof setTimeout> | null = null;
 
-onMount(async () => {
+async function fetchRecentDocs() {
 	try {
 		const res = await listDocuments({ limit: 6 });
 		recentDocs = res.items;
+		loadError = null;
 	} catch (e) {
 		console.error("RecentDocs: failed to load recent documents", e);
 		loadError = "Failed to load recent documents";
 	}
+}
+
+onMount(() => {
+	void fetchRecentDocs();
+});
+
+// Re-fetch the recent documents list whenever the global doc refresh
+// nonce changes (e.g. after a dashboard import or another component
+// calls refreshDocs()). Reading the nonce inside the effect registers
+// it as a reactive dependency.
+$effect(() => {
+	void getDocRefreshNonce();
+	void fetchRecentDocs();
 });
 
 onDestroy(() => {

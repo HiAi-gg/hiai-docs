@@ -13,3 +13,19 @@ export function refreshTags(): void {
 export function getTagRefreshNonce(): number {
 	return tagRefreshNonce;
 }
+
+// Module-level reactive signal for cross-component document list refresh.
+// The sidebar components (RecentDocs, FolderTree) and any other doc
+// consumer load documents only on mount, so any document mutation
+// elsewhere (e.g. the dashboard Import button) needs to nudge them to
+// reload. Same nonce pattern as tagRefreshNonce: callers read it inside
+// a $effect to trigger refreshes.
+let docRefreshNonce = $state(0);
+
+export function refreshDocs(): void {
+	docRefreshNonce++;
+}
+
+export function getDocRefreshNonce(): number {
+	return docRefreshNonce;
+}

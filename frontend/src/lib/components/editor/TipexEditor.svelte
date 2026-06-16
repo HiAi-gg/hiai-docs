@@ -158,9 +158,47 @@ $effect(() => {
 onDestroy(() => {
 	editor?.destroy?.();
 });
+
+/**
+ * Intercept clicks on `.doc-link` elements rendered by the editor.
+ *
+ * TipTap's `Link` extension is configured with `openOnClick: false`, so it
+ * does not handle link clicks itself. Without an explicit handler, the
+ * browser would follow the anchor's `href` and SvelteKit's link routing
+ * would rewrite `https://example.com` to the local `/s/example.com` share
+ * URL, breaking the link.
+ *
+ * We delegate from the wrapper so the listener is installed once per
+ * mount rather than once per link node, and we only act on left-clicks
+ * without modifier keys so middle-click / cmd-click / right-click still
+ * behave natively (open in new tab, context menu, etc.).
+ */
+function handleWrapperClick(event: MouseEvent) {
+	if (event.defaultPrevented) return;
+	if (event.button !== 0) return;
+	if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+
+	const target = event.target as Element | null;
+	const anchor = target?.closest("a.doc-link") as HTMLAnchorElement | null;
+	if (!anchor) return;
+
+	const href = anchor.getAttribute("href");
+	if (!href) return;
+
+	// External URLs (http/https/mailto/etc.) must open in a new tab.
+	// We treat anything else as an internal route the app should handle.
+	if (/^(https?:|mailto:|tel:)/i.test(href)) {
+		event.preventDefault();
+		window.open(href, "_blank", "noopener,noreferrer");
+		return;
+	}
+
+	// Internal links (e.g. `/docs/:id`): let the browser follow the href.
+	// SvelteKit's link interception will pick it up and call `goto()` for us.
+}
 </script>
 
-<div class="tipex-wrapper">
+<div class="tipex-wrapper" onclick={handleWrapperClick} role="presentation">
   {#if ready && editor}
     <EditorToolbar {editor} {documentId} />
     <div class="editor-content">

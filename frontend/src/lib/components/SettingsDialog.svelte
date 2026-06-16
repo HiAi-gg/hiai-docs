@@ -125,13 +125,25 @@ function close() {
 
 	<Tabs.Tabs bind:value={activeTab} class="w-full">
 		<Tabs.TabsList class="grid w-full grid-cols-3">
-			<Tabs.TabsTrigger value="profile" onclick={(v) => (activeTab = v)}>
+			<Tabs.TabsTrigger
+				value="profile"
+				selected={activeTab === "profile"}
+				onclick={(v) => (activeTab = v)}
+			>
 				{m.settings_profile()}
 			</Tabs.TabsTrigger>
-			<Tabs.TabsTrigger value="password" onclick={(v) => (activeTab = v)}>
+			<Tabs.TabsTrigger
+				value="password"
+				selected={activeTab === "password"}
+				onclick={(v) => (activeTab = v)}
+			>
 				{m.password_label()}
 			</Tabs.TabsTrigger>
-			<Tabs.TabsTrigger value="appearance" onclick={(v) => (activeTab = v)}>
+			<Tabs.TabsTrigger
+				value="appearance"
+				selected={activeTab === "appearance"}
+				onclick={(v) => (activeTab = v)}
+			>
 				{m.settings_appearance()}
 			</Tabs.TabsTrigger>
 		</Tabs.TabsList>
