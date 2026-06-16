@@ -675,7 +675,7 @@ async function handleRemoveTag(tagId: string) {
   }
 
   .save-status.unsaved {
-    color: oklch(0.75 0.15 75);
+    color: var(--destructive);
   }
 
   @keyframes spin {

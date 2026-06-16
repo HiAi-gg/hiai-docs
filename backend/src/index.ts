@@ -7,6 +7,7 @@ import {
 	healthRateLimiter,
 	rateLimitHeaders,
 } from "./api/middleware/rate-limit";
+import { attachmentRoutes } from "./api/routes/attachments";
 import { authRoutes } from "./api/routes/auth";
 import { collaborationRoutes } from "./api/routes/collaboration";
 import { documentRoutes } from "./api/routes/documents";
@@ -16,7 +17,6 @@ import { shareRoutes } from "./api/routes/share";
 import { tagRoutes } from "./api/routes/tags";
 import { versionRoutes } from "./api/routes/versions";
 import { webhookRoutes } from "./api/routes/webhooks";
-import { attachmentRoutes } from "./api/routes/attachments";
 import { config } from "./lib/config";
 import { startEmbeddingWorker } from "./lib/embedding-queue";
 import { logger } from "./lib/logger";
@@ -26,7 +26,7 @@ import { BUCKET, ensureBucket, minio } from "./lib/minio";
 startEmbeddingWorker();
 
 ensureBucket(minio, BUCKET).catch((err) => {
-  logger.error({ err }, "Failed to ensure MinIO bucket");
+	logger.error({ err }, "Failed to ensure MinIO bucket");
 });
 
 const MAX_BODY_SIZE_BYTES = 10 * 1024 * 1024;

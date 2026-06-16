@@ -34,6 +34,19 @@
 	/* Editor highlight fallback (TipTap sets inline `style="background-color: ..."`
 	   when a color is selected; this is only the default when none is set) */
 	--highlight-default: #fde68a;
+
+	/* Syntax highlighting — light mode (GitHub-inspired) */
+	--hljs-keyword: #cf222e;
+	--hljs-string: #0a3069;
+	--hljs-number: #0550ae;
+	--hljs-function: #8250df;
+	--hljs-title: #8250df;
+	--hljs-comment: #6e7781;
+	--hljs-built_in: #953800;
+	--hljs-type: #0550ae;
+	--hljs-attr: #953800;
+	--hljs-variable: #953800;
+	--hljs-literal: #cf222e;
 }
 
 .dark {
@@ -61,6 +74,19 @@
 	--color-secondary: oklch(0.269 0.019 270.87);
 	--color-bg: oklch(0.145 0.013 285.82);
 	--color-surface: oklch(0.205 0.013 285.82);
+
+	/* Syntax highlighting — dark mode (Material Palenight) */
+	--hljs-keyword: #c792ea;
+	--hljs-string: #c3e88d;
+	--hljs-number: #f78c6c;
+	--hljs-function: #82aaff;
+	--hljs-title: #82aaff;
+	--hljs-comment: #676e95;
+	--hljs-built_in: #ffcb6b;
+	--hljs-type: #ffcb6b;
+	--hljs-attr: #ffcb6b;
+	--hljs-variable: #f07178;
+	--hljs-literal: #ff5370;
 }
 
 @theme {

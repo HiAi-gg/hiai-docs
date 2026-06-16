@@ -1176,6 +1176,6 @@ $effect(() => {
 	/* Copy button — turn the icon green briefly when the clipboard write
 	   succeeded so users get a clear visual confirmation. */
 	.copy-btn.copied {
-		color: #16a34a;
+		color: var(--primary);
 	}
 </style>

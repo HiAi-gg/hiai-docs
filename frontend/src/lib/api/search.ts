@@ -47,6 +47,12 @@ export async function search(
 	page = 1,
 	limit = 20,
 	sort: SearchSort = "relevance",
+	filters?: {
+		folder?: string;
+		tags?: string[];
+		dateFrom?: string;
+		dateTo?: string;
+	},
 ): Promise<SearchResponse> {
 	if (!query.trim()) {
 		return { items: [], total: 0, page: 1, limit };
@@ -57,6 +63,11 @@ export async function search(
 		limit: String(limit),
 	});
 	if (sort !== "relevance") params.set("sort", sort);
+	if (filters?.folder) params.set("folder", filters.folder);
+	if (filters?.tags && filters.tags.length > 0)
+		params.set("tags", filters.tags.join(","));
+	if (filters?.dateFrom) params.set("dateFrom", filters.dateFrom);
+	if (filters?.dateTo) params.set("dateTo", filters.dateTo);
 	return apiFetch(`/api/search?${params}`);
 }
 

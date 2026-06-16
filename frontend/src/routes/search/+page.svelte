@@ -75,6 +75,10 @@ $effect(() => {
 	const q = data.query;
 	const p = data.page;
 	const sort = sortOrder;
+	const folder = activeFolder;
+	const tags = activeTags;
+	const from = dateFrom;
+	const to = dateTo;
 
 	if (!q) {
 		searchResponse = null;
@@ -84,7 +88,12 @@ $effect(() => {
 
 	loading = true;
 
-	search(q, p, PAGE_SIZE, sort).then((res) => {
+	search(q, p, PAGE_SIZE, sort, {
+		folder: folder || undefined,
+		tags: tags.length > 0 ? tags : undefined,
+		dateFrom: from || undefined,
+		dateTo: to || undefined,
+	}).then((res) => {
 		searchResponse = res;
 		loading = false;
 	});

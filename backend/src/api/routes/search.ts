@@ -1,4 +1,5 @@
-import { sql } from "drizzle-orm";
+import { documentTags, tags as tagsTable } from "@hiai-docs/db/schema";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import { Elysia } from "elysia";
 import { z } from "zod";
 import { getEmbedding } from "../../embedding";
@@ -14,6 +15,10 @@ const searchQuerySchema = z.object({
 	sort: z
 		.enum(["relevance", "date_desc", "date_asc", "name_asc", "name_desc"])
 		.default("relevance"),
+	folder: z.string().optional(),
+	tags: z.string().optional(),
+	dateFrom: z.string().optional(),
+	dateTo: z.string().optional(),
 });
 
 const suggestQuerySchema = z.object({
@@ -49,7 +54,16 @@ export const searchRoutes = new Elysia({ prefix: "/api/search" })
 			return { error: "Invalid query", details: parsed.error.flatten() };
 		}
 		try {
-			const { q: rawQ, page, limit, sort } = parsed.data;
+			const {
+				q: rawQ,
+				page,
+				limit,
+				sort,
+				folder,
+				tags,
+				dateFrom,
+				dateTo,
+			} = parsed.data;
 			const q = rawQ ?? "";
 			const offset = (page - 1) * limit;
 
@@ -111,36 +125,66 @@ export const searchRoutes = new Elysia({ prefix: "/api/search" })
 				}
 			}
 
+			// Apply filters (folder, date range, tags) before sort + pagination
+			let filtered = Array.from(merged.values());
+
+			if (folder) {
+				filtered = filtered.filter((r) => r.folderId === folder);
+			}
+
+			if (dateFrom) {
+				const from = new Date(dateFrom);
+				if (!Number.isNaN(from.getTime())) {
+					filtered = filtered.filter((r) => new Date(r.createdAt) >= from);
+				}
+			}
+
+			if (dateTo) {
+				const to = new Date(dateTo);
+				if (!Number.isNaN(to.getTime())) {
+					// Include the entire "to" day
+					to.setHours(23, 59, 59, 999);
+					filtered = filtered.filter((r) => new Date(r.createdAt) <= to);
+				}
+			}
+
+			if (tags) {
+				const tagList = tags
+					.split(",")
+					.map((t) => t.trim())
+					.filter(Boolean);
+				if (tagList.length > 0) {
+					const allowedIds = await tagFilter(userId, tagList);
+					filtered = filtered.filter((r) => allowedIds.has(r.id));
+				}
+			}
+
 			// Sort by selected order, then paginate
-			const allResults = Array.from(merged.values());
 			switch (sort) {
 				case "date_desc":
-					allResults.sort(
+					filtered.sort(
 						(a, b) =>
-							new Date(b.createdAt).getTime() -
-							new Date(a.createdAt).getTime(),
+							new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
 					);
 					break;
 				case "date_asc":
-					allResults.sort(
+					filtered.sort(
 						(a, b) =>
-							new Date(a.createdAt).getTime() -
-							new Date(b.createdAt).getTime(),
+							new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
 					);
 					break;
 				case "name_asc":
-					allResults.sort((a, b) => a.title.localeCompare(b.title));
+					filtered.sort((a, b) => a.title.localeCompare(b.title));
 					break;
 				case "name_desc":
-					allResults.sort((a, b) => b.title.localeCompare(a.title));
+					filtered.sort((a, b) => b.title.localeCompare(a.title));
 					break;
-				case "relevance":
 				default:
-					allResults.sort((a, b) => b.score - a.score);
+					filtered.sort((a, b) => b.score - a.score);
 					break;
 			}
-			const total = allResults.length;
-			const items = allResults.slice(offset, offset + limit);
+			const total = filtered.length;
+			const items = filtered.slice(offset, offset + limit);
 
 			return { items, total, page, limit };
 		} catch (err) {
@@ -238,4 +282,34 @@ async function semanticSearch(userId: string, q: string, limit: number) {
 		logger.warn({ err }, "Semantic search failed, falling back to text-only");
 		return [];
 	}
+}
+
+/**
+ * Return the set of document ids owned by `userId` that have at least one of
+ * the supplied tag names (ANY semantics — a doc qualifies if it carries any
+ * of the requested tags).
+ */
+async function tagFilter(
+	userId: string,
+	tagNames: string[],
+): Promise<Set<string>> {
+	if (tagNames.length === 0) return new Set();
+
+	// Look up tag ids by name (parameterised — safe against injection).
+	const tagRows = await db
+		.select({ id: tagsTable.id })
+		.from(tagsTable)
+		.where(
+			and(eq(tagsTable.ownerId, userId), inArray(tagsTable.name, tagNames)),
+		);
+	if (tagRows.length === 0) return new Set();
+
+	const tagIds = tagRows.map((r) => r.id);
+
+	const docRows = await db
+		.selectDistinct({ documentId: documentTags.documentId })
+		.from(documentTags)
+		.where(inArray(documentTags.tagId, tagIds));
+
+	return new Set(docRows.map((r) => r.documentId));
 }

@@ -314,8 +314,8 @@ function handleWrapperClick(event: MouseEvent) {
   }
 
   .editor-content :global(.tiptap pre) {
-    background: oklch(0.145 0.013 285.82);
-    color: oklch(0.985 0.002 247.86);
+    background: var(--card);
+    color: var(--card-foreground);
     padding: 1rem;
     border-radius: 8px;
     font-family: "Fira Code", "Consolas", monospace;
@@ -333,40 +333,40 @@ function handleWrapperClick(event: MouseEvent) {
     color: inherit;
   }
 
-  /* lowlight syntax highlighting */
+  /* lowlight syntax highlighting (theme-aware via CSS variables) */
   .editor-content :global(.tiptap pre .hljs-keyword) {
-    color: #c792ea;
+    color: var(--hljs-keyword);
   }
   .editor-content :global(.tiptap pre .hljs-string) {
-    color: #c3e88d;
+    color: var(--hljs-string);
   }
   .editor-content :global(.tiptap pre .hljs-number) {
-    color: #f78c6c;
+    color: var(--hljs-number);
   }
   .editor-content :global(.tiptap pre .hljs-function) {
-    color: #82aaff;
+    color: var(--hljs-function);
   }
   .editor-content :global(.tiptap pre .hljs-title) {
-    color: #82aaff;
+    color: var(--hljs-title);
   }
   .editor-content :global(.tiptap pre .hljs-comment) {
-    color: #676e95;
+    color: var(--hljs-comment);
     font-style: italic;
   }
   .editor-content :global(.tiptap pre .hljs-built_in) {
-    color: #ffcb6b;
+    color: var(--hljs-built_in);
   }
   .editor-content :global(.tiptap pre .hljs-type) {
-    color: #ffcb6b;
+    color: var(--hljs-type);
   }
   .editor-content :global(.tiptap pre .hljs-attr) {
-    color: #ffcb6b;
+    color: var(--hljs-attr);
   }
   .editor-content :global(.tiptap pre .hljs-variable) {
-    color: #f07178;
+    color: var(--hljs-variable);
   }
   .editor-content :global(.tiptap pre .hljs-literal) {
-    color: #ff5370;
+    color: var(--hljs-literal);
   }
 
   .editor-content :global(.tiptap hr) {
