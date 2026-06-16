@@ -21,5 +21,11 @@ export default defineConfig({
     // build (held by a previous container) while the new server
     // runs on 5173. Fail loudly instead.
     strictPort: true,
+    proxy: {
+      "/api": {
+        target: "http://localhost:50700",
+        changeOrigin: true,
+      },
+    },
   },
 });

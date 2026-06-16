@@ -926,7 +926,7 @@ $effect(() => {
 		position: absolute;
 		top: calc(100% + 6px);
 		left: 0;
-		z-index: 20;
+		z-index: 30;
 		display: flex;
 		flex-direction: column;
 		gap: 2px;
@@ -1001,7 +1001,7 @@ $effect(() => {
 		position: absolute;
 		top: calc(100% + 6px);
 		left: 0;
-		z-index: 20;
+		z-index: 30;
 		display: flex;
 		flex-direction: column;
 		gap: 6px;
@@ -1131,7 +1131,7 @@ $effect(() => {
 		position: absolute;
 		top: calc(100% + 6px);
 		left: 0;
-		z-index: 50;
+		z-index: 60;
 		padding: 8px;
 		background: var(--popover);
 		color: var(--popover-foreground);

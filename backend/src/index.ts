@@ -20,9 +20,14 @@ import { attachmentRoutes } from "./api/routes/attachments";
 import { config } from "./lib/config";
 import { startEmbeddingWorker } from "./lib/embedding-queue";
 import { logger } from "./lib/logger";
+import { BUCKET, ensureBucket, minio } from "./lib/minio";
 
 // Start background embedding worker
 startEmbeddingWorker();
+
+ensureBucket(minio, BUCKET).catch((err) => {
+  logger.error({ err }, "Failed to ensure MinIO bucket");
+});
 
 const MAX_BODY_SIZE_BYTES = 10 * 1024 * 1024;
 
@@ -30,7 +35,7 @@ const CSP_POLICY = [
 	"default-src 'self'",
 	"script-src 'self' 'unsafe-inline'",
 	"style-src 'self' 'unsafe-inline'",
-	"img-src 'self' data: blob: http://localhost:9020 http://minio:9000",
+	"img-src 'self' data: blob: http://localhost:9020 http://localhost:9000 http://minio:9000",
 	"connect-src 'self' http://localhost:50700 ws://localhost:50700",
 	"font-src 'self' data:",
 	"frame-ancestors 'none'",

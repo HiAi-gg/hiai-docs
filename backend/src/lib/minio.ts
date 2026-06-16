@@ -1,5 +1,6 @@
 import { Client } from "minio";
 import { config } from "./config";
+import { logger } from "./logger";
 
 export const minio = new Client({
 	endPoint: config.MINIO_ENDPOINT,
@@ -32,3 +33,11 @@ export const minioPublic = new Client({
 });
 
 export const BUCKET = config.MINIO_BUCKET;
+
+export async function ensureBucket(client: Client, bucket: string): Promise<void> {
+  const exists = await client.bucketExists(bucket);
+  if (!exists) {
+    await client.makeBucket(bucket, "us-east-1");
+    logger.info({ bucket }, "Created MinIO bucket");
+  }
+}

@@ -113,23 +113,41 @@ function wrapMark(
 	}
 }
 
+// Returns an inline `style` attribute fragment (` style="text-align: X"`) for
+// the block-level textAlign attribute, or an empty string when alignment is
+// unset / not a recognized value. Whitelists the four values supported by the
+// Tipex editor to avoid passing attacker-controlled strings into the markup.
+function alignStyle(attrs?: Record<string, unknown>): string {
+	const align = attrs?.textAlign as string | undefined;
+	if (
+		align !== "left" &&
+		align !== "center" &&
+		align !== "right" &&
+		align !== "justify"
+	) {
+		return "";
+	}
+	return ` style="text-align: ${align}"`;
+}
+
 function wrapBlock(node: ProseMirrorNode, inner: string): string {
 	const lang = (node.attrs?.language as string) ?? "";
+	const align = alignStyle(node.attrs);
 	switch (node.type) {
 		case "paragraph":
-			return `<p>${inner}</p>`;
+			return `<p${align}>${inner}</p>`;
 		case "heading": {
 			const level = Math.min(Math.max(Number(node.attrs?.level ?? 1), 1), 6);
-			return `<h${level}>${inner}</h${level}>`;
+			return `<h${level}${align}>${inner}</h${level}>`;
 		}
 		case "bulletList":
-			return `<ul>${inner}</ul>`;
+			return `<ul${align}>${inner}</ul>`;
 		case "orderedList":
-			return `<ol>${inner}</ol>`;
+			return `<ol${align}>${inner}</ol>`;
 		case "listItem":
-			return `<li>${inner}</li>`;
+			return `<li${align}>${inner}</li>`;
 		case "blockquote":
-			return `<blockquote>${inner}</blockquote>`;
+			return `<blockquote${align}>${inner}</blockquote>`;
 		case "codeBlock":
 			return `<pre><code${lang ? ` class="language-${escapeHtml(lang)}"` : ""}>${inner}</code></pre>`;
 		case "horizontalRule":
