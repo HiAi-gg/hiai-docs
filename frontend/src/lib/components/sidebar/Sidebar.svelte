@@ -118,12 +118,12 @@ function toggleCollapse() {
     </div>
   {/if}
 
-  <div class={cn("border-t border-border p-2", collapsed ? "flex flex-col items-center gap-2" : "space-y-2")}>
+  <div class={cn("p-2", collapsed ? "flex flex-col items-center gap-2" : "space-y-2")}>
     <button
       type="button"
       onclick={() => { showSettings = true; }}
       class={cn(
-        "flex items-center rounded-md text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground",
+        "flex items-center rounded-md text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground",
         collapsed ? "size-8 justify-center" : "w-full gap-2 px-2 py-1.5"
       )}
       title={m.settings_title()}
@@ -134,6 +134,8 @@ function toggleCollapse() {
         <span class="truncate">{m.settings_title()}</span>
       {/if}
     </button>
+  </div>
+  <div class="border-t border-border p-2">
     <a
       href="https://hiai.gg/docs"
       target="_blank"

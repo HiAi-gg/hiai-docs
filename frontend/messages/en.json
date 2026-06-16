@@ -306,6 +306,7 @@
   "share_go_home": "Go to homepage",
   "share_password_placeholder": "Enter password",
   "share_access_button": "Access content",
+  "share_password_incorrect": "Incorrect password. Please try again.",
   "share_via_label": "Shared via hiai-docs",
   "share_copied": "Copied",
   "share_empty_document": "Empty document",

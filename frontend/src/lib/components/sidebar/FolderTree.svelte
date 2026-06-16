@@ -1,11 +1,20 @@
 <script lang="ts">
-import { Check, ChevronRight, Copy, FileText, Folder, Plus } from "lucide-svelte";
+import {
+	Check,
+	ChevronRight,
+	Copy,
+	FileText,
+	Folder,
+	Loader2,
+	Plus,
+} from "lucide-svelte";
 import { onMount } from "svelte";
 import { flip } from "svelte/animate";
 import { type DndEvent, dndzone } from "svelte-dnd-action";
 import { page } from "$app/state";
 import {
 	type Document,
+	getDocument,
 	listDocuments,
 	updateDocument,
 } from "$lib/api/documents";
@@ -58,16 +67,28 @@ let expandTimer: ReturnType<typeof setTimeout> | null = null;
 let pendingExpandFolderId = $state<string | null>(null);
 
 let copiedDocId = $state<string | null>(null);
+let copyLoadingDocId = $state<string | null>(null);
 let copyTimer: ReturnType<typeof setTimeout> | null = null;
 
 async function handleCopyContent(docId: string) {
 	if (typeof window === "undefined") return;
-	// Copy the document's markdown source instead of its URL — the user
-	// wants the text in the clipboard. The list endpoint returns the
-	// `content` field (truncated to 200 chars via SQL), which is enough
-	// for the typical paste-into-another-doc workflow.
-	const doc = documents.find((d) => d.id === docId);
-	const text = (doc?.excerpt as string | undefined) || doc?.content || "";
+	// Copy the document's full markdown source. The list endpoint returns
+	// `content` truncated to 200 chars at the SQL level, so we fetch the
+	// single-document endpoint first to get the complete text. If the
+	// fetch fails we fall back to the list payload (excerpt, then
+	// truncated content) so the button still does something.
+	const cached = documents.find((d) => d.id === docId);
+	let text = "";
+	copyLoadingDocId = docId;
+	try {
+		const full = await getDocument(docId);
+		text = full.content ?? "";
+	} catch (err) {
+		console.error("FolderTree: failed to fetch full document for copy", err);
+		text = cached?.excerpt ?? cached?.content ?? "";
+	} finally {
+		copyLoadingDocId = null;
+	}
 	if (!text) return;
 	const ok = await copyToClipboard(text);
 	if (!ok) return;
@@ -267,7 +288,9 @@ async function persistZoneChanges(
 	if (updates.length === 0) return;
 	try {
 		await Promise.all(
-			updates.map((u) => updateDocument(u.id, { folderId: u.folderId ?? undefined })),
+			updates.map((u) =>
+				updateDocument(u.id, { folderId: u.folderId ?? undefined }),
+			),
 		);
 	} catch (err) {
 		console.error("FolderTree: persist failed", err);
@@ -305,12 +328,15 @@ async function persistZoneChanges(
         </a>
         <button
           type="button"
-          class="inline-flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground opacity-0 transition-opacity hover:bg-accent hover:text-accent-foreground group-hover/doc:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring {copiedDocId === doc.id ? 'opacity-100' : ''}"
+          class="inline-flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground opacity-0 transition-opacity hover:bg-accent hover:text-accent-foreground group-hover/doc:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring {copiedDocId === doc.id || copyLoadingDocId === doc.id ? 'opacity-100' : ''}"
           aria-label={m.action_copy_content()}
           title={m.action_copy_content()}
+          disabled={copyLoadingDocId === doc.id}
           onclick={(e: MouseEvent) => { e.preventDefault(); e.stopPropagation(); void handleCopyContent(doc.id); }}
         >
-          {#if copiedDocId === doc.id}
+          {#if copyLoadingDocId === doc.id}
+            <Loader2 class="size-3.5 animate-spin" />
+          {:else if copiedDocId === doc.id}
             <Check class="size-3.5" />
           {:else}
             <Copy class="size-3.5" />
@@ -371,12 +397,15 @@ async function persistZoneChanges(
                 </a>
                 <button
                   type="button"
-                  class="inline-flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground opacity-0 transition-opacity hover:bg-accent hover:text-accent-foreground group-hover/doc:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring {copiedDocId === doc.id ? 'opacity-100' : ''}"
+                  class="inline-flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground opacity-0 transition-opacity hover:bg-accent hover:text-accent-foreground group-hover/doc:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring {copiedDocId === doc.id || copyLoadingDocId === doc.id ? 'opacity-100' : ''}"
                   aria-label={m.action_copy_content()}
                   title={m.action_copy_content()}
+                  disabled={copyLoadingDocId === doc.id}
                   onclick={(e: MouseEvent) => { e.preventDefault(); e.stopPropagation(); void handleCopyContent(doc.id); }}
                 >
-                  {#if copiedDocId === doc.id}
+                  {#if copyLoadingDocId === doc.id}
+                    <Loader2 class="size-3.5 animate-spin" />
+                  {:else if copiedDocId === doc.id}
                     <Check class="size-3.5" />
                   {:else}
                     <Copy class="size-3.5" />

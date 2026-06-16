@@ -495,14 +495,8 @@ $effect(() => {
 			>
 				{#if activeHeadingLevel !== null}
 					<Heading1 size={16} />
-					<span class="dropdown-trigger-label">
-						{m.editor_toolbar_heading()} {activeHeadingLevel}
-					</span>
 				{:else}
 					<Type size={16} />
-					<span class="dropdown-trigger-label">
-						{m.editor_toolbar_paragraph()}
-					</span>
 				{/if}
 				<ChevronDown size={14} class="dropdown-chevron" />
 			</button>
@@ -517,7 +511,6 @@ $effect(() => {
 						onclick={() => applyHeading(null)}
 					>
 						<Type size={16} />
-						<span>{m.editor_toolbar_paragraph()}</span>
 					</button>
 					<button
 						type="button"
@@ -527,7 +520,6 @@ $effect(() => {
 						onclick={() => applyHeading(1)}
 					>
 						<Heading1 size={16} />
-						<span>{m.editor_toolbar_heading_1()}</span>
 					</button>
 					<button
 						type="button"
@@ -537,7 +529,6 @@ $effect(() => {
 						onclick={() => applyHeading(2)}
 					>
 						<Heading1 size={16} />
-						<span>{m.editor_toolbar_heading_2()}</span>
 					</button>
 					<button
 						type="button"
@@ -547,7 +538,6 @@ $effect(() => {
 						onclick={() => applyHeading(3)}
 					>
 						<Heading1 size={16} />
-						<span>{m.editor_toolbar_heading_3()}</span>
 					</button>
 				</div>
 			{/if}
@@ -1137,7 +1127,7 @@ $effect(() => {
 		position: absolute;
 		top: calc(100% + 6px);
 		left: 0;
-		z-index: 20;
+		z-index: 50;
 		padding: 8px;
 		background: var(--popover);
 		color: var(--popover-foreground);

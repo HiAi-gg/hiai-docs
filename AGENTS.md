@@ -2,6 +2,23 @@
 
 > Standalone, open-source, AI-native knowledge base. Markdown-first, auto-embeddings, self-hostable.
 
+## 📍 Источник правды экосистемы (читать первым)
+
+hiai-docs — часть экосистемы HiAi. Роль: **модуль документов**, подключается куда угодно
+(первый потребитель — `hiai-amigo`); **также источник дизайн-токенов** для всей экосистемы.
+Считается готовым продуктом — для экосистемы важны только унификация и интеграция.
+
+**Общая правда живёт в корне `projects/`:**
+- [`../HIAI_CONVENTIONS.md`](../HIAI_CONVENTIONS.md) — правила, топология; §4 берёт токены отсюда (hiai-docs = эталон).
+- [`../HIAI_ECOSYSTEM_UNIFICATION_PLAN.md`](../HIAI_ECOSYSTEM_UNIFICATION_PLAN.md) — U1.1 (вынос токенов в `@hiai/ui`).
+- [`../HIAI_PROJECTS_ROADMAP.md`](../HIAI_PROJECTS_ROADMAP.md) — **план проекта (раздел «hiai-docs», фазы DOC1–DOC2)**.
+
+**Что дальше (только униф./интегр.):** DOC1 — токены→`@hiai/ui/tokens.css`, потребление пакета →
+DOC2 — plugin-манифест, встраивание в hiai-admin/dashboard, per-tenant. Контракт с amigo не ломать.
+
+### Документы проекта (индекс)
+`README.md` · `AGENTS.md` (этот) · `todo.md` — core. `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, `SECURITY.md` — стандартные.
+
 ## Identity & Purpose
 
 **hiai-docs** is a self-hosted knowledge base with built-in vector embeddings for RAG-ready semantic search. Alternative to Outline/Docmost with focus on simplicity, AI integration, and data ownership.

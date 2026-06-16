@@ -148,7 +148,6 @@ const renderedContent = $derived(renderContent());
 
 async function fetchShare() {
 	loading = true;
-	error = "";
 	try {
 		const headers: Record<string, string> = {};
 		if (password) headers["x-share-password"] = password;
@@ -156,21 +155,37 @@ async function fetchShare() {
 		const res = await kitFetch(`/api/share/${token}`, { headers });
 		const data = await res.json();
 
-		if (res.status === 401 && data.requiresPassword) {
+		if (res.status === 401) {
+			// Server signals the share is password-protected when `requiresPassword`
+			// is true on the response (initial load with no password supplied).
+			// A wrong password comes back as 401 without that flag — we must keep
+			// the password form visible and surface a retryable inline error
+			// instead of replacing the whole view with a fatal error banner.
 			requiresPassword = true;
-			loading = false;
+			password = "";
+			error = data.requiresPassword ? "" : m.share_password_incorrect();
 			return;
 		}
 		if (!res.ok) {
+			// Non-password failure (expired, missing share, server error). Drop
+			// the password form so the user sees the banner with a way home.
+			requiresPassword = false;
+			password = "";
 			error = data.error ?? m.share_load_error();
-			loading = false;
 			return;
 		}
+		// Success — clear transient auth state so the document view renders.
 		shareData = data;
+		requiresPassword = false;
+		password = "";
+		error = "";
 	} catch (_e) {
+		requiresPassword = false;
+		password = "";
 		error = m.share_network_error();
+	} finally {
+		loading = false;
 	}
-	loading = false;
 }
 
 function copyUrl() {
@@ -191,33 +206,6 @@ fetchShare();
 <div class="flex min-h-screen items-center justify-center bg-background p-4">
   {#if loading}
     <div class="text-muted-foreground">{m.action_loading()}</div>
-  {:else if error}
-    <div class="w-full max-w-md rounded-lg border border-destructive/50 bg-destructive/10 p-6 text-center">
-      <p class="text-lg font-medium text-destructive">{error}</p>
-      <a href="/" class="mt-4 inline-block text-sm text-primary underline">{m.share_go_home()}</a>
-    </div>
-  {:else if requiresPassword}
-    <form
-      onsubmit={(e) => { e.preventDefault(); fetchShare(); }}
-      class="w-full max-w-sm space-y-4 rounded-lg border border-border bg-card p-6 shadow-sm"
-    >
-      <div class="flex items-center gap-2 text-lg font-semibold">
-        <Lock class="h-5 w-5" />
-        {m.share_password_required()}
-      </div>
-      <input
-        type="password"
-        bind:value={password}
-        placeholder={m.share_password_placeholder()}
-        class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-      />
-      <button
-        type="submit"
-        class="inline-flex h-9 w-full items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow hover:bg-primary/90"
-      >
-        {m.share_access_button()}
-      </button>
-    </form>
   {:else if shareData}
     <div class="w-full max-w-3xl space-y-6">
       <div class="flex items-center justify-between">
@@ -269,6 +257,41 @@ fetchShare();
           {/if}
         </div>
       {/if}
+    </div>
+  {:else if requiresPassword}
+    <form
+      onsubmit={(e) => { e.preventDefault(); fetchShare(); }}
+      class="w-full max-w-sm space-y-4 rounded-lg border border-border bg-card p-6 shadow-sm"
+    >
+      <div class="flex items-center gap-2 text-lg font-semibold">
+        <Lock class="h-5 w-5" />
+        {m.share_password_required()}
+      </div>
+      {#if error}
+        <div
+          role="alert"
+          class="rounded-md border border-destructive/50 bg-destructive/10 px-3 py-2 text-sm text-destructive"
+        >
+          {error}
+        </div>
+      {/if}
+      <input
+        type="password"
+        bind:value={password}
+        placeholder={m.share_password_placeholder()}
+        class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+      />
+      <button
+        type="submit"
+        class="inline-flex h-9 w-full items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow hover:bg-primary/90"
+      >
+        {m.share_access_button()}
+      </button>
+    </form>
+  {:else if error}
+    <div class="w-full max-w-md rounded-lg border border-destructive/50 bg-destructive/10 p-6 text-center">
+      <p class="text-lg font-medium text-destructive">{error}</p>
+      <a href="/" class="mt-4 inline-block text-sm text-primary underline">{m.share_go_home()}</a>
     </div>
   {/if}
 </div>

@@ -1,15 +1,16 @@
 <script lang="ts">
-import { onMount, onDestroy } from "svelte";
-import { Check, Copy, FileText } from "lucide-svelte";
-import { type Document, listDocuments } from "$lib/api/documents";
+import { Check, Copy, FileText, Loader2 } from "lucide-svelte";
+import { onDestroy, onMount } from "svelte";
+import { type Document, getDocument, listDocuments } from "$lib/api/documents";
 import * as m from "$lib/paraglide/messages.js";
-import { cn } from "$lib/utils.js";
 import { copyToClipboard } from "$lib/utils/clipboard.js";
+import { cn } from "$lib/utils.js";
 
 let recentDocs = $state<Document[]>([]);
 let activeId = $state<string | null>(null);
 let loadError = $state<string | null>(null);
 let copiedDocId = $state<string | null>(null);
+let copyLoadingDocId = $state<string | null>(null);
 let copyTimer: ReturnType<typeof setTimeout> | null = null;
 
 onMount(async () => {
@@ -33,12 +34,24 @@ async function handleCopyContent(e: MouseEvent, docId: string) {
 	e.preventDefault();
 	e.stopPropagation();
 	if (typeof window === "undefined") return;
-	// Copy the document's markdown source so the user pastes the actual
-	// text, not a URL. The list endpoint returns the full content field
-	// (truncated to 200 chars at the SQL level — see documents route); we
-	// still prefer `excerpt` first as a faster, more focused snippet.
-	const doc = recentDocs.find((d) => d.id === docId);
-	const text = (doc?.excerpt as string | undefined) || doc?.content || "";
+	// Copy the document's full markdown source. The list endpoint returns
+	// `content` truncated to 200 chars at the SQL level, so we fetch the
+	// single-document endpoint first to get the complete text. If the
+	// fetch fails we fall back to whatever the list payload already has
+	// (excerpt, then truncated content) so the button never silently
+	// does nothing.
+	const cached = recentDocs.find((d) => d.id === docId);
+	let text = "";
+	copyLoadingDocId = docId;
+	try {
+		const full = await getDocument(docId);
+		text = full.content ?? "";
+	} catch (err) {
+		console.error("RecentDocs: failed to fetch full document for copy", err);
+		text = cached?.excerpt ?? cached?.content ?? "";
+	} finally {
+		copyLoadingDocId = null;
+	}
 	if (!text) return;
 	const ok = await copyToClipboard(text);
 	if (!ok) return;
@@ -74,12 +87,15 @@ async function handleCopyContent(e: MouseEvent, docId: string) {
       </a>
       <button
         type="button"
-        class="inline-flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground opacity-0 transition-opacity hover:bg-accent hover:text-accent-foreground group-hover/doc:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring {copiedDocId === doc.id ? 'opacity-100' : ''}"
+        class="inline-flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground opacity-0 transition-opacity hover:bg-accent hover:text-accent-foreground group-hover/doc:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring {copiedDocId === doc.id || copyLoadingDocId === doc.id ? 'opacity-100' : ''}"
         aria-label={m.action_copy_content()}
         title={m.action_copy_content()}
+        disabled={copyLoadingDocId === doc.id}
         onclick={(e: MouseEvent) => void handleCopyContent(e, doc.id)}
       >
-        {#if copiedDocId === doc.id}
+        {#if copyLoadingDocId === doc.id}
+          <Loader2 class="size-3.5 animate-spin" />
+        {:else if copiedDocId === doc.id}
           <Check class="size-3.5" />
         {:else}
           <Copy class="size-3.5" />

@@ -1,15 +1,15 @@
 <script lang="ts">
 import { Loader2, Save } from "lucide-svelte";
 import { onMount } from "svelte";
-import { apiFetch } from "$lib/api/client";
 import { getProfile, updateProfile } from "$lib/api/settings";
-import * as m from "$lib/paraglide/messages.js";
-import { themeStore, type Theme } from "$lib/stores/theme";
+import { authClient } from "$lib/auth-client";
 import { Button } from "$lib/components/ui/button";
 import * as Dialog from "$lib/components/ui/dialog";
 import { Input } from "$lib/components/ui/input";
 import { Label } from "$lib/components/ui/label";
 import * as Tabs from "$lib/components/ui/tabs";
+import * as m from "$lib/paraglide/messages.js";
+import { type Theme, themeStore } from "$lib/stores/theme";
 
 let {
 	open = $bindable(false),
@@ -71,17 +71,21 @@ async function changePassword() {
 	}
 	passwordStatus = "saving";
 	try {
-		// Better Auth's update-user endpoint accepts `password` (current) and
-		// `newPassword` (desired) to rotate the credential.
-		// TODO: confirm endpoint shape against the deployed Better Auth version;
-		// fall back to `authClient.changePassword` if available.
-		await apiFetch("/api/auth/update-user", {
-			method: "POST",
-			body: JSON.stringify({
-				password: currentPassword,
-				newPassword,
-			}),
+		// Better Auth exposes a dedicated change-password endpoint
+		// (POST /api/auth/change-password) that requires `currentPassword` and
+		// `newPassword`. The previous `update-user` route is for profile fields
+		// (name/email) and rejected this body with 400. revokeOtherSessions
+		// invalidates any other active sessions for this user.
+		const { error } = await authClient.changePassword({
+			currentPassword,
+			newPassword,
+			revokeOtherSessions: true,
 		});
+		if (error) {
+			passwordStatus = "error";
+			passwordError = error.message ?? "Failed to change password";
+			return;
+		}
 		passwordStatus = "saved";
 		currentPassword = "";
 		newPassword = "";
@@ -91,7 +95,8 @@ async function changePassword() {
 		}, 2000);
 	} catch (e) {
 		passwordStatus = "error";
-		passwordError = e instanceof Error ? e.message : "Failed to change password";
+		passwordError =
+			e instanceof Error ? e.message : "Failed to change password";
 	}
 }
 

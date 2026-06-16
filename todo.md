@@ -1,5 +1,9 @@
 # hiai-docs — Development Roadmap
 
+> 🧭 **Живой статус этого проекта.** Считается готовым; для экосистемы — только унификация/интеграция:
+> [`HIAI_PROJECTS_ROADMAP.md`](../HIAI_PROJECTS_ROADMAP.md) (раздел «hiai-docs», фазы DOC1–DOC2) +
+> [`HIAI_CONVENTIONS.md`](../HIAI_CONVENTIONS.md) (docs = источник дизайн-токенов).
+
 > Multi-agent development plan. 128 files created across 7 phases.
 
 ---

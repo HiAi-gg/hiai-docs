@@ -1,20 +1,18 @@
 <script lang="ts">
-import { goto } from "$app/navigation";
 import {
 	ArrowUpRight,
 	Check,
 	Copy,
-	FileText,
 	Files,
+	FileText,
 	FolderInput,
+	Loader2,
 	MoreVertical,
 	Trash2,
 } from "lucide-svelte";
-import * as m from "$lib/paraglide/messages.js";
-import type { Document } from "$lib/types.js";
-import { cn, formatRelativeTime } from "$lib/utils.js";
-import { copyToClipboard } from "$lib/utils/clipboard.js";
-import { stripMarkdown } from "$lib/utils/strip-markdown";
+import { goto } from "$app/navigation";
+import { getDocument } from "$lib/api/documents";
+import { Badge } from "$lib/components/ui/badge/index.js";
 import {
 	Card,
 	CardContent,
@@ -27,7 +25,11 @@ import {
 	DropdownMenuSeparator,
 	DropdownMenuTrigger,
 } from "$lib/components/ui/dropdown-menu/index.js";
-import { Badge } from "$lib/components/ui/badge/index.js";
+import * as m from "$lib/paraglide/messages.js";
+import type { Document } from "$lib/types.js";
+import { copyToClipboard } from "$lib/utils/clipboard.js";
+import { stripMarkdown } from "$lib/utils/strip-markdown";
+import { cn, formatRelativeTime } from "$lib/utils.js";
 
 const {
 	document: doc,
@@ -51,16 +53,28 @@ function handleKeydown(e: KeyboardEvent) {
 }
 
 let contentCopied = $state(false);
+let contentCopying = $state(false);
 let copyTimer: ReturnType<typeof setTimeout> | null = null;
 
 async function handleCopyContent(e: Event) {
 	e.stopPropagation();
 	if (typeof window === "undefined") return;
-	// Copy the document's markdown source (or the preview excerpt as a
-	// fallback). The user wants the actual text in their clipboard, not a
-	// URL — copying the markdown preserves formatting, headings, lists,
-	// etc. when pasted into another editor.
-	const text = doc.excerpt || doc.content || "";
+	// Copy the document's full markdown source. The list endpoint returns
+	// `content` truncated to 200 chars at the SQL level, so we fetch the
+	// single-document endpoint first to get the complete text. If the
+	// fetch fails we fall back to the card payload (excerpt, then
+	// truncated content) so the menu item still does something.
+	let text = "";
+	contentCopying = true;
+	try {
+		const full = await getDocument(doc.id);
+		text = full.content ?? "";
+	} catch (err) {
+		console.error("DocumentCard: failed to fetch full document for copy", err);
+		text = doc.excerpt || doc.content || "";
+	} finally {
+		contentCopying = false;
+	}
 	if (!text) return;
 	const ok = await copyToClipboard(text);
 	if (!ok) return;
@@ -72,7 +86,9 @@ async function handleCopyContent(e: Event) {
 	}, 2000);
 }
 
-const preview = $derived(stripMarkdown(doc.excerpt || doc.content || "").slice(0, 100));
+const preview = $derived(
+	stripMarkdown(doc.excerpt || doc.content || "").slice(0, 100),
+);
 </script>
 
 <Card
@@ -100,8 +116,11 @@ const preview = $derived(stripMarkdown(doc.excerpt || doc.content || "").slice(0
           <ArrowUpRight class="size-4" />
           {m.doc_open()}
         </DropdownMenuItem>
-        <DropdownMenuItem onclick={handleCopyContent}>
-          {#if contentCopied}
+        <DropdownMenuItem onclick={handleCopyContent} disabled={contentCopying}>
+          {#if contentCopying}
+            <Loader2 class="size-4 animate-spin" />
+            {m.action_copy_content()}
+          {:else if contentCopied}
             <Check class="size-4" />
             {m.share_copied()}
           {:else}
