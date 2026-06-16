@@ -21,6 +21,7 @@ import {
 import SearchBar from "$lib/components/SearchBar.svelte";
 import * as m from "$lib/paraglide/messages.js";
 import { refreshDocs } from "$lib/stores/tag-store.svelte";
+import { copyToClipboard } from "$lib/utils/clipboard.js";
 import { stripMarkdown } from "$lib/utils/strip-markdown";
 
 let recentDocs = $state<Document[]>([]);
