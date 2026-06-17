@@ -1,19 +1,11 @@
 <script lang="ts">
 import "../app.css";
 import { getLocale } from "$lib/paraglide/runtime";
-import { initTheme, subscribeTheme, themeStore } from "$lib/stores/theme.svelte";
+import { initTheme } from "$lib/stores/theme.svelte";
 
 const { children } = $props();
 
 initTheme();
-
-$effect(() => {
-	const _ = themeStore.value;
-	return subscribeTheme(() => {
-		if (typeof document === "undefined") return;
-		document.documentElement.classList.toggle("dark", themeStore.isDark);
-	});
-});
 </script>
 
 <svelte:head>

@@ -31,6 +31,9 @@ export interface CreateShareLinkInput {
 export function createShareLink(
 	data: CreateShareLinkInput,
 ): Promise<ShareLink> {
+	if (!data.documentId) {
+		return Promise.reject(new Error("createShareLink: documentId is required"));
+	}
 	return apiFetch("/api/share", { method: "POST", body: JSON.stringify(data) });
 }
 
@@ -42,6 +45,9 @@ export function listShareLinks(params?: { documentId?: string }): Promise<{
 }
 
 export function getShareLink(token: string): Promise<ShareContent> {
+	if (!token) {
+		return Promise.reject(new Error("getShareLink: token is required"));
+	}
 	return apiFetch(`/api/share/${token}`);
 }
 
