@@ -131,7 +131,7 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: .
-          file: backend/Dockerfile
+          file: Dockerfile.backend
           tags: hiai-docs/api:ci-${{ github.sha }}
           labels: |
             org.opencontainers.image.title=hiai-docs-api
