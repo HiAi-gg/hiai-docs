@@ -50,6 +50,8 @@ RUN addgroup -S app && adduser -S app -G app \
 
 USER app
 
+HEALTHCHECK --interval=30s CMD wget -qO- http://localhost:50700/api/health || exit 1
+
 EXPOSE 50700
 
 CMD ["bun", "run", "dist/index.js"]

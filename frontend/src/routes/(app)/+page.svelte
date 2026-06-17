@@ -94,12 +94,12 @@ function triggerImport() {
 async function handleNewDocument() {
 	try {
 		const doc = await createDocument({
-			title: "Untitled Document",
+			title: m.dashboard_untitled_document(),
 			content: "",
 		});
 		goto(`/docs/${doc.id}`);
 	} catch (err) {
-		error = err instanceof Error ? err.message : "Failed to create document";
+		error = err instanceof Error ? err.message : m.error_document_save();
 	}
 }
 
@@ -116,7 +116,7 @@ async function handleImportFile(e: Event) {
 		// appears immediately without a page reload.
 		refreshDocs();
 	} catch (err) {
-		error = err instanceof Error ? err.message : "Import failed";
+		error = err instanceof Error ? err.message : m.error_generic();
 	}
 	input.value = "";
 }
@@ -165,7 +165,7 @@ function selectTag(tagId: string | null) {
           <input type="file" accept=".md,.txt,.json,.markdown" class="hidden" bind:this={importInput} onchange={handleImportFile} />
           <button onclick={triggerImport} class="inline-flex items-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-medium text-muted-foreground shadow-sm transition-colors hover:bg-accent hover:text-accent-foreground">
             <Upload class="size-4" />
-            Import
+            {m.dashboard_import()}
           </button>
           <button onclick={handleNewDocument} class="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow transition-colors hover:bg-primary/90">
             <Plus class="size-4" />
@@ -180,14 +180,14 @@ function selectTag(tagId: string | null) {
       <!-- Tag Filter Bar -->
       {#if !loading && !error && availableTags.length > 0}
         <div class="mb-6 flex flex-wrap items-center gap-2">
-          <span class="text-xs font-medium text-muted-foreground">Filter:</span>
+          <span class="text-xs font-medium text-muted-foreground">{m.dashboard_filter_label()}</span>
           <button
             type="button"
             onclick={() => selectTag(null)}
             class="inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-medium transition-colors {selectedTagId === null ? 'bg-primary text-primary-foreground' : 'bg-secondary text-secondary-foreground hover:bg-accent hover:text-accent-foreground'}"
             aria-pressed={selectedTagId === null}
           >
-            All
+            {m.search_filter_all()}
           </button>
           {#each availableTags as tag (tag.id)}
             <button

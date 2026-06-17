@@ -16,7 +16,9 @@ export const auth = betterAuth({
 	}),
 	secret: config.BETTER_AUTH_SECRET,
 	baseURL: config.BETTER_AUTH_URL,
-	trustedOrigins: ["http://localhost:50701", "http://127.0.0.1:50701"],
+	trustedOrigins: process.env.TRUSTED_ORIGINS
+		? process.env.TRUSTED_ORIGINS.split(",").map((s) => s.trim())
+		: ["http://localhost:50701", "http://127.0.0.1:50701"],
 	emailAndPassword: {
 		enabled: true,
 	},

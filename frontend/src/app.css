@@ -113,6 +113,24 @@
 }
 
 /* ============================================
+   Skip-to-content accessibility link
+   ============================================ */
+.skip-link {
+  position: absolute;
+  top: -100%;
+  left: 0;
+  z-index: 9999;
+  padding: 8px 16px;
+  background: var(--primary);
+  color: var(--primary-foreground);
+  text-decoration: none;
+  border-radius: 0 0 4px 0;
+}
+.skip-link:focus {
+  top: 0;
+}
+
+/* ============================================
    TipTap / ProseMirror editor base
    ============================================ */
 .ProseMirror,

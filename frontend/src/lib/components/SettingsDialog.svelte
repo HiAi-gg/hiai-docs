@@ -53,7 +53,7 @@ async function saveProfile() {
 		}, 2000);
 	} catch (e) {
 		profileStatus = "error";
-		profileError = e instanceof Error ? e.message : "Failed to save profile";
+		profileError = e instanceof Error ? e.message : m.error_document_save();
 	}
 }
 
@@ -83,7 +83,7 @@ async function changePassword() {
 		});
 		if (error) {
 			passwordStatus = "error";
-			passwordError = error.message ?? "Failed to change password";
+			passwordError = error.message ?? m.error_generic();
 			return;
 		}
 		passwordStatus = "saved";
@@ -96,7 +96,7 @@ async function changePassword() {
 	} catch (e) {
 		passwordStatus = "error";
 		passwordError =
-			e instanceof Error ? e.message : "Failed to change password";
+			e instanceof Error ? e.message : m.error_generic();
 	}
 }
 

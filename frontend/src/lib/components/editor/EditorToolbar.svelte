@@ -53,14 +53,14 @@ interface ToolbarAction {
 
 // 8 preset highlight colors, keyed to the swatches shown in the popover.
 const HIGHLIGHT_COLORS = [
-	{ name: "Yellow", value: "#fde68a" },
-	{ name: "Orange", value: "#fed7aa" },
-	{ name: "Red", value: "#fecaca" },
-	{ name: "Green", value: "#bbf7d0" },
-	{ name: "Blue", value: "#bfdbfe" },
-	{ name: "Purple", value: "#e9d5ff" },
-	{ name: "Pink", value: "#fbcfe8" },
-	{ name: "Gray", value: "#e5e7eb" },
+	{ name: m.editor_highlight_yellow(), value: "#fde68a" },
+	{ name: m.editor_highlight_orange(), value: "#fed7aa" },
+	{ name: m.editor_highlight_red(), value: "#fecaca" },
+	{ name: m.editor_highlight_green(), value: "#bbf7d0" },
+	{ name: m.editor_highlight_blue(), value: "#bfdbfe" },
+	{ name: m.editor_highlight_purple(), value: "#e9d5ff" },
+	{ name: m.editor_highlight_pink(), value: "#fbcfe8" },
+	{ name: m.editor_highlight_gray(), value: "#e5e7eb" },
 ] as const;
 
 type HighlightColor = (typeof HIGHLIGHT_COLORS)[number]["value"];

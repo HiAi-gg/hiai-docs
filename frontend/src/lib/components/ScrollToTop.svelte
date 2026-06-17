@@ -1,6 +1,7 @@
 <script lang="ts">
 import { ArrowUp } from "lucide-svelte";
 import { onDestroy } from "svelte";
+import * as m from "$lib/paraglide/messages.js";
 
 const SCROLL_THRESHOLD = 300;
 
@@ -63,8 +64,8 @@ onDestroy(() => {
 <button
 	type="button"
 	class="fixed bottom-6 right-6 z-50 inline-flex size-10 items-center justify-center rounded-full border border-border bg-card text-muted-foreground shadow-md transition-all hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring {visible ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}"
-	aria-label="Scroll to top"
-	title="Scroll to top"
+	aria-label={m.scroll_to_top_aria()}
+	title={m.scroll_to_top_aria()}
 	onclick={scrollToTop}
 >
 	<ArrowUp class="size-5" />

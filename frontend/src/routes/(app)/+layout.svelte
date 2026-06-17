@@ -9,7 +9,7 @@ let mainElement = $state<HTMLElement | null>(null);
 
 <div class="flex h-screen">
   <Sidebar />
-  <main bind:this={mainElement} class="relative z-0 flex-1 overflow-auto">
+  <main id="main-content" bind:this={mainElement} class="relative z-0 flex-1 overflow-auto">
     {@render children()}
   </main>
 </div>

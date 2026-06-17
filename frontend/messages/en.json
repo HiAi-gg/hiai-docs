@@ -354,5 +354,80 @@
   "search_try_searching": "Try searching for",
   "search_empty_title": "Search your knowledge base",
   "search_empty_description": "Find documents by title, content, or tags. Use filters to narrow down results.",
-  "search_popular": "Popular searches"
+  "search_popular": "Popular searches",
+
+  "sort_relevance": "Relevance",
+  "sort_date_newest": "Date (newest first)",
+  "sort_date_oldest": "Date (oldest first)",
+  "sort_name_asc": "Name (A-Z)",
+  "sort_name_desc": "Name (Z-A)",
+  "search_filter_label": "Filter",
+  "search_filter_label_aria": "Sort results",
+  "search_filter_all": "All",
+
+  "month_january": "January",
+  "month_february": "February",
+  "month_march": "March",
+  "month_april": "April",
+  "month_may": "May",
+  "month_june": "June",
+  "month_july": "July",
+  "month_august": "August",
+  "month_september": "September",
+  "month_october": "October",
+  "month_november": "November",
+  "month_december": "December",
+  "weekday_mo": "Mo",
+  "weekday_tu": "Tu",
+  "weekday_we": "We",
+  "weekday_th": "Th",
+  "weekday_fr": "Fr",
+  "weekday_sa": "Sa",
+  "weekday_su": "Su",
+  "date_picker_placeholder": "Select date",
+  "date_picker_clear": "Clear",
+  "date_picker_aria": "Choose date",
+  "date_picker_prev_month": "Previous month",
+  "date_picker_next_month": "Next month",
+
+  "error_validation": "Validation error",
+  "error_rate_limited": "Too many requests. Please try again later.",
+  "error_document_save": "Failed to save document",
+  "error_document_load": "Failed to load document",
+  "error_search_failed": "Search failed",
+
+  "editor_toolbar_table": "Table",
+  "editor_anonymous": "Anonymous",
+  "editor_saving_rate_limited": "Saving too quickly. Please wait.",
+  "editor_highlight_yellow": "Yellow",
+  "editor_highlight_orange": "Orange",
+  "editor_highlight_red": "Red",
+  "editor_highlight_green": "Green",
+  "editor_highlight_blue": "Blue",
+  "editor_highlight_purple": "Purple",
+  "editor_highlight_pink": "Pink",
+  "editor_highlight_gray": "Gray",
+
+  "share_copy_text": "Copy text",
+
+  "dashboard_import": "Import",
+  "dashboard_filter_label": "Filter:",
+  "dashboard_untitled_document": "Untitled Document",
+
+  "doc_no_folder": "No folder",
+  "doc_move_to_root": "Move to root",
+  "doc_new_folder": "New folder",
+  "doc_new_folder_name": "New folder name",
+  "doc_change_folder": "Change folder",
+  "doc_new_folder_name_aria": "New folder name input",
+
+  "sidebar_powered_by": "Powered by HiAi-Docs",
+
+  "scroll_to_top_aria": "Scroll to top",
+
+  "tag_custom_color": "Custom color",
+
+  "version_history_empty": "No versions yet.",
+
+  "ui_toggle_switch": "Toggle switch"
 }

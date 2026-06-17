@@ -46,7 +46,7 @@ async function createLink() {
 		});
 		shareUrl = `${window.location.origin}/s/${result.token}`;
 	} catch (e) {
-		error = e instanceof Error ? e.message : "Failed to create share link";
+		error = e instanceof Error ? e.message : m.error_generic();
 		console.error("ShareDialog: createShareLink failed", e);
 	} finally {
 		creating = false;

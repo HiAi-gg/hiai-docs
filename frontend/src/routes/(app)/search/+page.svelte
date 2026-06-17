@@ -127,6 +127,16 @@ function handleSubmit(e: SubmitEvent) {
 	goto(buildUrl({ q: query, page: "1" }), { replaceState: true });
 }
 
+function handleKeydown(e: KeyboardEvent) {
+	if (e.key === "Escape") {
+		if (showFilters) {
+			showFilters = false;
+		} else if (query || hasActiveFilters) {
+			clearSearch();
+		}
+	}
+}
+
 function clearSearch() {
 	query = "";
 	activeFolder = "";
@@ -183,6 +193,8 @@ function goToPage(page: number) {
 	goto(buildUrl({ page: String(page) }), { replaceState: true });
 }
 </script>
+
+<svelte:window onkeydown={handleKeydown} />
 
 <svelte:head>
   <title>{data.query ? m.search_title_with_query({query: data.query}) : m.search_title()} — {m.app_name()}</title>
@@ -411,13 +423,13 @@ function goToPage(page: number) {
       <select
         bind:value={sortOrder}
         class="rounded-md border border-input bg-background px-3 py-1.5 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-        aria-label="Sort results"
+        aria-label={m.search_filter_label_aria()}
       >
-        <option value="relevance">Relevance</option>
-        <option value="date_desc">Date (newest first)</option>
-        <option value="date_asc">Date (oldest first)</option>
-        <option value="name_asc">Name (A-Z)</option>
-        <option value="name_desc">Name (Z-A)</option>
+        <option value="relevance">{m.sort_relevance()}</option>
+        <option value="date_desc">{m.sort_date_newest()}</option>
+        <option value="date_asc">{m.sort_date_oldest()}</option>
+        <option value="name_asc">{m.sort_name_asc()}</option>
+        <option value="name_desc">{m.sort_name_desc()}</option>
       </select>
     </div>
 

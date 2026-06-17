@@ -70,7 +70,7 @@ function relativeTime(value: string | Date): string {
   {:else if loadError}
     <p class="py-4 text-center text-xs text-destructive">{loadError}</p>
   {:else if versions.length === 0}
-    <p class="py-4 text-center text-xs text-muted-foreground">No versions yet.</p>
+    <p class="py-4 text-center text-xs text-muted-foreground">{m.version_history_empty()}</p>
   {:else}
     <div class="flex flex-col gap-1 overflow-y-auto max-h-80">
       {#each versions as version (version.id)}

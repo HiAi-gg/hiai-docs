@@ -34,6 +34,8 @@ RUN addgroup -S app && adduser -S app -G app \
 
 USER app
 
+HEALTHCHECK --interval=30s CMD wget -qO- http://localhost:50701/ || exit 1
+
 EXPOSE 50701
 
 CMD ["bun", "run", "build/index.js"]

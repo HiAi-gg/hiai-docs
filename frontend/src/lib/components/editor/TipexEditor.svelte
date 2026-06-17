@@ -76,7 +76,7 @@ onMount(() => {
 			CollaborationCursor.configure({
 				provider: collaboration.provider,
 				user: {
-					name: "Anonymous",
+					name: m.editor_anonymous(),
 					color: `#${Math.floor(Math.random() * 16777215)
 						.toString(16)
 						.padStart(6, "0")}`,

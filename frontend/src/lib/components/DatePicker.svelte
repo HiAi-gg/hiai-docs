@@ -6,13 +6,14 @@
      ("YYYY-MM-DD") or "" when unset. -->
 <script lang="ts">
 import { Calendar, ChevronLeft, ChevronRight } from "lucide-svelte";
+import * as m from "$lib/paraglide/messages.js";
 
 let {
 	value = $bindable(""),
 	onchange,
 	id,
-	ariaLabel = "Choose date",
-	placeholder = "Select date",
+	ariaLabel = m.date_picker_aria(),
+	placeholder = m.date_picker_placeholder(),
 }: {
 	value?: string;
 	onchange?: () => void;
@@ -24,20 +25,28 @@ let {
 let open = $state(false);
 let root = $state<HTMLDivElement | null>(null);
 
-const WEEKDAYS = ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"];
+const WEEKDAYS = [
+	m.weekday_mo(),
+	m.weekday_tu(),
+	m.weekday_we(),
+	m.weekday_th(),
+	m.weekday_fr(),
+	m.weekday_sa(),
+	m.weekday_su(),
+];
 const MONTHS = [
-	"January",
-	"February",
-	"March",
-	"April",
-	"May",
-	"June",
-	"July",
-	"August",
-	"September",
-	"October",
-	"November",
-	"December",
+	m.month_january(),
+	m.month_february(),
+	m.month_march(),
+	m.month_april(),
+	m.month_may(),
+	m.month_june(),
+	m.month_july(),
+	m.month_august(),
+	m.month_september(),
+	m.month_october(),
+	m.month_november(),
+	m.month_december(),
 ];
 
 function pad(n: number): string {
@@ -158,11 +167,11 @@ $effect(() => {
 	{#if open}
 		<div class="dp-popover" role="dialog" aria-label={ariaLabel}>
 			<div class="dp-header">
-				<button type="button" class="dp-nav" onclick={prevMonth} aria-label="Previous month">
+				<button type="button" class="dp-nav" onclick={prevMonth} aria-label={m.date_picker_prev_month()}>
 					<ChevronLeft class="size-4" />
 				</button>
 				<span class="dp-title">{MONTHS[viewMonth]} {viewYear}</span>
-				<button type="button" class="dp-nav" onclick={nextMonth} aria-label="Next month">
+				<button type="button" class="dp-nav" onclick={nextMonth} aria-label={m.date_picker_next_month()}>
 					<ChevronRight class="size-4" />
 				</button>
 			</div>
@@ -185,7 +194,7 @@ $effect(() => {
 				{/each}
 			</div>
 			{#if value}
-				<button type="button" class="dp-clear" onclick={clear}>Clear</button>
+				<button type="button" class="dp-clear" onclick={clear}>{m.date_picker_clear()}</button>
 			{/if}
 		</div>
 	{/if}

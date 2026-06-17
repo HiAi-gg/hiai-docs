@@ -141,12 +141,12 @@ function toggleCollapse() {
       target="_blank"
       rel="noopener noreferrer"
       class="text-xs text-muted-foreground hover:text-foreground transition-colors"
-      title="Powered by HiAi-Docs"
+      title={m.sidebar_powered_by()}
     >
       {#if collapsed}
         HiAi
       {:else}
-        Powered by HiAi-Docs
+        {m.sidebar_powered_by()}
       {/if}
     </a>
   </div>

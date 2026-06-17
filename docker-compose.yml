@@ -48,7 +48,7 @@ services:
           cpus: "0.5"
 
   ollama:
-    image: ollama/ollama
+    image: ollama/ollama:0.13.4
     restart: unless-stopped
     # 11435 host: avoids conflict with primary Ollama on 11434
     ports:
@@ -70,7 +70,7 @@ services:
           cpus: "2"
 
   minio:
-    image: minio/minio
+    image: minio/minio:RELEASE.2025-06-13T14-19-31Z
     restart: unless-stopped
     # 9021 host: avoids conflict with webs-minio (9001) and ai-shared-minio (9011)
     ports:
@@ -106,6 +106,10 @@ services:
       postgres:
         condition: service_healthy
       redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      ollama:
         condition: service_healthy
     healthcheck:
       # $$ escapes compose interpolation so API_PORT is resolved at runtime
