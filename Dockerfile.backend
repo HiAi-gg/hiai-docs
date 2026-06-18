@@ -12,9 +12,9 @@ COPY package.json bun.lock* ./
 COPY backend/package.json ./backend/
 COPY frontend/package.json ./frontend/
 COPY packages/db/package.json ./packages/db/
-RUN bun install --frozen-lockfile
-RUN bun install --cwd backend --frozen-lockfile
-RUN bun install --cwd packages/db --frozen-lockfile
+RUN bun install
+RUN bun install --cwd backend
+RUN bun install --cwd packages/db
 
 # --- Build ---
 # Carry node_modules (workspace symlinks) from the deps stage, then layer

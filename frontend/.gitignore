@@ -1,0 +1,5 @@
+src/lib/paraglide/
+node_modules/
+.svelte-kit/
+build/
+dist/

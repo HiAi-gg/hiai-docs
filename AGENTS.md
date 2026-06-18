@@ -2,20 +2,11 @@
 
 > Standalone, open-source, AI-native knowledge base. Markdown-first, auto-embeddings, self-hostable.
 
-## 📍 Ecosystem Source of Truth (read first)
+## 📍 Источник правды экосистемы (читать первым)
 
-hiai-docs is part of the HiAi ecosystem. Role: **documents module**, integrates anywhere
-(first consumer is `hiai-amigo`); **also the source of design tokens** for the entire ecosystem.
-It is considered a complete product - only unification and integration are important for the ecosystem.
-
-**hiai-docs - standalone open-source project.** Self-hostable, no external dependencies
-beyond what's in `docker-compose.yml`. MIT licensed.
-
-**Ecosystem design standard:** `frontend/src/app.css` is the source of truth for tokens; it is
-mirrored by [`../../packages/hiai-ui/styles/tokens.css`](../../packages/hiai-ui/src/styles/tokens.css).
-If you change the design here -> synchronize the package. Integration contract and plan for integrating docs into `@hiai/ui`
-(DOC1): [`../../packages/hiai-ui/README.md`](../../packages/hiai-ui/README.md) ·
-[`../HIAI_UI_PACKAGE_PLAN.md`](../HIAI_UI_PACKAGE_PLAN.md).
+hiai-docs — часть экосистемы HiAi (модуль документов + источник дизайн-токенов). Общая правда — в корне `projects/`:
+- [`../HIAI_CONVENTIONS.md`](../HIAI_CONVENTIONS.md) — правила, топология, дизайн-токены, plugin-контракт.
+- [`../HIAI_ECOSYSTEM_UNIFICATION_PLAN.md`](../HIAI_ECOSYSTEM_UNIFICATION_PLAN.md) — программа унификации (U0–U5).
 
 ### Project Documents (Index)
 `README.md` · `AGENTS.md` (this one) · `todo.md` - core. `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, `SECURITY.md` - standard.

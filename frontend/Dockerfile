@@ -7,7 +7,7 @@ COPY package.json bun.lock* ./
 COPY frontend/package.json ./frontend/
 COPY backend/package.json ./backend/
 COPY packages/db/package.json ./packages/db/
-RUN bun install --frozen-lockfile
+RUN bun install
 
 # Build
 FROM base AS build

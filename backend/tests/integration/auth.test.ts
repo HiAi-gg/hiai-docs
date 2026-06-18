@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, mock } from "bun:test";
+import "./_harness.js";
 
 const sessionsTable = new Map<string, {
   id: string;
@@ -54,52 +55,6 @@ const authMock = {
 mock.module("../../src/lib/auth.js", () => ({
   auth: authMock,
   Session: undefined,
-}));
-
-mock.module("../../src/lib/db.js", () => ({
-  db: {
-    select: mock(() => ({ from: () => ({ where: () => ({ limit: () => [] }) }) })),
-    insert: mock(() => ({ values: () => ({ returning: () => [{ id: "row-1" }] }) })),
-    update: mock(() => ({ set: () => ({ where: () => ({ returning: () => [{ id: "row-1" }] }) }) })),
-    delete: mock(() => ({ where: () => [] })),
-  },
-  withTransaction: <T>(fn: (tx: unknown) => Promise<T>) => fn({}),
-}));
-
-mock.module("../../src/lib/redis.js", () => ({
-  redis: {
-    incr: mock(() => Promise.resolve(1)),
-    get: mock(() => Promise.resolve(null)),
-    set: mock(() => Promise.resolve("OK")),
-    del: mock(() => Promise.resolve(1)),
-  },
-  redisHealthCheck: () => Promise.resolve(true),
-}));
-
-mock.module("../../src/lib/logger.js", () => ({
-  logger: { info: mock(), warn: mock(), error: mock(), debug: mock() },
-  createChildLogger: () => ({ info: mock(), warn: mock(), error: mock(), debug: mock() }),
-}));
-
-mock.module("../../src/lib/config.js", () => ({
-  config: {
-    BETTER_AUTH_SECRET: SHARED_SECRET,
-    BETTER_AUTH_URL: "http://localhost:50700",
-    DATABASE_URL: "postgresql://test:test@localhost:5432/test",
-    REDIS_URL: "redis://localhost:6379",
-    EMBEDDING_PROVIDER: "ollama",
-    EMBEDDING_MODEL: "nomic-embed-text",
-    MINIO_ENDPOINT: "localhost",
-    MINIO_PORT: 9000,
-    MINIO_ACCESS_KEY: "minioadmin",
-    MINIO_SECRET_KEY: "minioadmin",
-    MINIO_BUCKET: "hiai-docs",
-    MINIO_USE_SSL: false,
-    API_PORT: 50700,
-    FRONTEND_PORT: 50701,
-    OLLAMA_URL: "http://localhost:11434",
-    OPENROUTER_API_KEY: "",
-  },
 }));
 
 const { auth } = await import("../../src/lib/auth.js");

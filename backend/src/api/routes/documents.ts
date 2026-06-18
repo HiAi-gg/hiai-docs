@@ -50,7 +50,9 @@ const importJsonSchema = z.object({
  */
 async function withTags<T extends { id: string }>(
 	rows: T[],
-): Promise<Array<T & { tags: Array<{ id: string; name: string; color: string | null }> }>> {
+): Promise<
+	Array<T & { tags: Array<{ id: string; name: string; color: string | null }> }>
+> {
 	if (rows.length === 0) return [];
 	const ids = rows.map((r) => r.id);
 	const tagRows = await db
@@ -64,7 +66,10 @@ async function withTags<T extends { id: string }>(
 		.innerJoin(tags, eq(tags.id, documentTags.tagId))
 		.where(inArray(documentTags.documentId, ids));
 
-	const byDoc = new Map<string, Array<{ id: string; name: string; color: string | null }>>();
+	const byDoc = new Map<
+		string,
+		Array<{ id: string; name: string; color: string | null }>
+	>();
 	for (const t of tagRows) {
 		const list = byDoc.get(t.documentId) ?? [];
 		list.push({ id: t.id, name: t.name, color: t.color });

@@ -1,7 +1,12 @@
 {
 	"$schema": "https://biomejs.dev/schemas/2.5.0/schema.json",
+	"vcs": {
+		"enabled": true,
+		"clientKind": "git",
+		"useIgnoreFile": true
+	},
 	"files": {
-		"includes": ["src/**/*.ts", "src/**/*.svelte", "src/**/*.js", "!src/lib/paraglide/**"]
+		"includes": ["src/**/*.ts", "src/**/*.svelte", "src/**/*.js"]
 	},
 	"assist": {
 		"actions": {

@@ -36,6 +36,7 @@ const PRESET_COLORS = [
 	"#ec4899", // pink
 ];
 
+// biome-ignore lint/style/noNonNullAssertion: guaranteed by array size
 const DEFAULT_COLOR = PRESET_COLORS[9]!; // violet
 
 let {
