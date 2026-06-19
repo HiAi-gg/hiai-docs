@@ -256,7 +256,7 @@ jobs:
         uses: aquasecurity/trivy-action@v0.24.0
         with:
           image-ref: hiai-docs/api:ci-${{ github.sha }}
-          format: "table"
+          format: "sarif"
           exit-code: "0"   # warn-only on PRs; tighten to "1" on protected branches
           ignore-unfixed: true
           vuln-type: "os,library"
@@ -273,7 +273,7 @@ jobs:
         uses: aquasecurity/trivy-action@v0.24.0
         with:
           image-ref: hiai-docs/web:ci-${{ github.sha }}
-          format: "table"
+          format: "sarif"
           exit-code: "0"
           ignore-unfixed: true
           vuln-type: "os,library"

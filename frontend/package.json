@@ -10,7 +10,7 @@
     "preview": "vite preview",
     "lint": "biome check src/",
     "lint:fix": "biome check --fix src/",
-    "typecheck": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
+    "typecheck": "paraglide-js compile --project ./project.inlang && svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
     "test": "bun test --path-ignore-patterns='*node_modules*' src/"
   },
   "dependencies": {
