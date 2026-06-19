@@ -82,6 +82,7 @@ export const searchRoutes = new Elysia({ prefix: "/api/search" })
 				snippet: string;
 				score: number;
 				folder_id: string | null;
+				folder_name: string | null;
 				created_at: string;
 				updated_at: string;
 			};
@@ -90,9 +91,11 @@ export const searchRoutes = new Elysia({ prefix: "/api/search" })
 				title: string;
 				snippet: string;
 				score: number;
-				folderId: string | null;
-				createdAt: string;
-				updatedAt: string;
+				folder_id: string | null;
+				folder_name: string | null;
+				created_at: string;
+				updated_at: string;
+				tags?: Array<{ id: string; name: string; color: string | null }>;
 			};
 			const merged = new Map<string, SearchResult>();
 
@@ -102,9 +105,10 @@ export const searchRoutes = new Elysia({ prefix: "/api/search" })
 					title: row.title,
 					snippet: row.snippet,
 					score: row.score,
-					folderId: row.folder_id,
-					createdAt: row.created_at,
-					updatedAt: row.updated_at,
+					folder_id: row.folder_id,
+					folder_name: row.folder_name,
+					created_at: row.created_at,
+					updated_at: row.updated_at,
 				};
 			}
 
@@ -129,13 +133,13 @@ export const searchRoutes = new Elysia({ prefix: "/api/search" })
 			let filtered = Array.from(merged.values());
 
 			if (folder) {
-				filtered = filtered.filter((r) => r.folderId === folder);
+				filtered = filtered.filter((r) => r.folder_id === folder);
 			}
 
 			if (dateFrom) {
 				const from = new Date(dateFrom);
 				if (!Number.isNaN(from.getTime())) {
-					filtered = filtered.filter((r) => new Date(r.createdAt) >= from);
+					filtered = filtered.filter((r) => new Date(r.created_at) >= from);
 				}
 			}
 
@@ -144,7 +148,7 @@ export const searchRoutes = new Elysia({ prefix: "/api/search" })
 				if (!Number.isNaN(to.getTime())) {
 					// Include the entire "to" day
 					to.setHours(23, 59, 59, 999);
-					filtered = filtered.filter((r) => new Date(r.createdAt) <= to);
+					filtered = filtered.filter((r) => new Date(r.created_at) <= to);
 				}
 			}
 
@@ -164,13 +168,15 @@ export const searchRoutes = new Elysia({ prefix: "/api/search" })
 				case "date_desc":
 					filtered.sort(
 						(a, b) =>
-							new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+							new Date(b.created_at).getTime() -
+							new Date(a.created_at).getTime(),
 					);
 					break;
 				case "date_asc":
 					filtered.sort(
 						(a, b) =>
-							new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
+							new Date(a.created_at).getTime() -
+							new Date(b.created_at).getTime(),
 					);
 					break;
 				case "name_asc":
@@ -186,7 +192,8 @@ export const searchRoutes = new Elysia({ prefix: "/api/search" })
 			const total = filtered.length;
 			const items = filtered.slice(offset, offset + limit);
 
-			return { items, total, page, limit };
+			const itemsWithTags = await withTags(items);
+			return { items: itemsWithTags, total, page, limit };
 		} catch (err) {
 			logger.error({ err }, "Search failed");
 			set.status = 500;
@@ -240,12 +247,13 @@ async function fullTextSearch(userId: string, q: string, limit: number) {
 	const tsQuery = sql`plainto_tsquery('english', ${q})`;
 
 	return db.execute(sql`
-    SELECT id, title, LEFT(content, 200) as snippet,
-      ts_rank(search_vector, ${tsQuery}) as score,
-      folder_id, created_at, updated_at
-    FROM documents
-    WHERE owner_id = ${userId}
-      AND search_vector @@ ${tsQuery}
+    SELECT d.id, d.title, LEFT(d.content, 200) as snippet,
+      ts_rank(d.search_vector, ${tsQuery}) as score,
+      d.folder_id, f.name as folder_name, d.created_at, d.updated_at
+    FROM documents d
+    LEFT JOIN folders f ON f.id = d.folder_id
+    WHERE d.owner_id = ${userId}
+      AND d.search_vector @@ ${tsQuery}
     ORDER BY score DESC
     LIMIT ${limit}
   `);
@@ -270,9 +278,10 @@ async function semanticSearch(userId: string, q: string, limit: number) {
       SELECT DISTINCT ON (d.id)
         d.id, d.title, LEFT(d.content, 200) as snippet,
         1 - (de.embedding <=> ${embeddingStr}::vector) as score,
-        d.folder_id, d.created_at, d.updated_at
+        d.folder_id, f.name as folder_name, d.created_at, d.updated_at
       FROM document_embeddings de
       JOIN documents d ON d.id = de.document_id
+      LEFT JOIN folders f ON f.id = d.folder_id
       WHERE d.owner_id = ${userId}
         AND de.embedding IS NOT NULL
       ORDER BY d.id, de.embedding <=> ${embeddingStr}::vector
@@ -312,4 +321,34 @@ async function tagFilter(
 		.where(inArray(documentTags.tagId, tagIds));
 
 	return new Set(docRows.map((r) => r.documentId));
+}
+
+async function withTags<T extends { id: string }>(
+	rows: T[],
+): Promise<
+	Array<T & { tags: Array<{ id: string; name: string; color: string | null }> }>
+> {
+	if (rows.length === 0) return [];
+	const ids = rows.map((r) => r.id);
+	const tagRows = await db
+		.select({
+			documentId: documentTags.documentId,
+			id: tagsTable.id,
+			name: tagsTable.name,
+			color: tagsTable.color,
+		})
+		.from(documentTags)
+		.innerJoin(tagsTable, eq(tagsTable.id, documentTags.tagId))
+		.where(inArray(documentTags.documentId, ids));
+
+	const byDoc = new Map<
+		string,
+		Array<{ id: string; name: string; color: string | null }>
+	>();
+	for (const t of tagRows) {
+		const list = byDoc.get(t.documentId) ?? [];
+		list.push({ id: t.id, name: t.name, color: t.color });
+		byDoc.set(t.documentId, list);
+	}
+	return rows.map((r) => ({ ...r, tags: byDoc.get(r.id) ?? [] }));
 }

@@ -50,7 +50,7 @@ onMount(async () => {
 async function saveProfile() {
 	saveStatus = "saving";
 	try {
-		await updateProfile({ name, email });
+		await updateProfile({ name });
 		saveStatus = "saved";
 		setTimeout(() => {
 			saveStatus = "idle";
@@ -114,7 +114,7 @@ async function handleDeleteAccount() {
       </div>
       <div class="space-y-2">
         <label for="email" class="text-sm font-medium">{m.settings_email()}</label>
-        <input id="email" type="email" bind:value={email} class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" />
+        <input id="email" type="email" bind:value={email} class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" disabled />
       </div>
       <div class="flex items-center gap-3">
         <button onclick={saveProfile} disabled={saveStatus === "saving"} class="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50">

@@ -21,7 +21,7 @@ export async function getSessionUserId(
 		}
 	}
 
-	// Fall back to Better Auth session
+	// Fall back to Better Auth session check
 	const session = await auth.api.getSession({ headers });
 	return session?.user?.id ?? null;
 }

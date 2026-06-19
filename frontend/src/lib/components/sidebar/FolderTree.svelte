@@ -1,4 +1,20 @@
 <script lang="ts">
+import { Button } from "@hiai-gg/hiai-ui/components/ui/button";
+import {
+	Dialog,
+	DialogDescription,
+	DialogFooter,
+	DialogHeader,
+	DialogTitle,
+} from "@hiai-gg/hiai-ui/components/ui/dialog";
+import {
+	DropdownMenu,
+	DropdownMenuContent,
+	DropdownMenuItem,
+	DropdownMenuTrigger,
+} from "@hiai-gg/hiai-ui/components/ui/dropdown-menu";
+import { Input } from "@hiai-gg/hiai-ui/components/ui/input";
+import { Label } from "@hiai-gg/hiai-ui/components/ui/label";
 import {
 	Check,
 	ChevronRight,
@@ -26,23 +42,7 @@ import {
 	listFolders,
 	updateFolder,
 } from "$lib/api/folders";
-import { Button } from "@hiai/ui/components/ui/button";
 import { ConfirmDialog } from "$lib/components/ui/confirm-dialog";
-import {
-	Dialog,
-	DialogDescription,
-	DialogFooter,
-	DialogHeader,
-	DialogTitle,
-} from "@hiai/ui/components/ui/dialog";
-import {
-	DropdownMenu,
-	DropdownMenuContent,
-	DropdownMenuItem,
-	DropdownMenuTrigger,
-} from "@hiai/ui/components/ui/dropdown-menu";
-import { Input } from "@hiai/ui/components/ui/input";
-import { Label } from "@hiai/ui/components/ui/label";
 import * as m from "$lib/paraglide/messages.js";
 import {
 	getDocRefreshNonce,
@@ -342,9 +342,7 @@ async function persistZoneChanges(
 	if (updates.length === 0) return;
 	try {
 		await Promise.all(
-			updates.map((u) =>
-				updateDocument(u.id, { folderId: u.folderId ?? undefined }),
-			),
+			updates.map((u) => updateDocument(u.id, { folderId: u.folderId })),
 		);
 	} catch (err) {
 		console.error("FolderTree: persist failed", err);

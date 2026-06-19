@@ -65,3 +65,5 @@ topics.txt
 *.local.md
 scratch/
 notes/
+.packages/
+

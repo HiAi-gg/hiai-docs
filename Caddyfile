@@ -10,7 +10,7 @@
 
 	header {
 		# Restrictive CSP — allows same-origin + dev WebSocket
-		Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' http://localhost:50700 ws://localhost:50700; font-src 'self' data:; frame-ancestors 'none'; form-action 'self'"
+		Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' http://localhost:50700 ws://localhost:50700; font-src 'self' data:; frame-ancestors 'none'; form-action 'self'"
 		# HSTS — harmless on plain HTTP, enforced once TLS is provisioned
 		Strict-Transport-Security "max-age=31536000; includeSubDomains"
 		X-Content-Type-Options "nosniff"
@@ -39,7 +39,7 @@ docs.{$DOMAIN:localhost} {
 		# Restrictive CSP — SvelteKit requires 'unsafe-inline' in style-src
 		# because it injects styles at runtime and cannot use nonces.
 		# This is an accepted trade-off for SvelteKit SPAs.
-		Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' wss:// https://; font-src 'self' data:; frame-ancestors 'none'; form-action 'self'"
+		Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' wss:// https://; font-src 'self' data:; frame-ancestors 'none'; form-action 'self'"
 		# HSTS — 1 year, include subdomains, preload-ready
 		Strict-Transport-Security "max-age=31536000; includeSubDomains"
 		X-Content-Type-Options "nosniff"

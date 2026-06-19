@@ -1,4 +1,10 @@
-import { documents, documentTags, tags, versions } from "@hiai-docs/db/schema";
+import {
+	documents,
+	documentTags,
+	folders,
+	tags,
+	versions,
+} from "@hiai-docs/db/schema";
 import { and, count, desc, eq, inArray, sql } from "drizzle-orm";
 import { Elysia } from "elysia";
 import { z } from "zod";
@@ -269,6 +275,7 @@ export const documentRoutes = new Elysia({ prefix: "/api" })
 					id: documents.id,
 					ownerId: documents.ownerId,
 					folderId: documents.folderId,
+					folderName: folders.name,
 					title: documents.title,
 					content: documents.content,
 					contentJson: documents.contentJson,
@@ -277,6 +284,7 @@ export const documentRoutes = new Elysia({ prefix: "/api" })
 					updatedAt: documents.updatedAt,
 				})
 				.from(documents)
+				.leftJoin(folders, eq(folders.id, documents.folderId))
 				.where(and(eq(documents.id, params.id), eq(documents.ownerId, userId)))
 				.limit(1);
 

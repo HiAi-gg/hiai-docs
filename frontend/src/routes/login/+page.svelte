@@ -39,7 +39,7 @@ async function handleSubmit(e: SubmitEvent) {
 	>
 		<div class="space-y-2">
 			<div class="flex items-center gap-2">
-				<img src="/logo.png" alt="HiAi-Docs" class="h-8 w-auto" />
+				<img src="/logo.png" alt="HiAi-Docs" class="h-8 w-auto dark:invert" />
 				<h1 class="text-2xl font-semibold tracking-tight">{m.login_title()}</h1>
 			</div>
 			<p class="text-sm text-muted-foreground">{m.login_subtitle()}</p>

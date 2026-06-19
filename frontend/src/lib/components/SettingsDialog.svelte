@@ -1,14 +1,14 @@
 <script lang="ts">
+import { Button } from "@hiai-gg/hiai-ui/components/ui/button";
+import * as Dialog from "@hiai-gg/hiai-ui/components/ui/dialog";
+import { Input } from "@hiai-gg/hiai-ui/components/ui/input";
+import { Label } from "@hiai-gg/hiai-ui/components/ui/label";
+import * as Tabs from "@hiai-gg/hiai-ui/components/ui/tabs";
 import { Loader2, LogOut, Save } from "lucide-svelte";
 import { onMount } from "svelte";
 import { goto } from "$app/navigation";
 import { getProfile, updateProfile } from "$lib/api/settings";
 import { authClient, signOut } from "$lib/auth-client";
-import { Button } from "@hiai/ui/components/ui/button";
-import * as Dialog from "@hiai/ui/components/ui/dialog";
-import { Input } from "@hiai/ui/components/ui/input";
-import { Label } from "@hiai/ui/components/ui/label";
-import * as Tabs from "@hiai/ui/components/ui/tabs";
 import * as m from "$lib/paraglide/messages.js";
 import { type Theme, themeStore } from "$lib/stores/theme.svelte";
 
@@ -47,7 +47,7 @@ async function saveProfile() {
 	profileStatus = "saving";
 	profileError = "";
 	try {
-		await updateProfile({ name, email });
+		await updateProfile({ name });
 		profileStatus = "saved";
 		setTimeout(() => {
 			profileStatus = "idle";
@@ -162,19 +162,19 @@ function close() {
 		</Tabs.TabsList>
 
 		<Tabs.TabsContent value="profile" currentValue={activeTab}>
-			<div class="space-y-4">
+			<form onsubmit={(e) => { e.preventDefault(); saveProfile(); }} class="space-y-4">
 				<div class="space-y-2">
 					<Label for="settings-name">{m.settings_name()}</Label>
-					<Input id="settings-name" type="text" bind:value={name} autocomplete="name" />
+					<Input id="settings-name" type="text" name="name" bind:value={name} autocomplete="name" />
 				</div>
 				<div class="space-y-2">
 					<Label for="settings-email">{m.settings_email()}</Label>
-					<Input id="settings-email" type="email" bind:value={email} autocomplete="email" />
+					<Input id="settings-email" type="email" name="email" bind:value={email} autocomplete="email" disabled />
 				</div>
 				{#if profileError}
 					<p class="text-sm text-destructive">{profileError}</p>
 				{/if}
-				<Button onclick={saveProfile} disabled={profileStatus === "saving"}>
+				<Button type="submit" disabled={profileStatus === "saving"}>
 					{#if profileStatus === "saving"}
 						<Loader2 class="mr-2 size-4 animate-spin" />
 					{:else}
@@ -182,16 +182,17 @@ function close() {
 					{/if}
 					{profileStatus === "saved" ? m.settings_saved_status() : m.settings_save()}
 				</Button>
-			</div>
+			</form>
 		</Tabs.TabsContent>
 
 		<Tabs.TabsContent value="password" currentValue={activeTab}>
-			<div class="space-y-4">
+			<form onsubmit={(e) => { e.preventDefault(); changePassword(); }} class="space-y-4">
 				<div class="space-y-2">
 					<Label for="settings-current-password">{m.auth_password()}</Label>
 					<Input
 						id="settings-current-password"
 						type="password"
+						name="current-password"
 						bind:value={currentPassword}
 						autocomplete="current-password"
 					/>
@@ -201,6 +202,7 @@ function close() {
 					<Input
 						id="settings-new-password"
 						type="password"
+						name="new-password"
 						bind:value={newPassword}
 						autocomplete="new-password"
 					/>
@@ -210,6 +212,7 @@ function close() {
 					<Input
 						id="settings-confirm-password"
 						type="password"
+						name="confirm-password"
 						bind:value={confirmPassword}
 						autocomplete="new-password"
 					/>
@@ -217,13 +220,13 @@ function close() {
 				{#if passwordError}
 					<p class="text-sm text-destructive">{passwordError}</p>
 				{/if}
-				<Button onclick={changePassword} disabled={passwordStatus === "saving"}>
+				<Button type="submit" disabled={passwordStatus === "saving"}>
 					{#if passwordStatus === "saving"}
 						<Loader2 class="mr-2 size-4 animate-spin" />
 					{/if}
 					{passwordStatus === "saved" ? m.settings_saved_status() : m.change_password()}
 				</Button>
-			</div>
+			</form>
 		</Tabs.TabsContent>
 
 		<Tabs.TabsContent value="appearance" currentValue={activeTab}>

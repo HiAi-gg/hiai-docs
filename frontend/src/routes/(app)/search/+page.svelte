@@ -46,7 +46,9 @@ let loading = $state(false);
 let showFilters = $state(false);
 
 let folders = $state<string[]>([]);
-let tags = $state<string[]>([]);
+let tags = $state<Array<{ id: string; name: string; color: string | null }>>(
+	[],
+);
 
 const PAGE_SIZE = 5;
 
@@ -344,14 +346,17 @@ function goToPage(page: number) {
           {m.search_tags()}
         </h4>
         <div class="flex flex-wrap gap-1.5">
-          {#each tags as tag}
+          {#each tags as tag (tag.id)}
             <button
-              onclick={() => toggleTag(tag)}
-              class="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium transition-colors {activeTags.includes(tag)
+              onclick={() => toggleTag(tag.name)}
+              class="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium transition-colors {activeTags.includes(tag.name)
                 ? 'bg-primary text-primary-foreground'
                 : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'}"
             >
-              {tag}
+              {#if tag.color}
+                <span class="mr-1.5 inline-block size-2 rounded-full" style="background-color: {tag.color}"></span>
+              {/if}
+              {tag.name}
             </button>
           {/each}
         </div>
@@ -451,8 +456,8 @@ function goToPage(page: number) {
           title={result.title}
           snippet={result.snippet}
           score={result.score}
-          folderName={result.folder_id ?? ""}
-          tags={[]}
+          folderName={result.folder_name ?? ""}
+          tags={result.tags ?? []}
           createdAt={result.created_at}
           query={data.query}
         />

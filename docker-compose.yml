@@ -99,6 +99,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.backend
+      network: host
     restart: unless-stopped
     ports:
       - "${API_PORT:-50700}:50700"
@@ -153,6 +154,7 @@ services:
     build:
       context: .
       dockerfile: frontend/Dockerfile
+      network: host
     restart: unless-stopped
     ports:
       - "${WEB_PORT:-50701}:50701"

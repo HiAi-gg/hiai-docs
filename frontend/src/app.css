@@ -1,6 +1,6 @@
 @import "tailwindcss";
 
 /* Canonical design tokens (oklch, shadcn-svelte new-york / slate) — single source
- * of truth lives in @hiai/ui. This file is intentionally minimal: docs-specific
+ * of truth lives in @hiai-gg/hiai-ui. This file is intentionally minimal: docs-specific
  * additions only. To change tokens, edit packages/hiai-ui/src/styles/tokens.css. */
-@import "@hiai/ui/styles/tokens.css";
+@import "@hiai-gg/hiai-ui/styles/tokens.css";

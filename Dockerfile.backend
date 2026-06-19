@@ -12,9 +12,11 @@ COPY package.json bun.lock* ./
 COPY backend/package.json ./backend/
 COPY frontend/package.json ./frontend/
 COPY packages/db/package.json ./packages/db/
-RUN bun install
-RUN bun install --cwd backend
-RUN bun install --cwd packages/db
+COPY .packages/hiai-ui /packages/hiai-ui
+ENV BUN_INSTALL_CONCURRENCY=1
+RUN bun install --no-verify
+RUN bun install --cwd backend --no-verify
+RUN bun install --cwd packages/db --no-verify
 
 # --- Build ---
 # Carry node_modules (workspace symlinks) from the deps stage, then layer
@@ -25,6 +27,7 @@ FROM base AS build
 COPY --from=deps /app/node_modules ./node_modules
 COPY --from=deps /app/backend/node_modules ./backend/node_modules
 COPY --from=deps /app/packages/db/node_modules ./packages/db/node_modules
+COPY --from=deps /packages/hiai-ui /packages/hiai-ui
 COPY packages/db/ ./packages/db/
 COPY backend/src ./backend/src
 COPY backend/tsconfig.json ./backend/

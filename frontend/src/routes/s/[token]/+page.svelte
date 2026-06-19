@@ -151,8 +151,10 @@ function wrapBlock(node: ProseMirrorNode, inner: string): string {
 			return `<ul data-type="taskList">${inner}</ul>`;
 		case "taskItem": {
 			// Read-only checkbox reflecting the saved checked state.
-			const checked = node.attrs?.checked === true ? " checked" : "";
-			return `<li data-type="taskItem"${checked ? ' data-checked="true"' : ""}><label><input type="checkbox" disabled${checked} /></label><div>${inner}</div></li>`;
+			const isChecked =
+				node.attrs?.checked === true || node.attrs?.checked === "true";
+			const checked = isChecked ? " checked" : "";
+			return `<li data-type="taskItem"${isChecked ? ' data-checked="true"' : ""}><label><input type="checkbox" onclick="return false;" class="cursor-default" ${checked} /></label><div>${inner}</div></li>`;
 		}
 		case "blockquote":
 			return `<blockquote${align}>${inner}</blockquote>`;
@@ -410,7 +412,14 @@ fetchShare();
     gap: 0.5rem;
   }
   .shared-doc-body :global(ul[data-type="taskList"] li > label) {
-    margin-top: 0.2rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 1.7em;
+    margin: 0;
+  }
+  .shared-doc-body :global(ul[data-type="taskList"] li > div > p) {
+    margin: 0;
   }
   .shared-doc-body :global(ul[data-type="taskList"] input[type="checkbox"]) {
     accent-color: var(--primary);
@@ -432,6 +441,7 @@ fetchShare();
   .shared-doc-body :global(pre) {
     background: var(--muted);
     color: var(--foreground);
+    border: 1px solid var(--border);
     padding: 1rem;
     border-radius: 8px;
     font-family: "Fira Code", "Consolas", monospace;

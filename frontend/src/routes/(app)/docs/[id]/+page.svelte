@@ -1,6 +1,13 @@
 <!-- Document editor page -->
 <script lang="ts">
 import {
+	DropdownMenu,
+	DropdownMenuContent,
+	DropdownMenuItem,
+	DropdownMenuSeparator,
+	DropdownMenuTrigger,
+} from "@hiai-gg/hiai-ui/components/ui/dropdown-menu";
+import {
 	Check,
 	ChevronRight,
 	Code,
@@ -33,13 +40,6 @@ import MarkdownToggle from "$lib/components/editor/MarkdownToggle.svelte";
 import ShareDialog from "$lib/components/ShareDialog.svelte";
 import TagCreateDialog from "$lib/components/TagCreateDialog.svelte";
 import { ConfirmDialog } from "$lib/components/ui/confirm-dialog";
-import {
-	DropdownMenu,
-	DropdownMenuContent,
-	DropdownMenuItem,
-	DropdownMenuSeparator,
-	DropdownMenuTrigger,
-} from "@hiai/ui/components/ui/dropdown-menu";
 import * as m from "$lib/paraglide/messages.js";
 import { refreshDocs, refreshTags } from "$lib/stores/tag-store.svelte";
 
@@ -201,6 +201,7 @@ async function handleTitleUpdate(newTitle: string) {
 	try {
 		await updateDocument(data.document.id, { title: newTitle });
 		saveStatus = "saved";
+		refreshDocs();
 	} catch (_e) {
 		saveStatus = "unsaved";
 		error = m.doc_save_title_error();
@@ -218,6 +219,7 @@ async function confirmDelete() {
 	try {
 		await deleteDocument(data.document.id);
 		showDeleteDialog = false;
+		refreshDocs();
 		goto("/");
 	} catch (_e) {
 		error = m.doc_delete_error();

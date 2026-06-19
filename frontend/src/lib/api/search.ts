@@ -8,8 +8,10 @@ export interface SearchResult {
 	snippet: string;
 	score: number;
 	folder_id: string | null;
+	folder_name?: string | null;
 	created_at: string;
 	updated_at: string;
+	tags?: Array<{ id: string; name: string; color: string | null }>;
 }
 
 export interface SearchResponse {
@@ -27,7 +29,7 @@ export interface SearchSuggestion {
 
 export interface FilterOptions {
 	folders: string[];
-	tags: string[];
+	tags: Array<{ id: string; name: string; color: string | null }>;
 }
 
 // --- Public API --------------------------------------------------------------
@@ -90,11 +92,13 @@ export async function getFilterOptions(): Promise<FilterOptions> {
 	try {
 		const [folders, tags] = await Promise.all([
 			apiFetch<Array<{ id: string; name: string }>>("/api/folders"),
-			apiFetch<Array<{ id: string; name: string }>>("/api/tags"),
+			apiFetch<Array<{ id: string; name: string; color: string | null }>>(
+				"/api/tags",
+			),
 		]);
 		return {
 			folders: folders.map((f) => f.name),
-			tags: tags.map((t) => t.name),
+			tags,
 		};
 	} catch {
 		return { folders: [], tags: [] };

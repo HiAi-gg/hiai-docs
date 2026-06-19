@@ -1,4 +1,12 @@
 <script lang="ts">
+import { Badge } from "@hiai-gg/hiai-ui/components/ui/badge";
+import { Button } from "@hiai-gg/hiai-ui/components/ui/button";
+import {
+	DropdownMenu,
+	DropdownMenuContent,
+	DropdownMenuItem,
+	DropdownMenuTrigger,
+} from "@hiai-gg/hiai-ui/components/ui/dropdown-menu";
 import {
 	ArrowUpDown,
 	ChevronRight,
@@ -14,15 +22,7 @@ import { goto } from "$app/navigation";
 import { apiFetch } from "$lib/api/client";
 import DocumentCard from "$lib/components/DocumentCard.svelte";
 import FolderCard from "$lib/components/FolderCard.svelte";
-import { Badge } from "@hiai/ui/components/ui/badge";
-import { Button } from "@hiai/ui/components/ui/button";
 import { ConfirmDialog } from "$lib/components/ui/confirm-dialog";
-import {
-	DropdownMenu,
-	DropdownMenuContent,
-	DropdownMenuItem,
-	DropdownMenuTrigger,
-} from "@hiai/ui/components/ui/dropdown-menu";
 import * as m from "$lib/paraglide/messages.js";
 import type { Document, Folder, SortOption } from "$lib/types.js";
 

@@ -320,13 +320,21 @@ function handleWrapperClick(event: MouseEvent) {
   }
 
   .editor-content :global(.tiptap ul[data-type="taskList"] li > label) {
-    margin-top: 0.2rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     user-select: none;
+    height: 1.7em;
+    margin: 0;
   }
 
   .editor-content :global(.tiptap ul[data-type="taskList"] li > div) {
     flex: 1 1 auto;
     min-width: 0;
+  }
+
+  .editor-content :global(.tiptap ul[data-type="taskList"] li > div > p) {
+    margin: 0;
   }
 
   .editor-content :global(.tiptap ul[data-type="taskList"] input[type="checkbox"]) {
@@ -351,8 +359,9 @@ function handleWrapperClick(event: MouseEvent) {
   }
 
   .editor-content :global(.tiptap pre) {
-    background: var(--card);
-    color: var(--card-foreground);
+    background: var(--muted);
+    color: var(--foreground);
+    border: 1px solid var(--border);
     padding: 1rem;
     border-radius: 8px;
     font-family: "Fira Code", "Consolas", monospace;

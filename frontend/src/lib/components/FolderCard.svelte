@@ -1,4 +1,12 @@
 <script lang="ts">
+import { Card, CardContent } from "@hiai-gg/hiai-ui/components/ui/card";
+import {
+	DropdownMenu,
+	DropdownMenuContent,
+	DropdownMenuItem,
+	DropdownMenuSeparator,
+	DropdownMenuTrigger,
+} from "@hiai-gg/hiai-ui/components/ui/dropdown-menu";
 import {
 	Folder,
 	FolderInput,
@@ -7,14 +15,6 @@ import {
 	Trash2,
 } from "lucide-svelte";
 import { goto } from "$app/navigation";
-import { Card, CardContent } from "@hiai/ui/components/ui/card";
-import {
-	DropdownMenu,
-	DropdownMenuContent,
-	DropdownMenuItem,
-	DropdownMenuSeparator,
-	DropdownMenuTrigger,
-} from "@hiai/ui/components/ui/dropdown-menu";
 import * as m from "$lib/paraglide/messages.js";
 import type { Folder as FolderType } from "$lib/types.js";
 import { formatRelativeTime } from "$lib/utils.js";

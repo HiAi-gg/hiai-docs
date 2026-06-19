@@ -1,5 +1,15 @@
 <!-- TagCreateDialog.svelte — Create or edit a tag (name + color). -->
 <script lang="ts">
+import { Button } from "@hiai-gg/hiai-ui/components/ui/button";
+import {
+	Dialog,
+	DialogDescription,
+	DialogFooter,
+	DialogHeader,
+	DialogTitle,
+} from "@hiai-gg/hiai-ui/components/ui/dialog";
+import { Input } from "@hiai-gg/hiai-ui/components/ui/input";
+import { Label } from "@hiai-gg/hiai-ui/components/ui/label";
 import { Loader2 } from "lucide-svelte";
 import {
 	createTag,
@@ -8,16 +18,6 @@ import {
 	updateTag,
 	updateTagInputSchema,
 } from "$lib/api/tags";
-import { Button } from "@hiai/ui/components/ui/button";
-import {
-	Dialog,
-	DialogDescription,
-	DialogFooter,
-	DialogHeader,
-	DialogTitle,
-} from "@hiai/ui/components/ui/dialog";
-import { Input } from "@hiai/ui/components/ui/input";
-import { Label } from "@hiai/ui/components/ui/label";
 import * as m from "$lib/paraglide/messages.js";
 import { cn } from "$lib/utils";
 

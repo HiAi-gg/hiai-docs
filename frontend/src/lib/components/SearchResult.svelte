@@ -7,7 +7,7 @@ interface Props {
 	snippet: string; // may contain <mark> tags
 	score: number;
 	folderName: string;
-	tags: string[];
+	tags: Array<{ id: string; name: string; color: string | null }>;
 	createdAt: string;
 	query?: string;
 }
@@ -97,10 +97,14 @@ const formattedDate = $derived(
     {/if}
 
     {#if tags.length > 0}
-      <span class="inline-flex items-center gap-1">
-        <Tag class="size-3.5" />
-        {tags.join(", ")}
-      </span>
+      {#each tags as tag (tag.id)}
+        <span class="inline-flex items-center gap-1 rounded-full bg-secondary px-1.5 py-0.5 text-xs text-secondary-foreground">
+          {#if tag.color}
+            <span class="inline-block size-2 rounded-full" style="background-color: {tag.color}"></span>
+          {/if}
+          {tag.name}
+        </span>
+      {/each}
     {/if}
 
     <span class="inline-flex items-center gap-1">

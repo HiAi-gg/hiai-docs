@@ -5,7 +5,7 @@
     "./node_modules/@inlang/plugin-m-function-matcher/dist/index.js"
   ],
   "plugin.inlang.messageFormat": {
-    "pathPattern": "./messages/{languageTag}.json"
+    "pathPattern": "/mnt/ai_data/projects/hiai-docs/frontend/messages/{languageTag}.json"
   },
   "sourceLanguageTag": "en",
   "languageTags": ["en"]

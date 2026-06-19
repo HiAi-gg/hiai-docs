@@ -103,6 +103,7 @@ async function handleNewDocument() {
 			title: m.dashboard_untitled_document(),
 			content: "",
 		});
+		refreshDocs();
 		goto(`/docs/${doc.id}`);
 	} catch (err) {
 		error = err instanceof Error ? err.message : m.error_document_save();
@@ -264,16 +265,16 @@ function selectTag(tagId: string | null) {
                 </div>
               </div>
               <p class="mb-3 text-sm text-muted-foreground line-clamp-2">{stripMarkdown(doc.content || "").slice(0, 120)}</p>
-              <div class="flex items-center justify-between">
-                <div class="flex items-center gap-1 text-xs text-muted-foreground">
+              <div class="flex items-center gap-3 text-xs text-muted-foreground flex-wrap">
+                <span class="flex items-center gap-1 shrink-0">
                   <Clock class="size-3" />
                   {relativeTime(doc.updatedAt)}
-                </div>
+                </span>
                 {#if doc.tags?.length}
-                  <div class="flex items-center gap-1">
-                    {#each doc.tags.slice(0, 2) as tag (tag.id)}
-                      <span class="inline-flex items-center gap-0.5 rounded-full bg-secondary px-1.5 py-0.5 text-xs text-secondary-foreground">
-                        <Tag class="size-2.5" />
+                  <div class="flex flex-wrap items-center gap-1.5">
+                    {#each doc.tags as tag (tag.id)}
+                      <span class="inline-flex items-center gap-1 rounded-full bg-secondary px-1.5 py-0.5 text-xs text-secondary-foreground">
+                        <span class="inline-block size-2 rounded-full" style="background-color: {tag.color}"></span>
                         {tag.name}
                       </span>
                     {/each}

@@ -45,11 +45,10 @@ export async function getProfile(): Promise<UserProfile> {
 
 export async function updateProfile(data: {
 	name?: string;
-	email?: string;
 }): Promise<UserProfile> {
 	return apiFetch("/api/auth/update-user", {
 		method: "POST",
-		body: JSON.stringify(data),
+		body: JSON.stringify({ name: data.name }),
 	});
 }
 
