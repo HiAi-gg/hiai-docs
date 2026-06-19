@@ -11,10 +11,10 @@
     "lint": "biome check src/",
     "lint:fix": "biome check --fix src/",
     "typecheck": "paraglide-js compile --project ./project.inlang --outdir ./src/lib/paraglide && svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
-    "test": "paraglide-js compile --project ./project.inlang --outdir ./src/lib/paraglide && bun test --path-ignore-patterns='*node_modules*' src/"
+    "test": "paraglide-js compile --project ./project.inlang --outdir ./src/lib/paraglide && svelte-kit sync && bun test --path-ignore-patterns='*node_modules*' src/"
   },
   "dependencies": {
-    "@hiai-gg/hiai-ui": "workspace:*",
+    "@hiai-gg/hiai-ui": "^0.0.1",
     "@inlang/paraglide-js": "^2.19.0",
     "@tiptap/core": "^3.26.1",
     "@tiptap/extension-code-block-lowlight": "^3.26.1",
