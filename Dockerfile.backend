@@ -4,9 +4,12 @@ WORKDIR /app
 # --- Install dependencies ---
 # A single root install creates /app/node_modules with hoisted deps and
 # populates the workspace symlinks for backend/, frontend/, and packages/db/.
-# Bun's resolver traverses parent node_modules, so backend's build can find
-# its hoisted deps and its workspace: dependencies (e.g. @hiai-docs/db) through
-# the root node_modules without per-workspace installs.
+# We then run per-workspace `bun install` for backend and packages/db so each
+# package gets its own local node_modules. Bun's bundler looks in the
+# workspace's own node_modules first when running from that directory, so the
+# per-workspace installs are what the build/runtime actually resolve against
+# (with the root node_modules providing hoisted fallback for shared deps and
+# workspace:* links like @hiai-docs/db).
 FROM base AS deps
 COPY package.json bun.lock* ./
 COPY backend/package.json ./backend/
@@ -14,6 +17,8 @@ COPY frontend/package.json ./frontend/
 COPY packages/db/package.json ./packages/db/
 ENV BUN_INSTALL_CONCURRENCY=1
 RUN bun install --no-verify
+RUN bun install --cwd backend --no-verify
+RUN bun install --cwd packages/db --no-verify
 
 # --- Build ---
 # Carry node_modules (workspace symlinks) from the deps stage, then layer
@@ -23,6 +28,8 @@ RUN bun install --no-verify
 FROM base AS build
 COPY package.json tsconfig.json ./
 COPY --from=deps /app/node_modules ./node_modules
+COPY --from=deps /app/backend/node_modules ./backend/node_modules
+COPY --from=deps /app/packages/db/node_modules ./packages/db/node_modules
 COPY packages/db/ ./packages/db/
 COPY backend/src ./backend/src
 COPY backend/tsconfig.json ./backend/
