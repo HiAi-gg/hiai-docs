@@ -6,10 +6,8 @@ COPY package.json bun.lock* ./
 COPY frontend/package.json ./frontend/
 COPY backend/package.json ./backend/
 COPY packages/db/package.json ./packages/db/
-COPY .packages/hiai-ui /packages/hiai-ui
 ENV BUN_INSTALL_CONCURRENCY=1
 RUN bun install --no-verify
-RUN cd /packages/hiai-ui && bunx svelte-kit sync
 
 # Build
 FROM base AS build
@@ -17,7 +15,6 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY --from=deps /app/frontend/node_modules ./frontend/node_modules
 COPY --from=deps /app/backend/node_modules ./backend/node_modules
 COPY --from=deps /app/packages/db/node_modules ./packages/db/node_modules
-COPY --from=deps /packages/hiai-ui /packages/hiai-ui
 COPY frontend/ ./frontend/
 COPY packages/db/ ./packages/db/
 

@@ -29,6 +29,22 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
+      - name: Configure workspaces for CI
+        run: |
+          bun -e "
+            const fs = require('fs');
+            const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+            pkg.workspaces = pkg.workspaces.filter(w => !w.includes('hiai-ui'));
+            fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2));
+          "
+          bun -e "
+            const fs = require('fs');
+            const pkg = JSON.parse(fs.readFileSync('frontend/package.json', 'utf8'));
+            if (pkg.dependencies && pkg.dependencies['@hiai-gg/hiai-ui']) {
+              pkg.dependencies['@hiai-gg/hiai-ui'] = '^0.0.1';
+            }
+            fs.writeFileSync('frontend/package.json', JSON.stringify(pkg, null, 2));
+          "
       - run: bun install
       - run: bun run lint
 
@@ -43,6 +59,22 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
+      - name: Configure workspaces for CI
+        run: |
+          bun -e "
+            const fs = require('fs');
+            const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+            pkg.workspaces = pkg.workspaces.filter(w => !w.includes('hiai-ui'));
+            fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2));
+          "
+          bun -e "
+            const fs = require('fs');
+            const pkg = JSON.parse(fs.readFileSync('frontend/package.json', 'utf8'));
+            if (pkg.dependencies && pkg.dependencies['@hiai-gg/hiai-ui']) {
+              pkg.dependencies['@hiai-gg/hiai-ui'] = '^0.0.1';
+            }
+            fs.writeFileSync('frontend/package.json', JSON.stringify(pkg, null, 2));
+          "
       - run: bun install
       - run: bun run typecheck
 
@@ -86,6 +118,22 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
+      - name: Configure workspaces for CI
+        run: |
+          bun -e "
+            const fs = require('fs');
+            const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+            pkg.workspaces = pkg.workspaces.filter(w => !w.includes('hiai-ui'));
+            fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2));
+          "
+          bun -e "
+            const fs = require('fs');
+            const pkg = JSON.parse(fs.readFileSync('frontend/package.json', 'utf8'));
+            if (pkg.dependencies && pkg.dependencies['@hiai-gg/hiai-ui']) {
+              pkg.dependencies['@hiai-gg/hiai-ui'] = '^0.0.1';
+            }
+            fs.writeFileSync('frontend/package.json', JSON.stringify(pkg, null, 2));
+          "
       - run: bun install
       - run: cd packages/db && bun run db:migrate
       - run: bun run test
@@ -99,6 +147,26 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - name: Configure workspaces for CI
+        run: |
+          bun -e "
+            const fs = require('fs');
+            const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+            pkg.workspaces = pkg.workspaces.filter(w => !w.includes('hiai-ui'));
+            fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2));
+          "
+          bun -e "
+            const fs = require('fs');
+            const pkg = JSON.parse(fs.readFileSync('frontend/package.json', 'utf8'));
+            if (pkg.dependencies && pkg.dependencies['@hiai-gg/hiai-ui']) {
+              pkg.dependencies['@hiai-gg/hiai-ui'] = '^0.0.1';
+            }
+            fs.writeFileSync('frontend/package.json', JSON.stringify(pkg, null, 2));
+          "
 
       # Materialise a synthetic .env so `docker compose config` resolves vars
       - name: Prepare .env for compose validation
@@ -185,7 +253,7 @@ jobs:
 
       # F) Security scan — Trivy (preferred; Docker Scout as fallback)
       - name: Security scan with Trivy
-        uses: aquasecurity/trivy-action@0.24.0
+        uses: aquasecurity/trivy-action@v0.24.0
         with:
           image-ref: hiai-docs/api:ci-${{ github.sha }}
           format: "table"
@@ -202,7 +270,7 @@ jobs:
           category: trivy-api
 
       - name: Security scan frontend with Trivy
-        uses: aquasecurity/trivy-action@0.24.0
+        uses: aquasecurity/trivy-action@v0.24.0
         with:
           image-ref: hiai-docs/web:ci-${{ github.sha }}
           format: "table"
