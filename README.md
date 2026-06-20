@@ -36,6 +36,9 @@ If you are looking for a **local LLM knowledge base** or a **lightweight Outline
 
 ---
 
+<img width="1920" height="974" alt="docs" src="https://github.com/user-attachments/assets/94701d01-a361-4ca1-b16d-de2a0c64d684" />
+
+
 ## Features
 
 - **Rich WYSIWYG editor** — powerful visual editing with TipTap v3 + svelte-tiptap
@@ -48,12 +51,7 @@ If you are looking for a **local LLM knowledge base** or a **lightweight Outline
 - **Self-hosted** — full data ownership with minimal resource usage
 
 ## Screenshots
-
-<!--
-  TODO: Add screenshots of the dashboard, editor, search, and dark mode.
-  Use 1200x675 (16:9) PNGs.
-  <img src="docs/screenshots/dashboard.png" width="100%" alt="hiai-docs dashboard with document grid" />
--->
+<img width="999" height="594" alt="docs_screenshot" src="https://github.com/user-attachments/assets/1ba409e7-32cf-40d3-ae30-f8369e48cb53" />
 
 ---
 
@@ -160,7 +158,7 @@ Then verify: `docker ps` should work without `sudo`.
 ## Stack
 
 | Layer | Technology |
-|-------|-----------|
+|-------|----------|
 | Runtime | [Bun](https://bun.sh) 1.3.14+ |
 | Backend | [Elysia](https://elysiajs.com) 1.4.28+ |
 | ORM | [Drizzle ORM](https://orm.drizzle.team) 0.45.2+ |
