@@ -47,15 +47,19 @@ Copy `.env.example` and fill in:
 | `BETTER_AUTH_SECRET` | **Yes** | — | Random 32+ char string |
 | `BETTER_AUTH_URL` | Yes | `http://localhost:50700` | Public API URL |
 | `MINIO_ACCESS_KEY` | Yes | `minioadmin` | MinIO access key |
-| `MINIO_SECRET_KEY` | Yes | `minioadmin` | MinIO secret key |
+| `MINIO_SECRET_KEY` | Yes | `change-me-to-random-32-chars` | MinIO secret key |
 | `MINIO_BUCKET` | Yes | `hiai-docs` | MinIO bucket name |
 | `EMBEDDING_BASE_URL` | If embeddings enabled | — | Base URL for OpenAI-compatible embedding API |
 | `EMBEDDING_API_KEY` | If embeddings enabled | — | API key for embedding provider |
-| `EMBEDDING_MODEL` | No | `text-embedding-3-small` | Model name for embeddings |
+| `EMBEDDING_MODEL` | No | — | Model name for embeddings |
 | `API_PORT` | No | `50700` | Backend port |
 | `WEB_PORT` | No | `50701` | Frontend port |
 | `NODE_ENV` | No | `development` | `development` or `production` |
 | `LOG_LEVEL` | No | `info` | `trace`/`debug`/`info`/`warn`/`error`/`fatal` |
+| `CSRF_SECRET` | Yes | — | CSRF protection secret |
+| `WEBHOOK_SECRET` | Yes | — | Webhook signature secret |
+| `CORS_ORIGINS` | No | `http://localhost:50701` | Comma-separated allowed origins |
+| `REDIS_URL` | Yes | `redis://redis:6384` | Redis connection URL |
 
 ## Production Considerations
 
@@ -66,6 +70,8 @@ Use Caddy (included) or a reverse proxy. The default Caddyfile routes:
 - `/*` → frontend
 
 For custom domains, update `Caddyfile` with your domain.
+
+*Note: Caddy requires the `--profile caddy` flag when running with docker compose.*
 
 ### Backups
 
@@ -105,8 +111,9 @@ bun run db:push
 | Container | Port | Purpose |
 |-----------|------|---------|
 | postgres | 5433 | PostgreSQL 18 + pgvector |
-| redis | 6380 | Cache/queue |
-| minio | 9000/9001 | S3-compatible file storage |
+| redis | 6384 | Cache/queue |
+| minio | 9000/9021 | S3-compatible file storage |
 | api | 50700 | Elysia REST API |
 | web | 50701 | SvelteKit frontend |
-| caddy | 80/443 | Reverse proxy |
+| caddy | 50708/50709 | Reverse proxy |
+*Note: Run with `--profile caddy` flag*

@@ -5,6 +5,6 @@ export default {
   schema: "./src/schema.ts",
   dialect: "postgresql",
   dbCredentials: {
-    url: process.env.DATABASE_URL || "postgresql://aiuser:aipassword@localhost:5433/hiai_docs",
+    url: process.env.DATABASE_URL || "postgresql://aiuser:changeme@localhost:5433/hiai_docs",
   },
 } satisfies Config;

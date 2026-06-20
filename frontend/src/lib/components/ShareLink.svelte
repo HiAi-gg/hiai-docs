@@ -1,6 +1,7 @@
 <script lang="ts">
 import { apiFetch } from "$lib/api/client";
 import * as m from "$lib/paraglide/messages.js";
+import { copyToClipboard } from "$lib/utils/clipboard";
 
 const {
 	token = "",
@@ -26,7 +27,7 @@ const shareUrl = $derived(
 );
 
 async function copyLink() {
-	await navigator.clipboard.writeText(shareUrl);
+	await copyToClipboard(shareUrl);
 	copied = true;
 	setTimeout(() => {
 		copied = false;

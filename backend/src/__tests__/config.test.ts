@@ -4,7 +4,7 @@ import { z } from "zod";
 const envSchema = z.object({
 	DATABASE_URL: z
 		.string()
-		.default("postgresql://aiuser:aipassword@localhost:5433/hiai_docs"),
+		.default("postgresql://aiuser:changeme@localhost:5433/hiai_docs"),
 	REDIS_URL: z.string().default("redis://localhost:6380"),
 	API_PORT: z.coerce.number().default(50700),
 	NODE_ENV: z

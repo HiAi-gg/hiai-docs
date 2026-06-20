@@ -69,7 +69,7 @@ const swaggerConfig = {
 	documentation: {
 		info: {
 			title: "hiai-docs API",
-			version: "0.0.7",
+			version: "0.0.8",
 			description:
 				"Self-hosted AI-first documentation platform. Full-text + semantic search, version history, sharing, and folder organization.",
 			contact: { name: "hiai-gg", url: "https://github.com/hiai-gg/hiai-docs" },

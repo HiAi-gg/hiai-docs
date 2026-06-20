@@ -3,6 +3,7 @@ import { Check, Copy, FileText, Folder, Lock } from "lucide-svelte";
 import { marked } from "marked";
 import { page } from "$app/state";
 import * as m from "$lib/paraglide/messages.js";
+import { copyToClipboard } from "$lib/utils/clipboard";
 
 const token = $derived(page.params.token);
 
@@ -226,18 +227,18 @@ async function fetchShare() {
 	}
 }
 
-function copyUrl() {
-	navigator.clipboard.writeText(window.location.href);
+async function copyUrl() {
+	await copyToClipboard(window.location.href);
 	copied = true;
 	setTimeout(() => {
 		copied = false;
 	}, 2000);
 }
 
-function copyText() {
+async function copyText() {
 	const text = shareData?.data?.content ?? "";
 	if (!text) return;
-	navigator.clipboard.writeText(text);
+	await copyToClipboard(text);
 	copiedText = true;
 	setTimeout(() => {
 		copiedText = false;

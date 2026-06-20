@@ -38,6 +38,7 @@ import {
 	uploadAttachment,
 } from "$lib/api/attachments";
 import * as m from "$lib/paraglide/messages.js";
+import { copyToClipboard } from "$lib/utils/clipboard";
 import LinkDialog from "./LinkDialog.svelte";
 
 const {
@@ -326,7 +327,7 @@ async function copyContent() {
 	const ed = editor as Editor & { getMarkdown?: () => string };
 	const content = ed.getMarkdown ? ed.getMarkdown() : editor.getText();
 	try {
-		await navigator.clipboard.writeText(content);
+		await copyToClipboard(content);
 		copyConfirmation = true;
 		setTimeout(() => {
 			copyConfirmation = false;

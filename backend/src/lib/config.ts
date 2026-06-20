@@ -4,10 +4,10 @@ import { logger } from "./logger";
 const envSchema = z.object({
 	DATABASE_URL: z
 		.string()
-		.default("postgresql://aiuser:aipassword@localhost:5433/hiai_docs"),
-	REDIS_URL: z.string().default("redis://localhost:6380"),
+		.default("postgresql://aiuser:changeme@localhost:5433/hiai_docs"),
+	REDIS_URL: z.string().default("redis://localhost:6384"),
 	MINIO_ENDPOINT: z.string().default("localhost"),
-	MINIO_PORT: z.coerce.number().default(9010),
+	MINIO_PORT: z.coerce.number().default(9020),
 	MINIO_PUBLIC_ENDPOINT: z.string().default("localhost"),
 	MINIO_PUBLIC_PORT: z.coerce.number().default(9020),
 	MINIO_ACCESS_KEY: z.string().default("minioadmin"),

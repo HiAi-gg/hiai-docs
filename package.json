@@ -1,6 +1,6 @@
 {
   "name": "hiai-docs",
-  "version": "0.0.7",
+  "version": "0.0.8",
   "private": true,
   "type": "module",
   "license": "MIT",
@@ -14,8 +14,8 @@
   },
   "scripts": {
     "dev": "bun run --parallel dev:api dev:web",
-    "dev:api": "bun run --filter '@hiai-docs/backend' dev",
-    "dev:web": "bun run --filter '@hiai-docs/frontend' dev",
+    "dev:api": "bun --env-file=.env run --filter '@hiai-docs/backend' dev",
+    "dev:web": "bun --env-file=.env run --filter '@hiai-docs/frontend' dev",
     "lint": "bun run --filter '*' lint",
     "typecheck": "bun run --filter '*' typecheck",
     "test": "bun run --filter '*' test",

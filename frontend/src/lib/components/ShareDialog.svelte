@@ -1,6 +1,7 @@
 <script lang="ts">
 import { createShareLink } from "$lib/api/share";
 import * as m from "$lib/paraglide/messages.js";
+import { copyToClipboard } from "$lib/utils/clipboard";
 
 let {
 	open = $bindable(false),
@@ -55,7 +56,7 @@ async function createLink() {
 
 async function copyLink() {
 	if (shareUrl) {
-		await navigator.clipboard.writeText(shareUrl);
+		await copyToClipboard(shareUrl);
 		copied = true;
 		setTimeout(() => {
 			copied = false;

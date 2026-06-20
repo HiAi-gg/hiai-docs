@@ -42,7 +42,7 @@
 | Task | Command | Working Dir |
 |------|---------|-------------|
 | **Install** | `bun install` | Root |
-| **Dev (all)** | `bun run dev:all` | Root |
+| **Dev (all)** | `bun run dev` | Root |
 | **Dev (api)** | `bun run dev` | `backend/` |
 | **Dev (web)** | `bun run dev` | `frontend/` |
 | **Lint** | `bun run lint` | Root |
@@ -65,7 +65,7 @@ curl -fsS http://localhost:50700/api/health
 psql -h localhost -p 5433 -U aiuser -d hiai_docs -c "SELECT NOW();"
 
 # Redis
-redis-cli -p 6380 ping
+redis-cli -p 6384 ping
 
 
 
@@ -166,7 +166,7 @@ Hybrid search: `0.4 * full_text + 0.6 * semantic_cosine` (configurable weights)
 
 These are non-obvious project decisions pinned in `package.json` / Dockerfiles. Do not "clean up" without first understanding the constraint.
 
-- **`@sinclair/typebox@^0.34.0` (root devDependency)** — Forces a single Typebox version across the workspace to resolve a peer-dep conflict with Elysia 1.4.28. Required for `bun install` to succeed; do not remove.
+- **`@sinclair/typebox` (pinned in root devDependencies)** — Forces a single Typebox version across the workspace to resolve a peer-dep conflict with Elysia 1.4.28. Required for `bun install` to succeed; do not remove.
 - **`bun test --path-ignore-patterns='*node_modules*'`** — Bun 1.3's smart test discovery walks into hoisted `node_modules` and tries to run upstream library tests, which fail on missing fixtures. The path-ignore flag scopes test discovery to our own `src/` and `tests/` directories. Keep this flag on every `test` script.
 - **Paraglide v2 SvelteKit integration** — i18n is driven by `@inlang/paraglide-js@2.x` directly. The deprecated `@inlang/paraglide-sveltekit` adapter is NOT used. Setup:
   - `frontend/vite.config.ts` registers `paraglideVitePlugin({ project, outdir, strategy })`.
@@ -202,11 +202,11 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines on code style, testing, an
 | Container | Image | Port | Purpose |
 |-----------|-------|------|---------|
 | postgres | pgvector/pgvector:pg18 | 5433:5432 | Database |
-| redis | redis:8-alpine | 6380:6379 | Cache/queue |
-| minio | minio/minio | 9000:9000, 9001:9001 | File storage |
+| redis | redis:8-alpine | 6384:6379 | Cache/queue |
+| minio | minio/minio:latest | 9000:9000, 9001:9021 | File storage |
 | api | custom | 50700:50700 | Elysia backend |
 | web | custom | 50701:50701 | SvelteKit frontend |
-| caddy | caddy:2-alpine | 80:80, 443:443 | Reverse proxy |
+| caddy | caddy:2-alpine | 50708:80, 50709:443 | Reverse proxy (profile-only, not started by default) |
 
 ## Multi-Agent Development
 

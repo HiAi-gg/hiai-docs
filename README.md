@@ -241,10 +241,10 @@ All configuration via environment variables. Copy `.env.example` to `.env` and c
 | `MINIO_SECRET_KEY` | minioadmin | MinIO secret key |
 | `EMBEDDING_BASE_URL` | — | Base URL for OpenAI-compatible embedding API (optional) |
 | `EMBEDDING_API_KEY` | — | API key for embedding service (leave empty for local inference) |
-| `EMBEDDING_MODEL` | nomic-embed-text | Embedding model name |
+| `EMBEDDING_MODEL` | — | Embedding model name |
 | `CORS_ORIGINS` | http://localhost:50701 | Comma-separated allowed origins (required for local dev) |
 
-See `.env.example` for full list.
+See `.env.example` for full list of all configuration variables.
 
 ---
 
