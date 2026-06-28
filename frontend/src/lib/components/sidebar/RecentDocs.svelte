@@ -87,6 +87,16 @@ $effect(() => {
 	void fetchRecentDocs();
 });
 
+let firstTagRun = true;
+$effect(() => {
+	const tag = getSelectedTag();
+	if (firstTagRun) {
+		firstTagRun = false;
+		return;
+	}
+	void fetchRecentDocs();
+});
+
 // Note: a previous `$effect` here watched `getDocRefreshNonce()` and
 // `getSelectedTag()` to refetch the list on every refresh/tag change.
 // It caused the sidebar to fire a listDocuments call on EVERY reactive

@@ -57,7 +57,7 @@ async function handleMove(parentId: string | null, categoryId: string | null) {
     <div class="min-w-0 flex-1">
       <h3 class="truncate text-sm font-medium">{folder.name}</h3>
       <p class="text-xs text-muted-foreground">
-        {folder.documentCount} {folder.documentCount === 1 ? m.folders_document() : m.folders_documents()} &middot; {formatRelativeTime(folder.updatedAt)}
+        {folder.documentCount} {folder.documentCount === 1 ? m.folders_document() : m.folders_documents()} &middot; {folder.subfolderCount} {folder.subfolderCount === 1 ? m.folders_subfolder() : m.folders_subfolders()} &middot; {formatRelativeTime(folder.updatedAt)}
       </p>
     </div>
     <DropdownMenu>

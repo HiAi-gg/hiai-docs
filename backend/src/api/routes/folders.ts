@@ -42,10 +42,25 @@ export const folderRoutes = new Elysia({ prefix: "/api/folders" })
 					createdAt: folders.createdAt,
 					updatedAt: folders.updatedAt,
 					documentCount: sql<number>`(
+						WITH RECURSIVE sub_folders AS (
+							SELECT id FROM folders f2 WHERE f2.id = "folders"."id" AND f2.owner_id = ${userId}
+							UNION ALL
+							SELECT f.id FROM folders f
+							JOIN sub_folders sf ON f.parent_id = sf.id
+						)
 						SELECT COUNT(*)::int
-						FROM ${documents}
-						WHERE ${documents.folderId} = ${folders.id}
-							AND ${documents.ownerId} = ${userId}
+						FROM documents d
+						WHERE d.folder_id IN (SELECT id FROM sub_folders)
+							AND d.owner_id = ${userId}
+					)`,
+					subfolderCount: sql<number>`(
+						WITH RECURSIVE sub_folders AS (
+							SELECT id FROM folders f2 WHERE f2.parent_id = "folders"."id" AND f2.owner_id = ${userId}
+							UNION ALL
+							SELECT f.id FROM folders f
+							JOIN sub_folders sf ON f.parent_id = sf.id
+						)
+						SELECT COUNT(*)::int FROM sub_folders
 					)`,
 				})
 				.from(folders)
@@ -67,10 +82,25 @@ export const folderRoutes = new Elysia({ prefix: "/api/folders" })
 					createdAt: folders.createdAt,
 					updatedAt: folders.updatedAt,
 					documentCount: sql<number>`(
+						WITH RECURSIVE sub_folders AS (
+							SELECT id FROM folders f2 WHERE f2.id = "folders"."id" AND f2.owner_id = ${userId}
+							UNION ALL
+							SELECT f.id FROM folders f
+							JOIN sub_folders sf ON f.parent_id = sf.id
+						)
 						SELECT COUNT(*)::int
-						FROM ${documents}
-						WHERE ${documents.folderId} = ${folders.id}
-							AND ${documents.ownerId} = ${userId}
+						FROM documents d
+						WHERE d.folder_id IN (SELECT id FROM sub_folders)
+							AND d.owner_id = ${userId}
+					)`,
+					subfolderCount: sql<number>`(
+						WITH RECURSIVE sub_folders AS (
+							SELECT id FROM folders f2 WHERE f2.parent_id = "folders"."id" AND f2.owner_id = ${userId}
+							UNION ALL
+							SELECT f.id FROM folders f
+							JOIN sub_folders sf ON f.parent_id = sf.id
+						)
+						SELECT COUNT(*)::int FROM sub_folders
 					)`,
 				})
 				.from(folders)
@@ -118,10 +148,25 @@ export const folderRoutes = new Elysia({ prefix: "/api/folders" })
 					createdAt: folders.createdAt,
 					updatedAt: folders.updatedAt,
 					documentCount: sql<number>`(
+						WITH RECURSIVE sub_folders AS (
+							SELECT id FROM folders f2 WHERE f2.id = "folders"."id" AND f2.owner_id = ${userId}
+							UNION ALL
+							SELECT f.id FROM folders f
+							JOIN sub_folders sf ON f.parent_id = sf.id
+						)
 						SELECT COUNT(*)::int
-						FROM ${documents}
-						WHERE ${documents.folderId} = ${folders.id}
-							AND ${documents.ownerId} = ${userId}
+						FROM documents d
+						WHERE d.folder_id IN (SELECT id FROM sub_folders)
+							AND d.owner_id = ${userId}
+					)`,
+					subfolderCount: sql<number>`(
+						WITH RECURSIVE sub_folders AS (
+							SELECT id FROM folders f2 WHERE f2.parent_id = "folders"."id" AND f2.owner_id = ${userId}
+							UNION ALL
+							SELECT f.id FROM folders f
+							JOIN sub_folders sf ON f.parent_id = sf.id
+						)
+						SELECT COUNT(*)::int FROM sub_folders
 					)`,
 				})
 				.from(folders)

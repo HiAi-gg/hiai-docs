@@ -18,6 +18,7 @@ interface FolderWire {
 	order?: number;
 	ownerId?: string;
 	documentCount?: number;
+	subfolderCount?: number;
 	createdAt: string;
 	updatedAt: string;
 }
@@ -41,6 +42,7 @@ function toFolder(f: FolderWire): Folder {
 		categoryId: f.categoryId ?? null,
 		order: f.order ?? 0,
 		documentCount: f.documentCount ?? 0,
+		subfolderCount: f.subfolderCount ?? 0,
 		children: [],
 		documents: [],
 		createdAt: f.createdAt,
@@ -126,6 +128,7 @@ export async function listFolders(
 				parentId: null,
 				order: 0,
 				documentCount: 0,
+				subfolderCount: 0,
 				children: folders,
 				documents: [],
 				createdAt: now,

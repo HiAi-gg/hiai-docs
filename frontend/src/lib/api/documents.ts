@@ -123,12 +123,15 @@ function setTtlEntry(
 	}, LIST_CACHE_TTL_MS);
 }
 
-export function listDocuments(params?: {
-	folderId?: string;
-	tag?: string;
-	page?: number;
-	limit?: number;
-}): Promise<DocumentListResponse> {
+export function listDocuments(
+	params?: {
+		folderId?: string;
+		tag?: string;
+		page?: number;
+		limit?: number;
+	},
+	fetcher?: typeof fetch,
+): Promise<DocumentListResponse> {
 	const key = listDocumentsCacheKey(params);
 
 	// Identical in-flight call: share the same promise.
@@ -154,6 +157,8 @@ export function listDocuments(params?: {
 	// error handling is preserved.
 	const promise = apiFetch<DocumentListResponse>(
 		`/api/documents${qs ? `?${qs}` : ""}`,
+		{},
+		fetcher,
 	).catch((err) => {
 		listDocumentsTtl.delete(key);
 		throw err;

@@ -79,6 +79,7 @@ import {
 	bumpSubfoldersRefresh,
 	getDocumentFromRegistry,
 	getFolderFromRegistry,
+	getGlobalFolderRefreshNonce,
 	registerDocument,
 	registerFolder,
 } from "$lib/stores/subfolders-refresh-store.svelte.js";
@@ -171,6 +172,8 @@ let dragDisabled = $state(false);
 // True while a drag is in flight across any zone. Folder auto-expand on
 // hover should only fire during a drag, not on plain mouseover.
 let isDraggingGlobal = $state(false);
+let isDraggingFolder = $state(false);
+let isDraggingDoc = $state(false);
 let draggedDocId = $state<string | null>(null);
 // Concurrency guard for `persistFolderChanges`. `svelte-dnd-action`
 // dispatches `finalize` on BOTH source and destination zones for
@@ -541,8 +544,19 @@ onDestroy(() => {
 });
 
 $effect(() => {
-	const nonce = getDocRefreshNonce();
-	if (nonce === 0) return;
+	const docNonce = getDocRefreshNonce();
+	const folderNonce = getGlobalFolderRefreshNonce();
+	if (docNonce === 0 && folderNonce === 0) return;
+	void refresh();
+});
+
+let firstTagRun = true;
+$effect(() => {
+	const tag = getSelectedTag();
+	if (firstTagRun) {
+		firstTagRun = false;
+		return;
+	}
 	void refresh();
 });
 
@@ -650,6 +664,7 @@ function handleConsider(zone: DocZone) {
 	return (e: CustomEvent<DndEvent<DndDoc>>) => {
 		e.stopPropagation();
 		isDraggingGlobal = true;
+		isDraggingDoc = true;
 		if (e.detail.info?.id) {
 			draggedDocId = e.detail.info.id;
 		}
@@ -687,6 +702,7 @@ function handleFinalize(zone: DocZone) {
 			}
 		}
 		isDraggingGlobal = false;
+		isDraggingDoc = false;
 		draggedDocId = null;
 	};
 }
@@ -890,6 +906,7 @@ function handleFolderConsider(zoneKey: string) {
 	return (e: CustomEvent<DndEvent<FolderItem>>) => {
 		e.stopPropagation();
 		isDraggingGlobal = true;
+		isDraggingFolder = true;
 		const next = sanitizeFolderItems(e.detail.items);
 		// `bucketFoldersMap` is the source for category buckets; per-folder
 		// nested subfolders live inside each `FolderNode` and don't share
@@ -913,6 +930,7 @@ function handleFolderFinalize(zoneKey: string) {
 			bucketFoldersMap = { ...bucketFoldersMap, [zoneKey]: next };
 		}
 		isDraggingGlobal = false;
+		isDraggingFolder = false;
 
 		// Only persist changes for the DESTINATION zone.
 		// The source zone's persist would send stale data and race with
@@ -1445,6 +1463,8 @@ const buckets = $derived.by(() => {
     onDelete={(id, name) => startDelete("folder", id, name)}
     {dragDisabled}
     {isDraggingGlobal}
+    {isDraggingFolder}
+    {isDraggingDoc}
     draggedDocId={draggedDocId}
     onScheduleFolderExpand={scheduleFolderExpand}
     onClearExpandTimer={clearExpandTimer}
@@ -1550,7 +1570,7 @@ const buckets = $derived.by(() => {
               {/snippet}
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem onSelect={() => goto("/folders#category-" + bucket.category.id)}>
+              <DropdownMenuItem onSelect={() => goto(`/?category=${bucket.category.id}`)}>
                 {m.action_go_to()}
               </DropdownMenuItem>
               <DropdownMenuItem onSelect={() => goto(`/docs/new?category=${bucket.category.id}`)}>
@@ -1575,7 +1595,7 @@ const buckets = $derived.by(() => {
             <div
               class={cn(
                 "min-h-[8px] space-y-0.5 transition-all duration-150",
-                isDraggingGlobal && zoneItems.length === 0 && "min-h-[36px] bg-accent/20 rounded border border-dashed border-muted-foreground/20"
+                isDraggingFolder && zoneItems.length === 0 && "min-h-[36px] bg-accent/20 rounded border border-dashed border-muted-foreground/20"
               )}
               use:dndzone={{
                 items: zoneItems,
@@ -1599,7 +1619,7 @@ const buckets = $derived.by(() => {
             <div
               class={cn(
                 "min-h-[8px] space-y-0.5 transition-all duration-150",
-                isDraggingGlobal && rootDocs.length === 0 && "min-h-[36px] bg-accent/20 rounded border border-dashed border-muted-foreground/20"
+                isDraggingDoc && rootDocs.length === 0 && "min-h-[36px] bg-accent/20 rounded border border-dashed border-muted-foreground/20"
               )}
               use:dndzone={{
                 items: rootDocs,
@@ -1668,7 +1688,7 @@ const buckets = $derived.by(() => {
           <div
             class={cn(
               "min-h-[8px] space-y-0.5 transition-all duration-150",
-              isDraggingGlobal && zoneItems.length === 0 && "min-h-[36px] bg-accent/20 rounded border border-dashed border-muted-foreground/20"
+              isDraggingFolder && zoneItems.length === 0 && "min-h-[36px] bg-accent/20 rounded border border-dashed border-muted-foreground/20"
             )}
             use:dndzone={{
               items: zoneItems,
@@ -1692,7 +1712,7 @@ const buckets = $derived.by(() => {
           <div
             class={cn(
               "min-h-[8px] space-y-0.5 transition-all duration-150",
-              isDraggingGlobal && rootItems.length === 0 && "min-h-[36px] bg-accent/20 rounded border border-dashed border-muted-foreground/20"
+              isDraggingDoc && rootItems.length === 0 && "min-h-[36px] bg-accent/20 rounded border border-dashed border-muted-foreground/20"
             )}
             use:dndzone={{ items: rootItems, flipDurationMs: FLIP_MS, type: "doc", dropTargetStyle: {}, dragDisabled }}
             onconsider={handleConsider({ kind: "root" })}

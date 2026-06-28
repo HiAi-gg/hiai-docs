@@ -21,6 +21,7 @@ export interface Folder {
 	categoryId?: string | null;
 	order: number;
 	documentCount: number;
+	subfolderCount: number;
 	children: Folder[];
 	documents: Document[];
 	createdAt: string;

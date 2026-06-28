@@ -1,4 +1,7 @@
 <script lang="ts">
+import { getSchema } from "@tiptap/core";
+import { Node } from "@tiptap/pm/model";
+import { Packer } from "docx";
 import {
 	ArrowLeft,
 	Check,
@@ -10,8 +13,13 @@ import {
 	Lock,
 } from "lucide-svelte";
 import { marked } from "marked";
+import { untrack } from "svelte";
+import { customSerializer } from "$lib/components/editor/docx-serializer";
+import { editorExtensions } from "$lib/components/editor/editorExtensions";
+import { markdownToJson } from "$lib/components/editor/markdown";
 import * as m from "$lib/paraglide/messages.js";
 import { copyToClipboard } from "$lib/utils/clipboard";
+import ScrollToTop from "$lib/components/ScrollToTop.svelte";
 
 // Initial state comes from the `load` function in `+page.ts` (runs on both
 // the server during SSR and the client during hydration). This keeps
@@ -57,31 +65,37 @@ let viewedDoc = $state<{
 let breadcrumbs = $state<Array<{ id: string; name: string }>>([]);
 
 $effect(() => {
-	const sd = data.shareData ?? null; // local const, no reactive read of $state
-	requiresPassword = data.requiresPassword ?? false;
-	error = data.shareError ?? "";
-	password = "";
-	verifiedPassword = "";
+	const sd = data.shareData;
+	const reqPass = data.requiresPassword;
+	const shareErr = data.shareError;
 
-	if (sd && sd.type === "folder" && sd.data) {
-		folderData = {
-			id: sd.data.id || "",
-			name: sd.data.name || "",
-			parentId: sd.data.parentId || null,
-			folders: sd.data.folders || [],
-			documents: sd.data.documents || [],
-		};
-		breadcrumbs = [{ id: "root", name: sd.data.name || "" }]; // read sd, not folderData
-		currentView = "folder";
-	} else if (sd && sd.type === "document" && sd.data) {
-		currentView = "document";
-		viewedDoc = {
-			id: sd.data.id || "",
-			title: sd.data.title || "",
-			content: sd.data.content || "",
-			contentJson: sd.data.contentJson,
-		};
-	}
+	untrack(() => {
+		shareData = sd ?? null;
+		requiresPassword = reqPass ?? false;
+		error = shareErr ?? "";
+		password = "";
+		verifiedPassword = "";
+
+		if (sd && sd.type === "folder" && sd.data) {
+			folderData = {
+				id: sd.data.id || "",
+				name: sd.data.name || "",
+				parentId: sd.data.parentId || null,
+				folders: sd.data.folders || [],
+				documents: sd.data.documents || [],
+			};
+			breadcrumbs = [{ id: "root", name: sd.data.name || "" }];
+			currentView = "folder";
+		} else if (sd && sd.type === "document" && sd.data) {
+			currentView = "document";
+			viewedDoc = {
+				id: sd.data.id || "",
+				title: sd.data.title || "",
+				content: sd.data.content || "",
+				contentJson: sd.data.contentJson,
+			};
+		}
+	});
 });
 
 // Configure marked for safe, GFM-flavored rendering of shared document
@@ -321,12 +335,14 @@ function getCurrentDoc() {
 		return {
 			title: shareData.data.title || "Untitled Document",
 			content: shareData.data.content || "",
+			contentJson: shareData.data.contentJson,
 		};
 	}
 	if (currentView === "document" && viewedDoc) {
 		return {
 			title: viewedDoc.title || "Untitled Document",
 			content: viewedDoc.content || "",
+			contentJson: viewedDoc.contentJson,
 		};
 	}
 	return null;
@@ -358,42 +374,66 @@ function handleExportMd() {
 function handleExportDocx() {
 	const doc = getCurrentDoc();
 	if (!doc) return;
-	const htmlContent = marked.parse(doc.content || "", {
-		async: false,
-	}) as string;
-	const docHtml = `
+	try {
+		let json = doc.contentJson;
+		if (!json) {
+			json = markdownToJson(doc.content || "");
+		}
+		const schema = getSchema(editorExtensions);
+		const docNode = Node.fromJSON(schema, json);
+		const wordDoc = customSerializer.serialize(docNode, {
+			getImageBuffer(_src) {
+				return new Uint8Array(0);
+			},
+			sections: [{ properties: {} }],
+		});
+		Packer.toBlob(wordDoc)
+			.then((blob) => {
+				const url = URL.createObjectURL(blob);
+				const a = document.createElement("a");
+				a.href = url;
+				a.download = `${doc.title}.docx`;
+				a.click();
+				URL.revokeObjectURL(url);
+			})
+			.catch((err) => {
+				console.error("Packer failed to generate docx blob:", err);
+				fallbackHtmlDocx(doc);
+			});
+	} catch (err) {
+		console.error("Failed to export to DOCX:", err);
+		fallbackHtmlDocx(doc);
+	}
+
+	function fallbackHtmlDocx(docItem: { title: string; content: string }) {
+		const htmlContent = marked.parse(docItem.content || "", {
+			async: false,
+		}) as string;
+		const docHtml = `
 <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
-<head><title>${doc.title}</title>
-<!--[if gte mso 9]><xml><w:WordDocument><w:View>Print</w:View><w:Zoom>100</w:Zoom></w:WordDocument></xml><![endif]-->
+<head><title>${docItem.title}</title>
 <style>
 body { font-family: Arial, sans-serif; line-height: 1.6; }
 h1 { font-size: 24pt; font-weight: bold; margin-top: 12pt; margin-bottom: 6pt; }
-h2 { font-size: 18pt; font-weight: bold; margin-top: 12pt; margin-bottom: 6pt; }
-h3 { font-size: 14pt; font-weight: bold; margin-top: 12pt; margin-bottom: 4pt; }
 p { margin-bottom: 6pt; }
-code { font-family: Courier, monospace; background-color: #f4f4f4; padding: 2px 4px; }
-pre { font-family: Courier, monospace; background-color: #f4f4f4; padding: 8px; border: 1px solid #ccc; }
-blockquote { border-left: 3px solid #ccc; padding-left: 8px; margin-left: 0; color: #666; }
-table { border-collapse: collapse; width: 100%; margin: 12pt 0; }
-th, td { border: 1px solid #ccc; padding: 6px; text-align: left; }
-th { background-color: #f4f4f4; font-weight: bold; }
 </style>
 </head>
 <body>
-<h1>${doc.title}</h1>
+<h1>${docItem.title}</h1>
 ${htmlContent}
 </body>
 </html>
-	`;
-	const blob = new Blob([docHtml], {
-		type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-	});
-	const url = URL.createObjectURL(blob);
-	const a = document.createElement("a");
-	a.href = url;
-	a.download = `${doc.title}.docx`;
-	a.click();
-	URL.revokeObjectURL(url);
+		`;
+		const blob = new Blob([docHtml], {
+			type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+		});
+		const url = URL.createObjectURL(blob);
+		const a = document.createElement("a");
+		a.href = url;
+		a.download = `${docItem.title}.docx`;
+		a.click();
+		URL.revokeObjectURL(url);
+	}
 }
 
 function handleExportPdf() {
@@ -662,20 +702,21 @@ function renderViewedDocContent(): string {
 
       {#if currentView === "document" && viewedDoc}
         <article class="rounded-lg border border-border bg-card p-8 shadow-sm">
-          {#if shareData.type === "folder"}
-            <div class="mb-4 flex items-center">
+          <h1 class="mb-6 flex items-center gap-2.5 text-3xl font-bold tracking-tight">
+            {#if shareData.type === "folder"}
               <button
                 type="button"
                 onclick={() => {
                   currentView = "folder";
                 }}
-                class="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                class="inline-flex size-8 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
+                title="Back to folder"
               >
-                <ArrowLeft class="h-3.5 w-3.5" /> Back to folder
+                <ArrowLeft class="h-5 w-5" />
               </button>
-            </div>
-          {/if}
-          <h1 class="mb-6 text-3xl font-bold tracking-tight">{viewedDoc.title}</h1>
+            {/if}
+            <span>{viewedDoc.title}</span>
+          </h1>
           {#if renderViewedDocContent()}
             <div class="shared-doc-body">
               {@html renderViewedDocContent()}
@@ -686,7 +727,6 @@ function renderViewedDocContent(): string {
         </article>
       {:else if currentView === "folder" && folderData}
         <div class="rounded-lg border border-border bg-card p-6 shadow-sm">
-          <h1 class="mb-4 text-2xl font-bold">{folderData.name}</h1>
           
           {#if (!folderData.folders || folderData.folders.length === 0) && (!folderData.documents || folderData.documents.length === 0)}
             <p class="text-muted-foreground">{m.share_folder_empty()}</p>
@@ -771,6 +811,8 @@ function renderViewedDocContent(): string {
     </div>
   {/if}
 </div>
+
+<ScrollToTop />
 
 <style>
   /* Shared document body — minimal styles for the markdown/JSON HTML output

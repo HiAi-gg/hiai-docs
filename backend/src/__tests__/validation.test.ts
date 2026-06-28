@@ -23,7 +23,7 @@ const listQuerySchema = z.object({
 	folderId: z.string().uuid().optional(),
 	tag: z.string().uuid().optional(),
 	page: z.coerce.number().int().min(1).default(1),
-	limit: z.coerce.number().int().min(1).max(100).default(20),
+	limit: z.coerce.number().int().min(1).max(1000).default(20),
 });
 
 // ============================================
@@ -217,8 +217,8 @@ describe("listQuerySchema", () => {
 		expect(result.success).toBe(false);
 	});
 
-	test("rejects limit > 100", () => {
-		const result = listQuerySchema.safeParse({ limit: 101 });
+	test("rejects limit > 1000", () => {
+		const result = listQuerySchema.safeParse({ limit: 1001 });
 		expect(result.success).toBe(false);
 	});
 
@@ -227,8 +227,8 @@ describe("listQuerySchema", () => {
 		expect(result.success).toBe(false);
 	});
 
-	test("accepts limit at boundary 100", () => {
-		const result = listQuerySchema.safeParse({ limit: 100 });
+	test("accepts limit at boundary 1000", () => {
+		const result = listQuerySchema.safeParse({ limit: 1000 });
 		expect(result.success).toBe(true);
 	});
 

@@ -208,7 +208,7 @@ $effect(() => {
 		display: inline-flex;
 		align-items: center;
 		gap: 6px;
-		height: 2rem;
+		height: 2.25rem;
 		width: 100%;
 		padding: 0 0.625rem;
 		border: 1px solid var(--input);

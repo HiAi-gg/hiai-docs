@@ -170,7 +170,7 @@ onMount(() => {
 	};
 });
 
-let prevContent = $state("");
+let prevContent = "";
 $effect(() => {
 	if (!editor || collaboration?.doc) return;
 	// Prefer the persisted ProseMirror JSON when available — the markdown

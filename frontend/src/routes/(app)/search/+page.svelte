@@ -1,4 +1,5 @@
 <script lang="ts">
+import { Badge } from "@hiai-gg/hiai-ui/components/ui/badge";
 import {
 	Calendar,
 	ChevronDown,
@@ -170,13 +171,13 @@ $effect(() => {
 function buildUrl(overrides: Record<string, string | undefined>) {
 	const params = new URLSearchParams();
 
-	const q = overrides.q ?? query;
-	const folder = overrides.folder ?? activeFolder;
-	const t = overrides.tags ?? activeTags.join(",");
-	const cat = overrides.category ?? activeCategoryId;
-	const df = overrides.dateFrom ?? dateFrom;
-	const dt = overrides.dateTo ?? dateTo;
-	const p = overrides.page ?? String(currentPage);
+	const q = "q" in overrides ? overrides.q : query;
+	const folder = "folder" in overrides ? overrides.folder : activeFolder;
+	const t = "tags" in overrides ? overrides.tags : activeTags.join(",");
+	const cat = "category" in overrides ? overrides.category : activeCategoryId;
+	const df = "dateFrom" in overrides ? overrides.dateFrom : dateFrom;
+	const dt = "dateTo" in overrides ? overrides.dateTo : dateTo;
+	const p = "page" in overrides ? overrides.page : String(currentPage);
 
 	if (q) params.set("q", q);
 	if (folder) params.set("folder", folder);
@@ -313,10 +314,12 @@ function goToPage(page: number) {
     </div>
   </form>
 
+
+
   <div class="flex gap-8">
     <!-- Filter sidebar -->
     <aside
-      class="w-56 shrink-0 space-y-6"
+      class="hidden lg:block w-56 shrink-0 space-y-6"
     >
       {@render filterPanel()}
     </aside>
@@ -368,6 +371,12 @@ function goToPage(page: number) {
                 {#each matchingDocs as doc (doc.id)}
                   <a
                     href="/docs/{doc.id}"
+                    onclick={(e) => {
+                      if (e.button === 0 && !e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey) {
+                        e.preventDefault();
+                        goto(`/docs/${doc.id}`);
+                      }
+                    }}
                     class="flex items-center gap-3 rounded-lg border border-border bg-card px-4 py-3 transition-colors hover:bg-accent"
                   >
                     <FileSearch class="size-4 shrink-0 text-muted-foreground" />
@@ -387,6 +396,12 @@ function goToPage(page: number) {
                 {#each matchingFolders as folder (folder.id)}
                   <a
                     href="/folders/{folder.id}"
+                    onclick={(e) => {
+                      if (e.button === 0 && !e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey) {
+                        e.preventDefault();
+                        goto(`/folders/${folder.id}`);
+                      }
+                    }}
                     class="flex items-center gap-3 rounded-lg border border-border bg-card px-4 py-3 transition-colors hover:bg-accent"
                   >
                     <Folder class="size-4 shrink-0 text-muted-foreground" />
@@ -406,6 +421,12 @@ function goToPage(page: number) {
                 {#each matchingCategories as category (category.id)}
                   <a
                     href="/folders#category-{category.id}"
+                    onclick={(e) => {
+                      if (e.button === 0 && !e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey) {
+                        e.preventDefault();
+                        goto(`/folders#category-${category.id}`);
+                      }
+                    }}
                     class="flex items-center gap-3 rounded-lg border border-border bg-card px-4 py-3 transition-colors hover:bg-accent"
                   >
                     <FolderKanban class="size-4 shrink-0 text-muted-foreground" />

@@ -1,5 +1,6 @@
 <script lang="ts">
 import { Calendar, Check, Folder, Tag } from "lucide-svelte";
+import { goto } from "$app/navigation";
 import * as m from "$lib/paraglide/messages.js";
 
 interface Props {
@@ -32,22 +33,6 @@ const {
 	titleMatch = false,
 }: Props = $props();
 
-function escapeHtml(text: string): string {
-	return text
-		.replace(/&/g, "&amp;")
-		.replace(/</g, "&lt;")
-		.replace(/>/g, "&gt;")
-		.replace(/"/g, "&quot;")
-		.replace(/'/g, "&#39;");
-}
-
-function highlightText(text: string, q: string): string {
-	if (!q) return escapeHtml(text);
-	const escapedQuery = q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-	const safe = escapeHtml(text);
-	return safe.replace(new RegExp(`(${escapedQuery})`, "gi"), "<mark>$1</mark>");
-}
-
 const highlightedSnippet = $derived(highlightText(snippet, query));
 
 const scorePercent = $derived(Math.round(score * 100));
@@ -69,10 +54,32 @@ const formattedDate = $derived(
 		day: "numeric",
 	}),
 );
+
+function escapeHtml(text: string): string {
+	return text
+		.replace(/&/g, "&amp;")
+		.replace(/</g, "&lt;")
+		.replace(/>/g, "&gt;")
+		.replace(/"/g, "&quot;")
+		.replace(/'/g, "&#39;");
+}
+
+function highlightText(text: string, q: string): string {
+	if (!q) return escapeHtml(text);
+	const escapedQuery = q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+	const safe = escapeHtml(text);
+	return safe.replace(new RegExp(`(${escapedQuery})`, "gi"), "<mark>$1</mark>");
+}
 </script>
 
 <a
   href="/docs/{id}"
+  onclick={(e) => {
+    if (e.button === 0 && !e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey) {
+      e.preventDefault();
+      goto(`/docs/${id}`);
+    }
+  }}
   class="group block rounded-lg border border-border bg-card p-5 shadow-sm transition-all hover:border-primary/30 hover:shadow-md"
 >
   <!-- Header: title + score -->

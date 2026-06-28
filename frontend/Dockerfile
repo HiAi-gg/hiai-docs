@@ -26,15 +26,17 @@ RUN cd frontend && bun run build
 
 # Run
 FROM base AS runtime
-COPY --from=build /app/frontend/build ./frontend/build
-COPY frontend/package.json ./frontend/
+COPY --from=deps /app/node_modules /app/node_modules
+COPY --from=deps /app/frontend/node_modules /app/frontend/node_modules
+COPY --from=build /app/frontend/build /app/frontend/build
+COPY frontend/package.json /app/frontend/
 
 ENV NODE_ENV=production
 ENV WEB_PORT=50701
 WORKDIR /app/frontend
 
 RUN addgroup -S app && adduser -S app -G app \
-    && chown -R app:app /app/frontend  # COPY files are root-owned by default; chown is required for non-root USER
+    && chown -R -h app:app /app/frontend /app/node_modules
 
 USER app
 

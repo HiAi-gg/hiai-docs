@@ -35,8 +35,8 @@ export type UpdateTagInput = z.infer<typeof updateTagInputSchema>;
 
 // --- API Functions ---
 
-export async function listTags(): Promise<Tag[]> {
-	return apiFetch("/api/tags");
+export async function listTags(fetcher?: typeof fetch): Promise<Tag[]> {
+	return apiFetch("/api/tags", {}, fetcher);
 }
 
 export function getTag(id: string): Promise<Tag> {

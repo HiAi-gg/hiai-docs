@@ -7,11 +7,15 @@ import {
 	DropdownMenuSeparator,
 	DropdownMenuTrigger,
 } from "@hiai-gg/hiai-ui/components/ui/dropdown-menu";
+import { getSchema } from "@tiptap/core";
+import { Node } from "@tiptap/pm/model";
+import { Packer } from "docx";
 import {
 	Bookmark,
 	Check,
 	ChevronRight,
 	Code,
+	Copy,
 	Download,
 	FileText,
 	Folder,
@@ -27,7 +31,7 @@ import {
 import { marked } from "marked";
 import { onDestroy, onMount } from "svelte";
 import { goto } from "$app/navigation";
-import { ApiError } from "$lib/api/client";
+import { ApiError, apiFetch } from "$lib/api/client";
 import { deleteDocument, updateDocument } from "$lib/api/documents";
 import { createFolder, listFolders } from "$lib/api/folders";
 import {
@@ -37,9 +41,14 @@ import {
 	type Tag,
 } from "$lib/api/tags";
 import DocumentTitle from "$lib/components/editor/DocumentTitle.svelte";
+import { customSerializer } from "$lib/components/editor/docx-serializer";
+import { editorExtensions } from "$lib/components/editor/editorExtensions";
 import type { EditorOutput } from "$lib/components/editor/HiAiEditor.svelte";
 import HiAiEditor from "$lib/components/editor/HiAiEditor.svelte";
 import MarkdownToggle from "$lib/components/editor/MarkdownToggle.svelte";
+import { markdownToJson } from "$lib/components/editor/markdown";
+import FolderTreeSelector from "$lib/components/FolderTreeSelector.svelte";
+import SaveAsDialog from "$lib/components/SaveAsDialog.svelte";
 import ShareDialog from "$lib/components/ShareDialog.svelte";
 import TagCreateDialog from "$lib/components/TagCreateDialog.svelte";
 import { ConfirmDialog } from "$lib/components/ui/confirm-dialog";
@@ -60,6 +69,7 @@ let error = $state<string | null>(null);
 let showShareDialog = $state(false);
 let showCreateTagDialog = $state(false);
 let showDeleteDialog = $state(false);
+let showSaveAsDialog = $state(false);
 let showVersionPanel = $state(false);
 let deleteBusy = $state(false);
 
@@ -157,6 +167,23 @@ function buildFolderTreeList(
 }
 
 const hierarchicalFolders = $derived(buildFolderTreeList(folders));
+
+const filteredFoldersForCategory = $derived.by(() => {
+	if (!currentCategoryId) return folders;
+	const rootFolders = folders.filter((f) => f.categoryId === currentCategoryId);
+	const resultIds = new Set<string>(rootFolders.map((f) => f.id));
+	let addedNew = true;
+	while (addedNew) {
+		addedNew = false;
+		for (const f of folders) {
+			if (f.parentId && resultIds.has(f.parentId) && !resultIds.has(f.id)) {
+				resultIds.add(f.id);
+				addedNew = true;
+			}
+		}
+	}
+	return folders.filter((f) => resultIds.has(f.id));
+});
 
 const assignedTagIds = $derived(new Set(tags.map((t) => t.id)));
 const assignableTags = $derived(
@@ -303,6 +330,37 @@ function cancelDelete() {
 	showDeleteDialog = false;
 }
 
+async function handleSaveAsConfirm(
+	newTitle: string,
+	parentId: string | null,
+	categoryId: string | null,
+) {
+	try {
+		const copy = await apiFetch<any>(
+			`/api/documents/${data.document.id}/duplicate`,
+			{
+				method: "POST",
+			},
+		);
+		if (copy && copy.id) {
+			await apiFetch(`/api/documents/${copy.id}`, {
+				method: "PATCH",
+				body: JSON.stringify({
+					title: newTitle,
+					folderId: parentId,
+					categoryId: categoryId,
+				}),
+			});
+			showSaveAsDialog = false;
+			refreshDocs();
+			await goto(`/docs/${copy.id}`);
+		}
+	} catch (err) {
+		console.error("Failed to duplicate document", err);
+		error = "Failed to duplicate document";
+	}
+}
+
 function handleExport() {
 	showMenu = false;
 	const blob = new Blob([content], { type: "text/markdown" });
@@ -316,23 +374,46 @@ function handleExport() {
 
 function handleExportDocx() {
 	showMenu = false;
-	const htmlContent = marked.parse(content || "", { async: false }) as string;
-	const docHtml = `
+	try {
+		let json = contentJson;
+		if (!json) {
+			json = markdownToJson(content || "");
+		}
+		const schema = getSchema(editorExtensions);
+		const docNode = Node.fromJSON(schema, json);
+		const wordDoc = customSerializer.serialize(docNode, {
+			getImageBuffer(src) {
+				return new Uint8Array(0);
+			},
+			sections: [{ properties: {} }],
+		});
+		Packer.toBlob(wordDoc)
+			.then((blob) => {
+				const url = URL.createObjectURL(blob);
+				const a = document.createElement("a");
+				a.href = url;
+				a.download = `${title || "Untitled Document"}.docx`;
+				a.click();
+				URL.revokeObjectURL(url);
+			})
+			.catch((err) => {
+				console.error("Packer failed to generate docx blob:", err);
+				fallbackHtmlDocx();
+			});
+	} catch (err) {
+		console.error("Failed to export to DOCX:", err);
+		fallbackHtmlDocx();
+	}
+
+	function fallbackHtmlDocx() {
+		const htmlContent = marked.parse(content || "", { async: false }) as string;
+		const docHtml = `
 <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
 <head><title>${title || "Document"}</title>
-<!--[if gte mso 9]><xml><w:WordDocument><w:View>Print</w:View><w:Zoom>100</w:Zoom></w:WordDocument></xml><![endif]-->
 <style>
 body { font-family: Arial, sans-serif; line-height: 1.6; }
 h1 { font-size: 24pt; font-weight: bold; margin-top: 12pt; margin-bottom: 6pt; }
-h2 { font-size: 18pt; font-weight: bold; margin-top: 12pt; margin-bottom: 6pt; }
-h3 { font-size: 14pt; font-weight: bold; margin-top: 12pt; margin-bottom: 4pt; }
 p { margin-bottom: 6pt; }
-code { font-family: Courier, monospace; background-color: #f4f4f4; padding: 2px 4px; }
-pre { font-family: Courier, monospace; background-color: #f4f4f4; padding: 8px; border: 1px solid #ccc; }
-blockquote { border-left: 3px solid #ccc; padding-left: 8px; margin-left: 0; color: #666; }
-table { border-collapse: collapse; width: 100%; margin: 12pt 0; }
-th, td { border: 1px solid #ccc; padding: 6px; text-align: left; }
-th { background-color: #f4f4f4; font-weight: bold; }
 </style>
 </head>
 <body>
@@ -340,16 +421,17 @@ th { background-color: #f4f4f4; font-weight: bold; }
 ${htmlContent}
 </body>
 </html>
-	`;
-	const blob = new Blob([docHtml], {
-		type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-	});
-	const url = URL.createObjectURL(blob);
-	const a = document.createElement("a");
-	a.href = url;
-	a.download = `${title || "Untitled Document"}.docx`;
-	a.click();
-	URL.revokeObjectURL(url);
+		`;
+		const blob = new Blob([docHtml], {
+			type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+		});
+		const url = URL.createObjectURL(blob);
+		const a = document.createElement("a");
+		a.href = url;
+		a.download = `${title || "Untitled Document"}.docx`;
+		a.click();
+		URL.revokeObjectURL(url);
+	}
 }
 
 function handleExportPdf() {
@@ -729,6 +811,13 @@ $effect(() => {
               >
                 <Download size={14} /> Export PDF
               </button>
+              <button
+                class="dropdown-item"
+                role="menuitem"
+                onclick={() => { showSaveAsDialog = true; showMenu = false; }}
+              >
+                <Copy size={14} /> Save as Copy...
+              </button>
               <div class="dropdown-divider"></div>
               <button
                 class="dropdown-item destructive"
@@ -819,28 +908,16 @@ $effect(() => {
               </button>
             {/snippet}
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="start">
+          <DropdownMenuContent align="start" class="w-85 p-2">
             {#if foldersLoading}
               <div class="tag-empty">{m.action_loading()}</div>
             {:else}
-              {#each hierarchicalFolders as { folder, depth } (folder.id)}
-                <DropdownMenuItem onSelect={() => moveToFolder(folder.id)}>
-                  <span style="display: flex; align-items: center; gap: 6px; padding-left: {depth * 16}px;" class="w-full">
-                    <Folder size={14} class="text-muted-foreground shrink-0" />
-                    <span class="truncate">{folder.name}</span>
-                  </span>
-                  {#if currentFolderId === folder.id}
-                    <Check size={12} class="ml-auto" />
-                  {/if}
-                </DropdownMenuItem>
-              {/each}
+              <FolderTreeSelector
+                folders={filteredFoldersForCategory}
+                selectedId={currentFolderId}
+                onSelect={moveToFolder}
+              />
             {/if}
-            <DropdownMenuItem
-              disabled={currentFolderId === null}
-              onSelect={() => moveToFolder(null)}
-            >
-              Move to root
-            </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem onSelect={() => { creatingFolder = true; }}>
               <Plus size={14} />
@@ -1000,6 +1077,14 @@ $effect(() => {
       busy={deleteBusy}
       onConfirm={confirmDelete}
       onCancel={cancelDelete}
+    />
+    <SaveAsDialog
+      bind:open={showSaveAsDialog}
+      documentId={data.document.id}
+      initialTitle={title}
+      initialParentId={currentFolderId}
+      initialCategoryId={currentCategoryId}
+      onSave={handleSaveAsConfirm}
     />
   </div>
 {/if}

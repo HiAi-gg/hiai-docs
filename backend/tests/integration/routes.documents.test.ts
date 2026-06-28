@@ -152,8 +152,8 @@ describe("GET /api/documents", () => {
 		expect(((res.body as any).items as any[]).length).toBe(2);
 	});
 
-	it("rejects limit above 100", async () => {
-		const res = await authedGet("/api/documents?limit=500");
+	it("rejects limit above 1000", async () => {
+		const res = await authedGet("/api/documents?limit=1001");
 		expect(res.status).toBe(400);
 		expect((res.body as any).error).toBe("Invalid query");
 	});

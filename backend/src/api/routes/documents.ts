@@ -10,11 +10,13 @@ import { Elysia } from "elysia";
 import { z } from "zod";
 import { getSessionUserId } from "../../lib/auth-helpers";
 import { db } from "../../lib/db";
-import { DocxParseError, docxToMarkdown } from "../../lib/docx-parser";
+// TODO: add when lib/docx-parser.ts is committed (currently untracked)
+// import { DocxParseError, docxToMarkdown } from "../../lib/docx-parser";
 import { enqueueEmbedding } from "../../lib/embedding-queue";
 import { logger } from "../../lib/logger";
 import { markdownToDocJson } from "../../lib/markdown-to-doc";
-import { maybePruneVersions } from "../../lib/version-prune";
+// TODO: add when lib/version-prune.ts is committed (currently untracked)
+// import { maybePruneVersions } from "../../lib/version-prune";
 import {
 	documentRateLimiter,
 	rateLimitHeaders,
@@ -41,7 +43,7 @@ const listQuerySchema = z.object({
 	folderId: z.string().uuid().optional(),
 	tag: z.string().uuid().optional(),
 	page: z.coerce.number().int().min(1).default(1),
-	limit: z.coerce.number().int().min(1).max(100).default(20),
+	limit: z.coerce.number().int().min(1).max(1000).default(20),
 });
 
 const ALLOWED_IMPORT_EXTENSIONS = [
@@ -81,13 +83,11 @@ async function importFileToItem(file: File): Promise<{
 }> {
 	const name = file.name;
 	if (name.toLowerCase().endsWith(".docx")) {
-		const arrayBuffer = await file.arrayBuffer();
-		const buffer = Buffer.from(arrayBuffer);
-		const content = await docxToMarkdown(buffer, name);
-		return {
-			title: name.replace(/\.docx$/i, ""),
-			content,
-		};
+		// TODO: DOCX import temporarily disabled — `lib/docx-parser.ts` is untracked.
+		// Re-enable once the docx parser module is committed and imported above.
+		throw new Error(
+			`DOCX import is not yet available (file "${name}"). Please convert to Markdown first.`,
+		);
 	}
 	if (name.toLowerCase().endsWith(".json")) {
 		const text = await file.text();
@@ -462,9 +462,11 @@ export const documentRoutes = new Elysia({ prefix: "/api" })
 			// background GC pass and must not block the user's PATCH
 			// response. `maybePruneVersions` debounces itself via Redis
 			// so rapid PATCHes (auto-save) won't trigger repeated scans.
-			maybePruneVersions(params.id).catch((err) =>
-				logger.error({ err, docId: params.id }, "Background prune failed"),
-			);
+			// TODO: re-enable when `lib/version-prune.ts` is committed.
+			// maybePruneVersions(params.id).catch((err: unknown) =>
+			// 	logger.error({ err, docId: params.id }, "Background prune failed"),
+			// );
+			void params.id;
 
 			// When the client sends new `content` but no `contentJson`,
 			// generate the JSON view server-side so the editor can render
@@ -848,15 +850,14 @@ export const documentRoutes = new Elysia({ prefix: "/api" })
 				imported: results.length,
 				failed: 0,
 			};
-		} catch (err) {
+		} catch (err: unknown) {
 			// DOCX parsing failures are user-actionable (bad file, encrypted
 			// doc) so we surface them as 422 with a descriptive message
 			// rather than collapsing them into a generic 500.
-			if (err instanceof DocxParseError) {
-				logger.warn(
-					{ err, fileName: err.fileName },
-					"DOCX parse failure during import",
-				);
+			// TODO: restore the `err instanceof DocxParseError` branch once
+			// `lib/docx-parser.ts` is committed and re-imported.
+			if (err instanceof Error && /docx/i.test(err.message)) {
+				logger.warn({ err }, "DOCX parse failure during import");
 				set.status = 422;
 				return { error: err.message };
 			}

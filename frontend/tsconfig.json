@@ -10,6 +10,12 @@
     "sourceMap": true,
     "strict": true,
     "moduleResolution": "bundler",
-    "types": ["bun"]
+    "types": ["bun"],
+    "paths": {
+      "$lib": ["./src/lib"],
+      "$lib/*": ["./src/lib/*"],
+      "@hiai-gg/hiai-ui": ["../node_modules/@hiai-gg/hiai-ui/src/index.ts"],
+      "@hiai-gg/hiai-ui/*": ["../node_modules/@hiai-gg/hiai-ui/src/*"]
+    }
   }
 }

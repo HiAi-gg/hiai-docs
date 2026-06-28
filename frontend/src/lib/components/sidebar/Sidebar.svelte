@@ -179,37 +179,50 @@ function toggleCollapse() {
     </div>
   {/if}
 
-  <div class={cn("p-2", collapsed ? "flex flex-col items-center gap-2" : "space-y-2")}>
-    <button
-      type="button"
-      onclick={() => { showSettings = true; }}
-      class={cn(
-        "flex items-center rounded-md text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground",
-        collapsed ? "size-8 justify-center" : "w-full gap-2 px-2 py-1.5"
-      )}
-      title={m.settings_title()}
-      aria-label={m.settings_title()}
-    >
-      <SettingsIcon class="size-4 shrink-0" />
-      {#if !collapsed}
-        <span class="truncate">{m.settings_title()}</span>
-      {/if}
-    </button>
-  </div>
   <div class="border-t border-border p-2">
-    <a
-      href="https://hiai.gg/docs"
-      target="_blank"
-      rel="noopener noreferrer"
-      class="text-xs text-muted-foreground hover:text-foreground transition-colors"
-      title={m.sidebar_powered_by()}
-    >
-      {#if collapsed}
-        HiAi
-      {:else}
-        {m.sidebar_powered_by()}
-      {/if}
-    </a>
+    {#if collapsed}
+      <div class="flex flex-col items-center gap-2">
+        <button
+          type="button"
+          onclick={() => { showSettings = true; }}
+          class="flex size-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+          title={m.settings_title()}
+          aria-label={m.settings_title()}
+        >
+          <SettingsIcon class="size-4" />
+        </button>
+        <a
+          href="https://hiai.gg/docs"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="text-xs text-muted-foreground hover:text-foreground transition-colors"
+          title={m.sidebar_powered_by()}
+        >
+          HiAi
+        </a>
+      </div>
+    {:else}
+      <div class="flex items-center justify-between">
+        <a
+          href="https://hiai.gg/docs"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="text-xs text-muted-foreground hover:text-foreground transition-colors"
+          title={m.sidebar_powered_by()}
+        >
+          {m.sidebar_powered_by()}
+        </a>
+        <button
+          type="button"
+          onclick={() => { showSettings = true; }}
+          class="flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+          title={m.settings_title()}
+          aria-label={m.settings_title()}
+        >
+          <SettingsIcon class="size-4" />
+        </button>
+      </div>
+    {/if}
   </div>
 </aside>
 

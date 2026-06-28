@@ -6,7 +6,7 @@ export const load: PageLoad = async ({ params, fetch, url }) => {
 	if (params.id === "new") {
 		const folderId = url.searchParams.get("folder") || undefined;
 		const categoryId = url.searchParams.get("category") || undefined;
-		let doc: import("$lib/types").Document | undefined;
+		let doc: any;
 		try {
 			doc = await createDocument(
 				{

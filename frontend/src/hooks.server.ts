@@ -1,4 +1,4 @@
-import type { Handle } from "@sveltejs/kit";
+import type { Handle, HandleServerError } from "@sveltejs/kit";
 import { getLocale } from "$lib/paraglide/runtime";
 
 export const handle: Handle = async ({ event, resolve }) => {
@@ -7,4 +7,11 @@ export const handle: Handle = async ({ event, resolve }) => {
 		transformPageChunk: ({ html }) =>
 			html.replace("%lang%", locale).replace("%dir%", "ltr"),
 	});
+};
+
+export const handleError: HandleServerError = ({ error }) => {
+	console.error("DETAILED SERVER ERROR:", error);
+	return {
+		message: "Internal Error",
+	};
 };
