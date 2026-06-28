@@ -4,6 +4,7 @@ import { Elysia } from "elysia";
 import { z } from "zod";
 import { getEmbedding } from "../../embedding";
 import { getSessionUserId } from "../../lib/auth-helpers";
+import { config } from "../../lib/config";
 import { db } from "../../lib/db";
 import { expandResults } from "../../lib/graph/search-expansion";
 import { logger } from "../../lib/logger";
@@ -149,17 +150,17 @@ export const searchRoutes = new Elysia({ prefix: "/api/search" })
 
 			for (const row of textResults as unknown as RawSearchResult[]) {
 				const mapped = mapResult(row);
-				mapped.score = row.score * 0.4;
+				mapped.score = row.score * config.HYBRID_TEXT_WEIGHT;
 				merged.set(row.id, mapped);
 			}
 
 			for (const row of semanticResults as unknown as RawSearchResult[]) {
 				const existing = merged.get(row.id);
 				if (existing) {
-					existing.score += row.score * 0.6;
+					existing.score += row.score * config.HYBRID_SEMANTIC_WEIGHT;
 				} else {
 					const mapped = mapResult(row);
-					mapped.score = row.score * 0.6;
+					mapped.score = row.score * config.HYBRID_SEMANTIC_WEIGHT;
 					merged.set(row.id, mapped);
 				}
 			}

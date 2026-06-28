@@ -12,6 +12,7 @@ import { contentHash } from "../lib/content-hash";
 import { db } from "../lib/db";
 import { extractEntities } from "../lib/graph/extract-entities";
 import { logger } from "../lib/logger";
+import { incrementCounter, METRIC_NAMES } from "../lib/metrics";
 import { redis } from "../lib/redis";
 import { type EmbeddingMetadata, embedDocument } from "./index";
 
@@ -38,6 +39,12 @@ export function startEmbeddingWorker(): void {
 
 async function processDocument(documentId: string): Promise<void> {
 	logger.info({ documentId }, "Processing embedding for document");
+	// Counter sits at the very top of the worker callback so every dequeued
+	// document — including ones that early-return because the row is
+	// missing or content is empty — counts toward `embedding_docs_total`.
+	// This matches the operator-facing definition of "documents processed
+	// by the worker" and avoids double-counting on retry.
+	incrementCounter(METRIC_NAMES.EMBEDDING_DOCS_TOTAL);
 
 	try {
 		const doc = await db.query.documents.findFirst({
@@ -98,6 +105,11 @@ async function processDocument(documentId: string): Promise<void> {
 
 			await tx.insert(documentEmbeddings).values(rows);
 		});
+
+		// Bump the chunks counter AFTER the transaction commits so the
+		// counter reflects chunks that are actually persisted, not chunks
+		// that were embedded then lost to a failed insert.
+		incrementCounter(METRIC_NAMES.EMBEDDING_CHUNKS_TOTAL);
 
 		// Update content hash so future edits can skip re-embed if content unchanged
 		const hash = contentHash(doc.title, content);

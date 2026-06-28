@@ -40,4 +40,14 @@ describe("API route modules", () => {
 		const mod = await import("../api/routes/graph");
 		expect(mod.graphRoutes).toBeDefined();
 	});
+
+	test("adminRoutes loads without error", async () => {
+		const mod = await import("../api/routes/admin");
+		expect(mod.adminRoutes).toBeDefined();
+	});
+
+	test("metricsRoutes loads without error", async () => {
+		const mod = await import("../api/routes/metrics");
+		expect(mod.metricsRoutes).toBeDefined();
+	});
 });

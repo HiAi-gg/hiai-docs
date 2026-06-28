@@ -5,6 +5,7 @@
 
 import { config } from "../lib/config";
 import { logger } from "../lib/logger";
+import { incrementCounter, METRIC_NAMES, recordDuration } from "../lib/metrics";
 import { chunkText } from "./chunker";
 import { getOpenAICompatibleEmbedding } from "./providers/openai-compatible";
 import { EMBEDDING_DIMENSIONS } from "./utils";
@@ -12,22 +13,48 @@ import { EMBEDDING_DIMENSIONS } from "./utils";
 /**
  * Get an embedding vector for a single text.
  * Tries primary provider, then fallback, then returns a zero vector.
+ *
+ * Observability: records a duration sample for every call and increments
+ * one of `embedding_success` / `embedding_fallback` / `embedding_zero`
+ * based on the outcome. Operators surface these via
+ * `/api/admin/metrics`. The duration sample is recorded in a `finally`
+ * block so an unexpected throw in the provider still produces a metric
+ * sample (the counter increment is intentionally skipped on that path —
+ * we don't want to mis-classify exceptions as zero-vector fallbacks).
  */
 export async function getEmbedding(text: string): Promise<number[]> {
+	const start = Date.now();
+	try {
+		return await getEmbeddingInner(text);
+	} finally {
+		recordDuration(METRIC_NAMES.EMBEDDING_DURATION_MS, Date.now() - start);
+	}
+}
+
+/**
+ * Inner implementation of `getEmbedding` that owns the provider fan-out
+ * and the per-outcome counter increments. Split out from the outer
+ * function so the outer try/finally can wrap the whole call without
+ * duplicating increment logic in every return branch.
+ */
+async function getEmbeddingInner(text: string): Promise<number[]> {
 	if (!config.EMBEDDING_BASE_URL || !config.EMBEDDING_MODEL) {
 		logger.warn(
 			"Embedding primary provider not configured (EMBEDDING_BASE_URL or EMBEDDING_MODEL missing), returning zero vector",
 		);
+		incrementCounter(METRIC_NAMES.EMBEDDING_ZERO);
 		return new Array(EMBEDDING_DIMENSIONS).fill(0);
 	}
 
 	try {
-		return await getOpenAICompatibleEmbedding(
+		const vector = await getOpenAICompatibleEmbedding(
 			text,
 			config.EMBEDDING_BASE_URL,
 			config.EMBEDDING_API_KEY ?? "",
 			config.EMBEDDING_MODEL,
 		);
+		incrementCounter(METRIC_NAMES.EMBEDDING_SUCCESS);
+		return vector;
 	} catch (primaryErr) {
 		logger.warn(
 			{ err: primaryErr, model: config.EMBEDDING_MODEL },
@@ -36,22 +63,26 @@ export async function getEmbedding(text: string): Promise<number[]> {
 
 		if (config.EMBEDDING_FALLBACK_BASE_URL && config.EMBEDDING_FALLBACK_MODEL) {
 			try {
-				return await getOpenAICompatibleEmbedding(
+				const vector = await getOpenAICompatibleEmbedding(
 					text,
 					config.EMBEDDING_FALLBACK_BASE_URL,
 					config.EMBEDDING_FALLBACK_API_KEY ?? "",
 					config.EMBEDDING_FALLBACK_MODEL,
 				);
+				incrementCounter(METRIC_NAMES.EMBEDDING_FALLBACK);
+				return vector;
 			} catch (fallbackErr) {
 				logger.error(
 					{ err: fallbackErr, model: config.EMBEDDING_FALLBACK_MODEL },
 					"Fallback embedding provider also failed, returning zero vector",
 				);
+				incrementCounter(METRIC_NAMES.EMBEDDING_ZERO);
 			}
 		} else {
 			logger.warn(
 				"Embedding fallback provider not configured, returning zero vector",
 			);
+			incrementCounter(METRIC_NAMES.EMBEDDING_ZERO);
 		}
 
 		return new Array(EMBEDDING_DIMENSIONS).fill(0);

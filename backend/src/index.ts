@@ -7,6 +7,7 @@ import {
 	healthRateLimiter,
 	rateLimitHeaders,
 } from "./api/middleware/rate-limit";
+import { adminRoutes } from "./api/routes/admin";
 import { attachmentRoutes } from "./api/routes/attachments";
 import { authRoutes } from "./api/routes/auth";
 import { categoryRoutes } from "./api/routes/categories";
@@ -14,6 +15,7 @@ import { collaborationRoutes } from "./api/routes/collaboration";
 import { documentRoutes } from "./api/routes/documents";
 import { folderRoutes } from "./api/routes/folders";
 import { graphRoutes } from "./api/routes/graph";
+import { metricsRoutes } from "./api/routes/metrics";
 import { searchRoutes } from "./api/routes/search";
 import { shareRoutes } from "./api/routes/share";
 import { tagRoutes } from "./api/routes/tags";
@@ -93,6 +95,11 @@ const swaggerConfig = {
 				name: "Graph",
 				description: "GraphRAG entity and relationship queries (AGE)",
 			},
+			{
+				name: "Admin",
+				description:
+					"Operator maintenance endpoints (reindex, embedding stats, provider health) — API key protected",
+			},
 		],
 	},
 };
@@ -142,6 +149,8 @@ const app = new Elysia()
 	.use(webhookRoutes)
 	.use(collaborationRoutes)
 	.use(graphRoutes)
+	.use(adminRoutes)
+	.use(metricsRoutes)
 	.listen(config.API_PORT);
 
 logger.info({ port: config.API_PORT }, "hiai-docs API started");

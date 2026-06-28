@@ -68,6 +68,11 @@ const envSchema = z.object({
 	// GraphRAG extractor reuses the configured embedding provider's model
 	// name where possible; falls back to `gpt-4o-mini` if neither is set.
 	GRAPH_EXTRACT_MODEL: z.string().optional(),
+	// Hybrid search weights — applied to the merged text + semantic score.
+	// Both must be in [0, 1]; defaults preserve the historical 0.4 text /
+	// 0.6 semantic balance from the README contract.
+	HYBRID_TEXT_WEIGHT: z.coerce.number().min(0).max(1).default(0.4),
+	HYBRID_SEMANTIC_WEIGHT: z.coerce.number().min(0).max(1).default(0.6),
 });
 
 let config: z.infer<typeof envSchema>;
