@@ -17,9 +17,9 @@ import { untrack } from "svelte";
 import { customSerializer } from "$lib/components/editor/docx-serializer";
 import { editorExtensions } from "$lib/components/editor/editorExtensions";
 import { markdownToJson } from "$lib/components/editor/markdown";
+import ScrollToTop from "$lib/components/ScrollToTop.svelte";
 import * as m from "$lib/paraglide/messages.js";
 import { copyToClipboard } from "$lib/utils/clipboard";
-import ScrollToTop from "$lib/components/ScrollToTop.svelte";
 
 // Initial state comes from the `load` function in `+page.ts` (runs on both
 // the server during SSR and the client during hydration). This keeps

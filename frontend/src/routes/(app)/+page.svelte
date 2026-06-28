@@ -273,7 +273,11 @@ function updateFilters() {
 	if (dateTo) params.set("dateTo", dateTo);
 	else params.delete("dateTo");
 
-	goto(`/?${params.toString()}`, { replaceState: true, keepFocus: true, noScroll: true });
+	goto(`/?${params.toString()}`, {
+		replaceState: true,
+		keepFocus: true,
+		noScroll: true,
+	});
 }
 
 const hasActiveFilters = $derived(
