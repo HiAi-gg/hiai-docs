@@ -149,20 +149,23 @@ async function resolveFolderCategory(
 	folderId: string,
 	userId: string,
 ): Promise<string | null> {
-	let currentId: string | null = folderId;
-	const visited = new Set<string>();
-	while (currentId && !visited.has(currentId)) {
-		visited.add(currentId);
-		const [folder] = await db
-			.select({ parentId: folders.parentId, categoryId: folders.categoryId })
-			.from(folders)
-			.where(and(eq(folders.id, currentId), eq(folders.ownerId, userId)))
-			.limit(1);
-		if (!folder) return null;
-		if (folder.categoryId) return folder.categoryId;
-		currentId = folder.parentId;
-	}
-	return null;
+	const rows = await db.execute(sql`
+		WITH RECURSIVE ancestors AS (
+			SELECT id, parent_id, category_id
+			FROM folders
+			WHERE id = ${folderId} AND owner_id = ${userId}
+			UNION ALL
+			SELECT f.id, f.parent_id, f.category_id
+			FROM folders f
+			JOIN ancestors a ON f.id = a.parent_id
+			WHERE f.owner_id = ${userId}
+		)
+		SELECT category_id FROM ancestors
+		WHERE category_id IS NOT NULL
+		LIMIT 1
+	`);
+	const row = rows[0] as { category_id: string } | undefined;
+	return row?.category_id ?? null;
 }
 
 export const documentRoutes = new Elysia({ prefix: "/api" })
@@ -172,7 +175,7 @@ export const documentRoutes = new Elysia({ prefix: "/api" })
 			request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
 			request.headers.get("x-real-ip") ??
 			"unknown";
-		const rl = await documentRateLimiter(ip);
+		const rl = await documentRateLimiter(ip, request);
 		if (!rl.allowed) {
 			set.status = 429;
 			set.headers = rateLimitHeaders(0, rl.retryAfter);
@@ -270,7 +273,7 @@ export const documentRoutes = new Elysia({ prefix: "/api" })
 			request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
 			request.headers.get("x-real-ip") ??
 			"unknown";
-		const rl = await writeRateLimiter(ip);
+		const rl = await writeRateLimiter(ip, request);
 		if (!rl.allowed) {
 			set.status = 429;
 			set.headers = rateLimitHeaders(0, rl.retryAfter);
@@ -346,7 +349,7 @@ export const documentRoutes = new Elysia({ prefix: "/api" })
 			request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
 			request.headers.get("x-real-ip") ??
 			"unknown";
-		const rl = await documentRateLimiter(ip);
+		const rl = await documentRateLimiter(ip, request);
 		if (!rl.allowed) {
 			set.status = 429;
 			set.headers = rateLimitHeaders(0, rl.retryAfter);
@@ -405,7 +408,7 @@ export const documentRoutes = new Elysia({ prefix: "/api" })
 			request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
 			request.headers.get("x-real-ip") ??
 			"unknown";
-		const rl = await writeRateLimiter(ip);
+		const rl = await writeRateLimiter(ip, request);
 		if (!rl.allowed) {
 			set.status = 429;
 			set.headers = rateLimitHeaders(0, rl.retryAfter);
@@ -531,7 +534,7 @@ export const documentRoutes = new Elysia({ prefix: "/api" })
 			request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
 			request.headers.get("x-real-ip") ??
 			"unknown";
-		const rl = await writeRateLimiter(ip);
+		const rl = await writeRateLimiter(ip, request);
 		if (!rl.allowed) {
 			set.status = 429;
 			set.headers = rateLimitHeaders(0, rl.retryAfter);
@@ -595,7 +598,7 @@ export const documentRoutes = new Elysia({ prefix: "/api" })
 			request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
 			request.headers.get("x-real-ip") ??
 			"unknown";
-		const rl = await writeRateLimiter(ip);
+		const rl = await writeRateLimiter(ip, request);
 		if (!rl.allowed) {
 			set.status = 429;
 			set.headers = rateLimitHeaders(0, rl.retryAfter);
@@ -668,7 +671,7 @@ export const documentRoutes = new Elysia({ prefix: "/api" })
 			request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
 			request.headers.get("x-real-ip") ??
 			"unknown";
-		const rl = await writeRateLimiter(ip);
+		const rl = await writeRateLimiter(ip, request);
 		if (!rl.allowed) {
 			set.status = 429;
 			set.headers = rateLimitHeaders(0, rl.retryAfter);

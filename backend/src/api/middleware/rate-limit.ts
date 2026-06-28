@@ -1,3 +1,4 @@
+import { config } from "../../lib/config";
 import { redis } from "../../lib/redis";
 
 interface RateLimitConfig {
@@ -14,10 +15,21 @@ function _getClientIp(request: Request): string {
 	);
 }
 
+function isInternalRequest(request?: Request): boolean {
+	if (!request) return false;
+	const apiKey = request.headers.get("x-api-key");
+	return apiKey === config.HIAI_DOCS_API_KEY;
+}
+
 export function createRateLimiter(config: RateLimitConfig) {
 	return async (
 		ip: string,
+		request?: Request,
 	): Promise<{ allowed: boolean; remaining: number; retryAfter?: number }> => {
+		// Bypass rate limiting for internal API key requests
+		if (request && isInternalRequest(request)) {
+			return { allowed: true, remaining: 999 };
+		}
 		const key = `hiai-docs:${config.keyPrefix}:${ip}`;
 		try {
 			const count = await redis.incr(key);

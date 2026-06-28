@@ -42,7 +42,7 @@ export const searchRoutes = new Elysia({ prefix: "/api/search" })
 			request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
 			request.headers.get("x-real-ip") ??
 			"unknown";
-		const rl = await searchRateLimiter(ip);
+		const rl = await searchRateLimiter(ip, request);
 		if (!rl.allowed) {
 			set.status = 429;
 			set.headers = rateLimitHeaders(0, rl.retryAfter);
@@ -226,7 +226,7 @@ export const searchRoutes = new Elysia({ prefix: "/api/search" })
 			request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
 			request.headers.get("x-real-ip") ??
 			"unknown";
-		const rl = await searchRateLimiter(ip);
+		const rl = await searchRateLimiter(ip, request);
 		if (!rl.allowed) {
 			set.status = 429;
 			set.headers = rateLimitHeaders(0, rl.retryAfter);

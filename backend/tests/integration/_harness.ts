@@ -673,7 +673,7 @@ mock.module("../../src/lib/embedding-queue.js", () => ({
 const REAL_EMBEDDING_MODULE = await import("../../src/embedding/index");
 mock.module("../../src/embedding/index.js", () => ({
 	getEmbedding: async () => new Array(1024).fill(0),
-	embedDocument: async () => [new Array(1024).fill(0)],
+	embedDocument: async () => [{ chunkText: "mock chunk", embedding: new Array(1024).fill(0) }],
 	// Forward real exports so any test that pulls them through this mock
 	// path still gets the genuine implementation.
 	buildMetadataPreamble: REAL_EMBEDDING_MODULE.buildMetadataPreamble,

@@ -167,7 +167,7 @@ export const versionRoutes = new Elysia({
 	// GET /api/documents/:id/versions — list versions
 	.get("/", async ({ params, query, set, request }) => {
 		const ip = getClientIp(request);
-		const rl = await writeRateLimiter(ip);
+		const rl = await writeRateLimiter(ip, request);
 		if (!rl.allowed) {
 			set.status = 429;
 			set.headers = rateLimitHeaders(0, rl.retryAfter);
@@ -235,7 +235,7 @@ export const versionRoutes = new Elysia({
 	// ordinary auto-saved versions are subject to the retention policy.
 	.post("/", async ({ params, request, set }) => {
 		const ip = getClientIp(request);
-		const rl = await writeRateLimiter(ip);
+		const rl = await writeRateLimiter(ip, request);
 		if (!rl.allowed) {
 			set.status = 429;
 			set.headers = rateLimitHeaders(0, rl.retryAfter);
@@ -363,7 +363,7 @@ export const versionRoutes = new Elysia({
 	// always reversible from the version history.
 	.post("/:vid/restore", async ({ params, set, request }) => {
 		const ip = getClientIp(request);
-		const rl = await writeRateLimiter(ip);
+		const rl = await writeRateLimiter(ip, request);
 		if (!rl.allowed) {
 			set.status = 429;
 			set.headers = rateLimitHeaders(0, rl.retryAfter);

@@ -55,7 +55,7 @@ export const tagRoutes = new Elysia({ prefix: "/api" })
 			request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
 			request.headers.get("x-real-ip") ??
 			"unknown";
-		const rl = await writeRateLimiter(ip);
+		const rl = await writeRateLimiter(ip, request);
 		if (!rl.allowed) {
 			set.status = 429;
 			return { error: "Rate limited" };
@@ -101,7 +101,7 @@ export const tagRoutes = new Elysia({ prefix: "/api" })
 			request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
 			request.headers.get("x-real-ip") ??
 			"unknown";
-		const rl = await writeRateLimiter(ip);
+		const rl = await writeRateLimiter(ip, request);
 		if (!rl.allowed) {
 			set.status = 429;
 			return { error: "Rate limited" };
@@ -141,7 +141,7 @@ export const tagRoutes = new Elysia({ prefix: "/api" })
 			request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
 			request.headers.get("x-real-ip") ??
 			"unknown";
-		const rl = await writeRateLimiter(ip);
+		const rl = await writeRateLimiter(ip, request);
 		if (!rl.allowed) {
 			set.status = 429;
 			return { error: "Rate limited" };
@@ -167,7 +167,7 @@ export const tagRoutes = new Elysia({ prefix: "/api" })
 			request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
 			request.headers.get("x-real-ip") ??
 			"unknown";
-		const rl = await writeRateLimiter(ip);
+		const rl = await writeRateLimiter(ip, request);
 		if (!rl.allowed) {
 			set.status = 429;
 			return { error: "Rate limited" };
@@ -212,7 +212,7 @@ export const tagRoutes = new Elysia({ prefix: "/api" })
 			request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
 			request.headers.get("x-real-ip") ??
 			"unknown";
-		const rl = await writeRateLimiter(ip);
+		const rl = await writeRateLimiter(ip, request);
 		if (!rl.allowed) {
 			set.status = 429;
 			return { error: "Rate limited" };
