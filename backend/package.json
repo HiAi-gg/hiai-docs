@@ -12,7 +12,8 @@
     "lint:fix": "biome check --fix src/",
     "typecheck": "tsc --noEmit",
     "test": "bun test --path-ignore-patterns='*node_modules*' src/ tests/",
-    "reembed": "bun run scripts/reembed-all.ts"
+    "reembed": "bun run scripts/reembed-all.ts",
+    "benchmark:graph": "bun run src/scripts/benchmark-graph.ts"
   },
   "dependencies": {
     "@elysiajs/cors": "latest",
