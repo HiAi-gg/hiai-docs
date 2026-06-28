@@ -101,8 +101,19 @@ export function buildMetadataPreamble(metadata?: EmbeddingMetadata): string {
 }
 
 /**
+ * Pair of (chunk text, embedding vector) returned by `embedDocument`.
+ * Callers store both fields so the chunk text round-trips with its vector
+ * and can be surfaced later for highlight/snippet UIs and re-embedding.
+ */
+export interface EmbeddingChunk {
+	chunkText: string;
+	embedding: number[];
+}
+
+/**
  * Chunk a document and embed each chunk.
- * Returns one embedding vector per chunk.
+ * Returns one `{ chunkText, embedding }` pair per chunk so callers can
+ * persist the original chunk text alongside its vector.
  *
  * When `metadata` is supplied, its fields are prepended to the chunk text so
  * the resulting embeddings reflect folder/tag/category context. Without
@@ -112,20 +123,27 @@ export async function embedDocument(
 	title: string,
 	content: string,
 	metadata?: EmbeddingMetadata,
-): Promise<number[][]> {
+): Promise<EmbeddingChunk[]> {
 	const preamble = buildMetadataPreamble(metadata);
 	const fullText = `${preamble}${title}\n\n${content}`;
 	const chunks = chunkText(fullText);
 
 	if (chunks.length === 0) {
-		return [new Array(EMBEDDING_DIMENSIONS).fill(0)];
+		return [
+			{ chunkText: "", embedding: new Array(EMBEDDING_DIMENSIONS).fill(0) },
+		];
 	}
 
-	const results: number[][] = [];
+	const results: EmbeddingChunk[] = [];
 	for (let i = 0; i < chunks.length; i += 5) {
 		const batch = chunks.slice(i, i + 5);
-		const batchResults = await Promise.all(batch.map(getEmbedding));
-		results.push(...batchResults);
+		const batchEmbeddings = await Promise.all(batch.map(getEmbedding));
+		for (let j = 0; j < batchEmbeddings.length; j++) {
+			results.push({
+				chunkText: batch[j]!,
+				embedding: batchEmbeddings[j]!,
+			});
+		}
 	}
 
 	return results;

@@ -17,7 +17,7 @@ describe("embedding providers", () => {
 		expect(Array.isArray(result)).toBe(true);
 		expect(result.length).toBeGreaterThanOrEqual(1);
 		if (result[0]) {
-			expect(result[0].length).toBe(1024);
+			expect(result[0].embedding.length).toBe(1024);
 		}
 	});
 

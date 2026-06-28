@@ -86,10 +86,10 @@ async function processDocument(documentId: string): Promise<void> {
 				.delete(documentEmbeddings)
 				.where(eq(documentEmbeddings.documentId, documentId));
 
-			const rows = embeddings.map((embedding, index) => ({
+			const rows = embeddings.map(({ chunkText, embedding }, index) => ({
 				documentId,
 				chunkIndex: index,
-				chunkText: "",
+				chunkText,
 				embedding,
 			}));
 
@@ -100,7 +100,7 @@ async function processDocument(documentId: string): Promise<void> {
 			{
 				documentId,
 				chunks: embeddings.length,
-				dimensions: embeddings[0]?.length,
+				dimensions: embeddings[0]?.embedding.length,
 			},
 			"All chunk embeddings stored for document",
 		);

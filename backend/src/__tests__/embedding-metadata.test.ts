@@ -82,7 +82,7 @@ describe("embedDocument metadata behaviour", () => {
 		const result = await embedDocument("My Title", "Some content here.");
 		expect(result.length).toBeGreaterThan(0);
 		for (const v of result) {
-			expect(v.length).toBe(1024);
+			expect(v.embedding.length).toBe(1024);
 		}
 	});
 
@@ -92,7 +92,7 @@ describe("embedDocument metadata behaviour", () => {
 		});
 		expect(result.length).toBeGreaterThan(0);
 		for (const v of result) {
-			expect(v.length).toBe(1024);
+			expect(v.embedding.length).toBe(1024);
 		}
 	});
 
@@ -104,7 +104,7 @@ describe("embedDocument metadata behaviour", () => {
 		});
 		expect(result.length).toBeGreaterThan(0);
 		for (const v of result) {
-			expect(v.length).toBe(1024);
+			expect(v.embedding.length).toBe(1024);
 		}
 	});
 
@@ -112,7 +112,7 @@ describe("embedDocument metadata behaviour", () => {
 		const result = await embedDocument("Title Only", "");
 		expect(result.length).toBeGreaterThan(0);
 		for (const v of result) {
-			expect(v.length).toBe(1024);
+			expect(v.embedding.length).toBe(1024);
 		}
 	});
 
