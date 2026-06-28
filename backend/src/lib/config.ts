@@ -99,6 +99,14 @@ const envSchema = z.object({
 	// graph-heavy corpora, tune down if graph results crowd out semantic
 	// hits. Range [0, 2]; 0 disables graph boost entirely.
 	GRAPH_EXPANSION_BOOST: z.coerce.number().min(0).max(2).default(0.3),
+	// When `false`, admin reindex endpoints require an explicit `?ownerId=`
+	// query parameter. When `true` (default, backward-compatible), they are
+	// cross-tenant and the ownerId parameter is optional.
+	ADMIN_CROSS_TENANT: z
+		.string()
+		.optional()
+		.default("true")
+		.transform((v) => v === "true"),
 	HYBRID_TEXT_WEIGHT: z.coerce.number().min(0).max(1).default(0.4),
 	HYBRID_SEMANTIC_WEIGHT: z.coerce.number().min(0).max(1).default(0.6),
 	// Metadata-triggered re-embed batch caps. When a folder / category /

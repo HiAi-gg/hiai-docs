@@ -14,7 +14,7 @@ import {
 	documents,
 	documentTags,
 } from "@hiai-docs/db/schema";
-import { count, eq, ne, sql } from "drizzle-orm";
+import { and, count, eq, ne, sql } from "drizzle-orm";
 import { Elysia } from "elysia";
 import { getEmbedding } from "../../embedding";
 import { config } from "../../lib/config";
@@ -25,6 +25,7 @@ import { logger } from "../../lib/logger";
 import {
 	enqueueReembed,
 	reembedDocsByTag,
+	reembedDocsInFolder,
 	reembedDocsInFolderAdmin,
 } from "../../lib/reembed";
 import { rateLimitHeaders, searchRateLimiter } from "../middleware/rate-limit";
@@ -301,8 +302,7 @@ export const adminRoutes = new Elysia({ prefix: "/api/admin" })
 		}
 
 		const currentModel = config.EMBEDDING_MODEL ?? "";
-		const dryRun = query?.dryRun === "true" || query?.dryRun === true;
-
+		const dryRun = query?.dryRun === "true";
 		try {
 			// Find every doc id whose latest stored embedding_model does not
 			// match the current one. We DISTINCT ON (document_id, embedding_model)
@@ -411,6 +411,9 @@ export const adminRoutes = new Elysia({ prefix: "/api/admin" })
 	 * the re-embed to a single tenant. Default (no ownerId) is
 	 * cross-tenant. Optional ?dryRun=true returns the affected count
 	 * without enqueuing. Bounded by FOLDER_REEMBED_BATCH_SIZE (default 100).
+	 *
+	 * When `ADMIN_CROSS_TENANT=false` and no `ownerId` is provided,
+	 * returns 400 with an error message.
 	 */
 	.post(
 		"/reindex/folder/:folderId",
@@ -429,8 +432,48 @@ export const adminRoutes = new Elysia({ prefix: "/api/admin" })
 				return { error: "Invalid or missing admin API key" };
 			}
 
-			const dryRun = query?.dryRun === "true" || query?.dryRun === true;
+			const ownerId = query?.ownerId;
+			const dryRun = query?.dryRun === "true";
 			try {
+				if (ownerId) {
+					if (dryRun) {
+						const rows = await db
+							.select({ id: documents.id })
+							.from(documents)
+							.where(
+								and(
+									eq(documents.folderId, params.folderId),
+									eq(documents.ownerId, ownerId),
+								),
+							);
+						return {
+							dryRun: true,
+							affectedDocs: rows.length,
+							folderId: params.folderId,
+							ownerId,
+						};
+					}
+					const affected = await reembedDocsInFolder(params.folderId, ownerId);
+					logger.info(
+						{ folderId: params.folderId, ownerId, affected },
+						"Admin reindex by folder (owner-scoped)",
+					);
+					return {
+						success: true,
+						folderId: params.folderId,
+						ownerId,
+						affected,
+					};
+				}
+
+				if (!config.ADMIN_CROSS_TENANT) {
+					set.status = 400;
+					return {
+						error:
+							"ownerId query parameter required when ADMIN_CROSS_TENANT is false",
+					};
+				}
+
 				if (dryRun) {
 					const rows = await db
 						.select({ id: documents.id })
@@ -467,8 +510,14 @@ export const adminRoutes = new Elysia({ prefix: "/api/admin" })
 	 * Bulk re-embed every document carrying a tag. Mirrors
 	 * POST /api/admin/reindex/folder/:folderId but for tags.
 	 *
+	 * Optional `?ownerId=<uuid>` narrows the re-embed to a single tenant
+	 * by filtering through documentTags JOIN documents WHERE
+	 * documents.owner_id = ownerId. Default (no ownerId) is cross-tenant.
 	 * Optional `?dryRun=true` returns the affected count. Bounded by
 	 * TAG_REEMBED_BATCH_SIZE (default 500).
+	 *
+	 * When `ADMIN_CROSS_TENANT=false` and no `ownerId` is provided,
+	 * returns 400 with an error message.
 	 */
 	.post("/reindex/tag/:tagId", async ({ params, query, set, request }) => {
 		const ip = clientIp(request);
@@ -485,8 +534,45 @@ export const adminRoutes = new Elysia({ prefix: "/api/admin" })
 			return { error: "Invalid or missing admin API key" };
 		}
 
-		const dryRun = query?.dryRun === "true" || query?.dryRun === true;
+		const ownerId = query?.ownerId;
+		const dryRun = query?.dryRun === "true";
 		try {
+			if (ownerId) {
+				const whereClause = and(
+					eq(documentTags.tagId, params.tagId),
+					eq(documents.ownerId, ownerId),
+				);
+				const rows = await db
+					.selectDistinct({ documentId: documentTags.documentId })
+					.from(documentTags)
+					.innerJoin(documents, eq(documentTags.documentId, documents.id))
+					.where(whereClause);
+				const docIds = rows.map((r) => r.documentId);
+
+				if (dryRun) {
+					return {
+						dryRun: true,
+						affectedDocs: docIds.length,
+						tagId: params.tagId,
+						ownerId,
+					};
+				}
+				const affected = await enqueueReembed(docIds);
+				logger.info(
+					{ tagId: params.tagId, ownerId, affected },
+					"Admin reindex by tag (owner-scoped)",
+				);
+				return { success: true, tagId: params.tagId, ownerId, affected };
+			}
+
+			if (!config.ADMIN_CROSS_TENANT) {
+				set.status = 400;
+				return {
+					error:
+						"ownerId query parameter required when ADMIN_CROSS_TENANT is false",
+				};
+			}
+
 			if (dryRun) {
 				const rows = await db
 					.selectDistinct({ id: documentTags.documentId })

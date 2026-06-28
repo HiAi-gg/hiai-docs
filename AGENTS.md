@@ -201,10 +201,14 @@ In production, set to your frontend URL(s).
 
 All operator tooling lives under `/api/admin` and is gated by a static `HIAI_DOCS_API_KEY` supplied via the `x-api-key` header. See `docs/API.md` for the full surface. Notable endpoints:
 
+#### Tenant scoping
+
+The `ADMIN_CROSS_TENANT` env var (default `true`, backward-compatible) controls whether admin reindex endpoints accept cross-tenant operations without an explicit `?ownerId=`. When set to `false`, both folder and tag reindex endpoints require the caller to specify `?ownerId=<uuid>`. This is useful when the admin API key is shared across operators but your data model is multi-tenant.
+
 - `POST /api/admin/reindex/:docId` — force re-embed one document
 - `POST /api/admin/reindex/model?dryRun=true` — targeted re-embed for embedding-model mismatch
-- `POST /api/admin/reindex/folder/:folderId?dryRun=true` — bulk re-embed a folder (uses operator-scope `reembedDocsInFolderAdmin(folderId)` from `backend/src/lib/reembed.ts`, which bypasses the `owner_id` filter — the user-scoped helper would match zero rows because admin callers have no `owner_id`)
-- `POST /api/admin/reindex/tag/:tagId?dryRun=true` — bulk re-embed a tag
+- `POST /api/admin/reindex/folder/:folderId?dryRun=true&ownerId=<uuid>` — bulk re-embed a folder. When `ownerId` is provided, calls `reembedDocsInFolder(folderId, ownerId)` (owner-scoped from `backend/src/lib/reembed.ts`). When omitted and `ADMIN_CROSS_TENANT=true`, calls `reembedDocsInFolderAdmin(folderId)` (operator-scope, bypasses `owner_id` filter). When omitted and `ADMIN_CROSS_TENANT=false`, returns 400.
+- `POST /api/admin/reindex/tag/:tagId?dryRun=true&ownerId=<uuid>` — bulk re-embed a tag. When `ownerId` is provided, filters through `documentTags JOIN documents WHERE documents.owner_id = :ownerId` and calls `enqueueReembed(ids)`. When omitted and `ADMIN_CROSS_TENANT=true`, calls `reembedDocsByTag(tagId)` as before. When omitted and `ADMIN_CROSS_TENANT=false`, returns 400.
 - `GET /api/admin/embedding-stats` — chunk counts and zero-vector detection
 - `GET /api/admin/health/embeddings` — live provider probe
 - `GET /api/admin/graph/stats` — AGE inventory
