@@ -9,8 +9,7 @@ import {
 } from "./api/middleware/rate-limit";
 import { attachmentRoutes } from "./api/routes/attachments";
 import { authRoutes } from "./api/routes/auth";
-// TODO: add when categories route is committed (`backend/src/api/routes/categories.ts` is currently untracked)
-// import { categoryRoutes } from "./api/routes/categories";
+import { categoryRoutes } from "./api/routes/categories";
 import { collaborationRoutes } from "./api/routes/collaboration";
 import { documentRoutes } from "./api/routes/documents";
 import { folderRoutes } from "./api/routes/folders";
@@ -128,8 +127,7 @@ const app = new Elysia()
 	.use(authMiddleware)
 	.use(authRoutes)
 	.use(tagRoutes)
-	// TODO: add when categories route is committed (`backend/src/api/routes/categories.ts` is currently untracked)
-	// .use(categoryRoutes)
+	.use(categoryRoutes)
 	.use(attachmentRoutes)
 	.use(shareRoutes)
 	.use(searchRoutes)
