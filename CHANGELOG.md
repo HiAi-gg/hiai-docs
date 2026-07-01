@@ -5,7 +5,21 @@ All notable changes to hiai-docs are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.1.1] - 2026-07-01
+
+### Security & Config
+
+- **Dependency pinning** — replaced all ~80 `"latest"` specifiers with pinned semver ranges across all package.json files. `bun.lock` is now checked into version control for reproducible builds.
+- **Production hardening** — `docker-compose.yml` now defaults `NODE_ENV` to `production` (overridable via `${NODE_ENV:-production}`). All hardcoded config values (graph, chunk, batch params) are now `${VAR:-default}` parameterized at the compose level.
+- **Secrets hygiene** — `.env.example` no longer contains real cryptographic secrets. All keys replaced with `change-me` placeholders and `# CHANGE-ME` comments.
+- **Caddy auto-TLS** — port mapping changed from `50708:80`/`50709:443` to standard `80:80`/`443:443`. Custom Dockerfile builds Caddy with `caddy-ratelimit` module via xcaddy.
+- **Config schema guards** — `CSRF_SECRET` and `WEBHOOK_SECRET` now have production-only `refine()` guards (like `BETTER_AUTH_SECRET`), rejecting default values in production.
+- **Cookie compatibility** — explicit `"cookie": "^0.6.0"` dependency pinned in frontend for SvelteKit build compatibility.
+- **Port alignment** — `scripts/health-check.sh` defaults corrected: `REDIS_PORT` → 6384, `DB_PORT` → 5437 (matching compose defaults).
+- **CI registry fix** — Docker Hub push target changed from `vgalibov/hiai-docs` to `hiai-gg/hiai-docs`.
+- **MinIO image pinning** — `minio/minio:latest` → `minio/minio:RELEASE.2025-06-26T16-23-29Z` in both compose files.
+
+## [0.1.0] - 2026-06-28
 
 ### Highlights
 

@@ -1,6 +1,6 @@
 {
   "name": "@hiai-docs/db",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "type": "module",
   "license": "MIT",
@@ -18,13 +18,13 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "drizzle-orm": "latest",
-    "postgres": "latest",
-    "zod": "latest"
+    "drizzle-orm": "^0.45.2",
+    "postgres": "^3.4.9",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
-    "@types/node": "latest",
-    "drizzle-kit": "latest",
-    "typescript": "latest"
+    "@types/node": "^26.0.1",
+    "drizzle-kit": "^0.31.10",
+    "typescript": "^6.0.3"
   }
 }

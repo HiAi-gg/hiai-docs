@@ -7,11 +7,11 @@
 #
 # Environment overrides (all optional):
 #   API_PORT    default 50700
-#   DB_PORT     default 5433
+#   DB_PORT     default 5437
 #   DB_USER     default aiuser
 #   DB_NAME     default hiai_docs
 #   DB_HOST     default localhost
-#   REDIS_PORT  default 6380  (matches REDIS_URL in .env.example)
+#   REDIS_PORT  default 6384  (matches docker-compose.yml default)
 #   OLLAMA_URL  default http://localhost:11434
 #   MINIO_PORT  default 9000
 #   MINIO_HEALTH_PATH  default /minio/health/live
@@ -24,10 +24,10 @@ set -euo pipefail
 
 API_PORT="${API_PORT:-50700}"
 DB_HOST="${DB_HOST:-localhost}"
-DB_PORT="${DB_PORT:-5433}"
+DB_PORT="${DB_PORT:-5437}"
 DB_USER="${DB_USER:-aiuser}"
 DB_NAME="${DB_NAME:-hiai_docs}"
-REDIS_PORT="${REDIS_PORT:-6380}"
+REDIS_PORT="${REDIS_PORT:-6384}"
 OLLAMA_URL="${OLLAMA_URL:-http://localhost:11434}"
 MINIO_PORT="${MINIO_PORT:-9000}"
 MINIO_HEALTH_PATH="${MINIO_HEALTH_PATH:-/minio/health/live}"

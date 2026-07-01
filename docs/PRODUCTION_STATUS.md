@@ -1,7 +1,7 @@
 # Production Status Report
 
-> **Status:** ✅ READY FOR DEPLOYMENT
-> **Last verified:** 2026-06-14
+> **Status:** 🔧 Under maintenance — v0.1.1 release in progress (see .bob/plans/production-release-v0.1.1.md)
+> **Last verified:** 2026-07-01
 
 ---
 
@@ -9,14 +9,14 @@
 
 | Check | Status |
 |-------|--------|
-| Typecheck | ✅ PASS — 0 errors across all packages |
+| Typecheck | ✅ PASS — 0 errors across all packages (pending full re-run) |
 | Tests | ✅ PASS — 178/178 passing |
 | Build | ✅ PASS — Docker multi-stage builds |
 | Health checks | ✅ PASS |
 
 ## 2. Architecture
 
-10 route files: auth, documents, folders, search, share, tags, attachments, versions, webhooks, collaboration.
+14 route files: admin, auth, categories, collaboration, documents, folders, graph, metrics, search, share, tags, attachments, versions, webhooks.
 
 Security: rate limiting, Zod validation, owner_id scoping, CSRF protection, CORS, security headers.
 
@@ -58,4 +58,4 @@ Authentication, CSRF, rate limiting, Zod validation, owner scoping, CORS, HSTS, 
 
 ---
 
-*Status: ✅ READY FOR DEPLOYMENT*
+*Status: 🔧 Under maintenance — refer to .bob/plans/production-release-v0.1.1.md*

@@ -26,10 +26,19 @@ RUN cd frontend && bun run build
 
 # Run
 FROM base AS runtime
-COPY --from=deps /app/node_modules /app/node_modules
-COPY --from=deps /app/frontend/node_modules /app/frontend/node_modules
+# Workspace manifests — needed so `bun install --frozen-lockfile` can resolve
+# the monorepo without dragging source/devDeps into the runtime image
+COPY package.json bun.lock* ./
+COPY frontend/package.json ./frontend/
+COPY backend/package.json ./backend/
+COPY packages/db/package.json ./packages/db/
+COPY packages/cli/package.json ./packages/cli/
+COPY packages/mcp-server/package.json ./packages/mcp-server/
+COPY packages/sdk/package.json ./packages/sdk/
+# Production-only deps — smaller image, smaller attack surface
+RUN --mount=type=cache,target=/root/.bun/install/cache \
+    cd /app && bun install --production --frozen-lockfile --no-verify
 COPY --from=build /app/frontend/build /app/frontend/build
-COPY frontend/package.json /app/frontend/
 
 ENV NODE_ENV=production
 ENV WEB_PORT=50701

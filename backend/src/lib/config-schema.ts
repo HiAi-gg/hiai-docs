@@ -29,9 +29,25 @@ export const envSchema = z.object({
 			"BETTER_AUTH_SECRET must be set in production",
 		),
 	// CSRF: dedicated signing key — must NOT equal BETTER_AUTH_SECRET
-	CSRF_SECRET: z.string().default("change-me-to-random-32-chars"),
+	CSRF_SECRET: z
+		.string()
+		.default("change-me-to-random-32-chars")
+		.refine(
+			(val) =>
+				process.env.NODE_ENV !== "production" ||
+				val !== "change-me-to-random-32-chars",
+			"CSRF_SECRET must be set in production",
+		),
 	// Webhook: dedicated HMAC key — must NOT equal MINIO_SECRET_KEY
-	WEBHOOK_SECRET: z.string().default("change-me-to-random-32-chars"),
+	WEBHOOK_SECRET: z
+		.string()
+		.default("change-me-to-random-32-chars")
+		.refine(
+			(val) =>
+				process.env.NODE_ENV !== "production" ||
+				val !== "change-me-to-random-32-chars",
+			"WEBHOOK_SECRET must be set in production",
+		),
 	BETTER_AUTH_URL: z.string().default("http://localhost:50700"),
 	CORS_ORIGINS: z.string().optional(),
 	EMBEDDING_BASE_URL: z.string().optional(),

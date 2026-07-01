@@ -63,3 +63,12 @@ GRANT ALL PRIVILEGES ON SCHEMA ag_catalog TO aiuser;
 -- above only affects the current docker-entrypoint-initdb.d session;
 -- this ALTER ROLE persists across the connection pool.
 ALTER ROLE aiuser SET search_path = public, ag_catalog;
+
+-- hiai_app role for dev-compose runtime connection
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT FROM pg_catalog.pg_roles WHERE rolname = 'hiai_app') THEN
+    CREATE ROLE hiai_app WITH LOGIN PASSWORD 'hiai_app_password';
+  END IF;
+END
+$$;
