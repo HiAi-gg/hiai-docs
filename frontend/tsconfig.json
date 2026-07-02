@@ -14,8 +14,8 @@
     "paths": {
       "$lib": ["./src/lib"],
       "$lib/*": ["./src/lib/*"],
-      "@hiai-gg/hiai-ui": ["../node_modules/@hiai-gg/hiai-ui/src/index.ts"],
-      "@hiai-gg/hiai-ui/*": ["../node_modules/@hiai-gg/hiai-ui/src/*"]
+      "@hiai-gg/hiai-ui": ["../node_modules/@hiai-gg/hiai-ui/dist/index.js"],
+      "@hiai-gg/hiai-ui/*": ["../node_modules/@hiai-gg/hiai-ui/dist/*"]
     }
   }
 }

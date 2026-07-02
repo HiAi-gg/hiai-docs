@@ -1,16 +1,16 @@
 <!-- TagList.svelte — Sidebar list of tags with filter toggle, create, edit, delete. -->
 <script lang="ts">
-import { Loader2, MoreVertical, Plus } from "lucide-svelte";
-import { onMount } from "svelte";
-import { deleteTag, listTags, type Tag } from "$lib/api/tags";
-import TagCreateDialog from "$lib/components/TagCreateDialog.svelte";
-import { ConfirmDialog } from "$lib/components/ui/confirm-dialog";
+import { ConfirmDialog } from "@hiai-gg/hiai-ui/components/ui/confirm-dialog";
 import {
 	DropdownMenu,
 	DropdownMenuContent,
 	DropdownMenuItem,
 	DropdownMenuTrigger,
-} from "$lib/components/ui/dropdown-menu";
+} from "@hiai-gg/hiai-ui/components/ui/dropdown-menu";
+import { Loader2, MoreVertical, Plus } from "lucide-svelte";
+import { onMount } from "svelte";
+import { deleteTag, listTags, type Tag } from "$lib/api/tags";
+import TagCreateDialog from "$lib/components/TagCreateDialog.svelte";
 import * as m from "$lib/paraglide/messages.js";
 import {
 	getSelectedTag,
@@ -193,6 +193,7 @@ async function confirmDelete() {
   title={m.tags_delete_title()}
   description={m.tags_delete_description()}
   confirmLabel={m.action_delete()}
+  cancelLabel={m.action_cancel()}
   variant="destructive"
   busy={busy}
   onConfirm={confirmDelete}

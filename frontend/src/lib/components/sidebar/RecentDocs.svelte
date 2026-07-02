@@ -1,4 +1,21 @@
 <script lang="ts">
+import { Button } from "@hiai-gg/hiai-ui/components/ui/button";
+import { ConfirmDialog } from "@hiai-gg/hiai-ui/components/ui/confirm-dialog";
+import {
+	Dialog,
+	DialogDescription,
+	DialogFooter,
+	DialogHeader,
+	DialogTitle,
+} from "@hiai-gg/hiai-ui/components/ui/dialog";
+import {
+	DropdownMenu,
+	DropdownMenuContent,
+	DropdownMenuItem,
+	DropdownMenuTrigger,
+} from "@hiai-gg/hiai-ui/components/ui/dropdown-menu";
+import { Input } from "@hiai-gg/hiai-ui/components/ui/input";
+import { Label } from "@hiai-gg/hiai-ui/components/ui/label";
 import { Check, Copy, FileText, Loader2, MoreVertical } from "lucide-svelte";
 import { onDestroy, onMount } from "svelte";
 import {
@@ -8,23 +25,6 @@ import {
 	listDocuments,
 	updateDocument,
 } from "$lib/api/documents";
-import { Button } from "$lib/components/ui/button";
-import { ConfirmDialog } from "$lib/components/ui/confirm-dialog";
-import {
-	Dialog,
-	DialogDescription,
-	DialogFooter,
-	DialogHeader,
-	DialogTitle,
-} from "$lib/components/ui/dialog";
-import {
-	DropdownMenu,
-	DropdownMenuContent,
-	DropdownMenuItem,
-	DropdownMenuTrigger,
-} from "$lib/components/ui/dropdown-menu";
-import { Input } from "$lib/components/ui/input";
-import { Label } from "$lib/components/ui/label";
 import * as m from "$lib/paraglide/messages.js";
 import {
 	getDocRefreshNonce,
@@ -347,6 +347,7 @@ async function confirmDelete() {
   title={m.doc_delete()}
   description={m.doc_delete_confirm()}
   confirmLabel={m.action_delete()}
+  cancelLabel={m.action_cancel()}
   variant="destructive"
   busy={deleteBusy}
   onConfirm={confirmDelete}

@@ -1,4 +1,10 @@
 <script lang="ts">
+import { Badge } from "@hiai-gg/hiai-ui/components/ui/badge";
+import SelectRoot from "@hiai-gg/hiai-ui/components/ui/select/select.svelte";
+import SelectContent from "@hiai-gg/hiai-ui/components/ui/select/select-content.svelte";
+import SelectItem from "@hiai-gg/hiai-ui/components/ui/select/select-item.svelte";
+import SelectTrigger from "@hiai-gg/hiai-ui/components/ui/select/select-trigger.svelte";
+import SelectValue from "@hiai-gg/hiai-ui/components/ui/select/select-value.svelte";
 import {
 	Calendar,
 	ChevronDown,
@@ -21,12 +27,6 @@ import { listFolders } from "$lib/api/folders";
 import { getFilterOptions, type SearchResponse, search } from "$lib/api/search";
 import DatePicker from "$lib/components/DatePicker.svelte";
 import SearchResult from "$lib/components/SearchResult.svelte";
-import { Badge } from "$lib/components/ui/badge";
-import SelectRoot from "$lib/components/ui/select/select.svelte";
-import SelectContent from "$lib/components/ui/select/select-content.svelte";
-import SelectItem from "$lib/components/ui/select/select-item.svelte";
-import SelectTrigger from "$lib/components/ui/select/select-trigger.svelte";
-import SelectValue from "$lib/components/ui/select/select-value.svelte";
 import * as m from "$lib/paraglide/messages.js";
 import { getSelectedTagName } from "$lib/stores/tag-store.svelte";
 import type { Folder as FolderType } from "$lib/types.js";

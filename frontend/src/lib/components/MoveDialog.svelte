@@ -1,16 +1,16 @@
 <script lang="ts">
-import { Loader2 } from "lucide-svelte";
-import { type Category, listCategories } from "$lib/api/categories";
-import { listFolders } from "$lib/api/folders";
-import { Button } from "$lib/components/ui/button";
+import { Button } from "@hiai-gg/hiai-ui/components/ui/button";
 import {
 	Dialog,
 	DialogDescription,
 	DialogFooter,
 	DialogHeader,
 	DialogTitle,
-} from "$lib/components/ui/dialog";
-import { Label } from "$lib/components/ui/label";
+} from "@hiai-gg/hiai-ui/components/ui/dialog";
+import { Label } from "@hiai-gg/hiai-ui/components/ui/label";
+import { Loader2 } from "lucide-svelte";
+import { type Category, listCategories } from "$lib/api/categories";
+import { listFolders } from "$lib/api/folders";
 import * as m from "$lib/paraglide/messages.js";
 import {
 	bumpSubfoldersRefresh,

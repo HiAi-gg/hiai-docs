@@ -8,9 +8,9 @@
     "cssVariables": true
   },
   "aliases": {
-    "components": "$lib/components/ui",
+    "components": "@hiai-gg/hiai-ui/components",
     "utils": "$lib/utils",
-    "ui": "$lib/components/ui",
+    "ui": "@hiai-gg/hiai-ui/components/ui",
     "lib": "$lib"
   },
   "typescript": true,

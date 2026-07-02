@@ -12,6 +12,7 @@
          and an at-a-glance preview of the version content.
        * Expose a CreateSnapshotDialog for ad-hoc snapshots. -->
 <script lang="ts">
+import ConfirmDialog from "@hiai-gg/hiai-ui/components/ui/confirm-dialog/ConfirmDialog.svelte";
 import {
 	Camera,
 	CheckCircle2,
@@ -23,7 +24,6 @@ import {
 } from "lucide-svelte";
 import { ApiError, apiFetch } from "$lib/api/client";
 import CreateSnapshotDialog from "$lib/components/CreateSnapshotDialog.svelte";
-import ConfirmDialog from "$lib/components/ui/confirm-dialog/ConfirmDialog.svelte";
 import * as m from "$lib/paraglide/messages.js";
 
 interface Version {

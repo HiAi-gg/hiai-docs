@@ -14,17 +14,17 @@
        - Enter submits the create/edit form.
        - Escape closes (handled by the underlying Dialog). -->
 <script lang="ts">
-import { Loader2 } from "lucide-svelte";
-import { Button } from "$lib/components/ui/button";
+import { Button } from "@hiai-gg/hiai-ui/components/ui/button";
 import {
 	Dialog,
 	DialogDescription,
 	DialogFooter,
 	DialogHeader,
 	DialogTitle,
-} from "$lib/components/ui/dialog";
-import { Input } from "$lib/components/ui/input";
-import { Label } from "$lib/components/ui/label";
+} from "@hiai-gg/hiai-ui/components/ui/dialog";
+import { Input } from "@hiai-gg/hiai-ui/components/ui/input";
+import { Label } from "@hiai-gg/hiai-ui/components/ui/label";
+import { Loader2 } from "lucide-svelte";
 import * as m from "$lib/paraglide/messages.js";
 
 type Mode = "create" | "edit" | "delete";
