@@ -7,6 +7,17 @@ All notable changes to hiai-docs are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.5] - 2026-07-02
+
+### Fixed
+
+- **npm `files` whitelist** in `package.public.json` now lists explicit per-package source directories (`packages/db/src`, `packages/cli/src`, `packages/mcp-server/src`, `backend/src`, `frontend/src`) instead of the non-recursive glob `packages/*/src`. The glob was silently omitting `packages/db/src`, which broke the `./db` and `./schema` subpaths in the published tarball.
+- **Added `./auth` export** pointing to `backend/src/lib/auth.ts` so consumers can import the configured Better Auth instance directly.
+
+### Changed
+
+- **Version synchronization** — all workspace packages, CLI, MCP server, Swagger/OpenAPI spec, and `docs/openapi.json` now report `0.1.5`.
+
 ## [0.1.4] - 2026-07-02
 
 ### Changed

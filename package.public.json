@@ -1,6 +1,6 @@
 {
   "name": "@hiai-gg/hiai-docs",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "type": "module",
   "license": "MIT",
   "description": "The lightweight, AI-native self-hosted knowledge base \u2014 built-in RAG, hybrid semantic search, and a clean REST API for AI agents.",
@@ -46,6 +46,10 @@
       "import": "./packages/db/src/schema.ts",
       "types": "./packages/db/src/schema.ts"
     },
+    "./auth": {
+      "import": "./backend/src/lib/auth.ts",
+      "types": "./backend/src/lib/auth.ts"
+    },
     "./packages/*": {
       "import": "./packages/*",
       "types": "./packages/*"
@@ -61,7 +65,9 @@
   },
   "files": [
     "packages/sdk/dist",
-    "packages/*/src",
+    "packages/db/src",
+    "packages/cli/src",
+    "packages/mcp-server/src",
     "backend/src",
     "frontend/src",
     "README.md",
