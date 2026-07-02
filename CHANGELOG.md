@@ -17,6 +17,7 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
   - `./backend/*`, `./frontend/*`, `./packages/*` were unscoped wildcard exports that leaked the entire monorepo source tree. No documented use case existed for these paths.
 - **`files[]` tightened** — removed `packages/cli/src`, `packages/mcp-server/src`, `backend/src`, `frontend/src` from the published tarball. These directories had no corresponding clean export paths and added ~1 MB of raw TypeScript to the npm package without benefit to consumers.
 - **`RELEASE_CHECKLIST.md` version-bump count** corrected from 6 to 8 — `packages/cli/package.json` and `packages/mcp-server/package.json` were omitted from the bump target list.
+- **Script file modes** — restored executable permission (`chmod +x`) on `scripts/health-check.sh`, `scripts/migrate.sh`, and `scripts/release.sh`; normalized line endings to LF.
 
 ### Added
 
