@@ -16,7 +16,7 @@ RUN --mount=type=cache,target=/root/.bun/install/cache bun install --no-verify
 # `dependencies` (no devDependencies) so the runtime image excludes the
 # build toolchain (vite, svelte, @sveltejs/kit, svelte-check, …).
 FROM base AS prod-deps
-COPY package.json bun.lock* ./
+COPY package.json ./
 COPY frontend/package.json ./frontend/
 COPY backend/package.json ./backend/
 COPY packages/db/package.json ./packages/db/
@@ -24,7 +24,7 @@ COPY packages/cli/package.json ./packages/cli/
 COPY packages/mcp-server/package.json ./packages/mcp-server/
 COPY packages/sdk/package.json ./packages/sdk/
 ENV BUN_INSTALL_CONCURRENCY=1
-RUN --mount=type=cache,target=/root/.bun/install/cache bun install --production --no-verify
+RUN --mount=type=cache,target=/root/.bun/install/cache bun install --production
 
 # Build
 FROM base AS build
