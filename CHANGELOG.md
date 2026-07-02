@@ -7,6 +7,14 @@ All notable changes to hiai-docs are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.3] - 2026-07-02
+
+### Changed
+
+- **Publishable package manifest** (`package.public.json`) now exposes `./db`, `./schema`, `./backend/*`, and `./frontend/*` subpaths, plus wildcard exports for `./packages/*`.
+- **SDK dependency cleanup** — removed the `zod` dependency from `packages/sdk` (it was unused; runtime types remain pure TypeScript interfaces).
+- **Version synchronization** — all workspace packages, CLI, MCP server, Swagger/OpenAPI spec, and `docs/openapi.json` now report `0.1.3`.
+
 ## [0.1.2] - 2026-07-02
 
 ### Performance

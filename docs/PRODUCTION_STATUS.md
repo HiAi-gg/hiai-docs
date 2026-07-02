@@ -1,6 +1,6 @@
 # Production Status Report
 
-> **Status:** 🔧 Under maintenance — v0.1.1 released
+> **Status:** 🔧 Under maintenance — v0.1.3 released
 > **Last verified:** 2026-07-02
 
 ---
@@ -58,4 +58,4 @@ Authentication, CSRF, rate limiting, Zod validation, owner scoping, CORS, HSTS, 
 
 ---
 
-*Status: 🔧 Under maintenance — v0.1.1 released*
+*Status: 🔧 Under maintenance — v0.1.3 released*

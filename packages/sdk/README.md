@@ -1,6 +1,6 @@
 # @hiai-gg/hiai-docs-sdk
 
-A typed TypeScript client for the [hiai-docs](https://github.com/hiai-gg/hiai-docs) REST API. Bun-native `fetch`-based wrapper with Bearer auth, typed responses, automatic retries with exponential backoff, and full Zod-validated request shapes.
+A typed TypeScript client for the [hiai-docs](https://github.com/hiai-gg/hiai-docs) REST API. Bun-native `fetch`-based wrapper with Bearer auth, typed responses, and automatic retries with exponential backoff.
 
 > Bun-native, ESM-only, TypeScript strict.
 
@@ -14,7 +14,7 @@ bun add @hiai-gg/hiai-docs-sdk
 npm install @hiai-gg/hiai-docs-sdk
 ```
 
-The SDK has a single runtime dependency: `zod`.
+The SDK has no runtime dependencies.
 
 ## Quick start
 

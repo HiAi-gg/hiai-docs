@@ -375,6 +375,12 @@ jobs:
       - name: Install dependencies
         run: bun install
 
+      - name: Build SDK
+        # The published tarball ships packages/sdk/dist/*. CI uses --ignore-scripts
+        # at publish time, so prepublishOnly does not run. Build it explicitly here
+        # to guarantee the dist/ artifacts exist before `npm publish`.
+        run: cd packages/sdk && bun run build
+
       - name: Prepare public package.json
         run: |
           # Swap package.json with package.public.json for publishing

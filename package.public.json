@@ -1,9 +1,9 @@
 {
   "name": "@hiai-gg/hiai-docs",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "type": "module",
   "license": "MIT",
-  "description": "The lightweight, AI-native self-hosted knowledge base — built-in RAG, hybrid semantic search, and a clean REST API for AI agents.",
+  "description": "The lightweight, AI-native self-hosted knowledge base \u2014 built-in RAG, hybrid semantic search, and a clean REST API for AI agents.",
   "repository": {
     "type": "git",
     "url": "https://github.com/HiAi-gg/hiai-docs"
@@ -33,8 +33,40 @@
     ".": {
       "import": "./packages/sdk/dist/index.js",
       "types": "./packages/sdk/dist/index.d.ts"
+    },
+    "./sdk": {
+      "import": "./packages/sdk/dist/index.js",
+      "types": "./packages/sdk/dist/index.d.ts"
+    },
+    "./db": {
+      "import": "./packages/db/src/index.ts",
+      "types": "./packages/db/src/index.ts"
+    },
+    "./schema": {
+      "import": "./packages/db/src/schema.ts",
+      "types": "./packages/db/src/schema.ts"
+    },
+    "./packages/*": {
+      "import": "./packages/*",
+      "types": "./packages/*"
+    },
+    "./backend/*": {
+      "import": "./backend/*",
+      "types": "./backend/*"
+    },
+    "./frontend/*": {
+      "import": "./frontend/*",
+      "types": "./frontend/*"
     }
   },
+  "files": [
+    "packages/sdk/dist",
+    "packages/*/src",
+    "backend/src",
+    "frontend/src",
+    "README.md",
+    "LICENSE"
+  ],
   "engines": {
     "bun": ">= 1.3.14"
   },
@@ -42,6 +74,20 @@
     "dev": "docker compose up -d",
     "build": "docker compose build",
     "start": "docker compose up -d",
-    "stop": "docker compose down"
+    "stop": "docker compose down",
+    "build:sdk": "cd packages/sdk && bun run build",
+    "prepublishOnly": "cd packages/sdk && bun run build"
+  },
+  "peerDependencies": {
+    "drizzle-orm": "^0.45.2",
+    "postgres": "^3.4.9"
+  },
+  "peerDependenciesMeta": {
+    "drizzle-orm": {
+      "optional": true
+    },
+    "postgres": {
+      "optional": true
+    }
   }
 }
