@@ -39,13 +39,12 @@ Copy `.env.example` and fill in:
 
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
-| `DB_USER` | Yes | `aiuser` | PostgreSQL username |
-| `DB_PASSWORD` | Yes | `changeme` | PostgreSQL password |
-| `DB_NAME` | Yes | `hiai_docs` | Database name |
-| `DB_HOST` | Yes | `localhost` | PostgreSQL host |
-| `DB_PORT` | Yes | `5437` | PostgreSQL port |
+| `DATABASE_URL` | Yes | `postgresql://hiai_app:changeme@localhost:5437/hiai_docs` | PostgreSQL connection string (encodes host, port, user, password, db) |
+| `REDIS_URL` | Yes | `redis://localhost:6384` | Redis connection URL. **Host/macOS:** use `redis://localhost:6384`. **Docker Compose:** the default compose file overrides this to `redis://redis:6379` (container DNS name, internal port 6379) so the api container can reach redis via the Docker network. |
 | `BETTER_AUTH_SECRET` | **Yes** | — | Random 32+ char string |
 | `BETTER_AUTH_URL` | Yes | `http://localhost:50700` | Public API URL |
+| `MINIO_ENDPOINT` | No | `localhost` | MinIO host |
+| `MINIO_PORT` | No | `9020` | MinIO port |
 | `MINIO_ACCESS_KEY` | Yes | `minioadmin` | MinIO access key |
 | `MINIO_SECRET_KEY` | Yes | `change-me-to-random-32-chars` | MinIO secret key |
 | `MINIO_BUCKET` | Yes | `hiai-docs` | MinIO bucket name |
@@ -59,9 +58,8 @@ Copy `.env.example` and fill in:
 | `CSRF_SECRET` | Yes | — | CSRF protection secret |
 | `WEBHOOK_SECRET` | Yes | — | Webhook signature secret |
 | `CORS_ORIGINS` | No | `http://localhost:50701` | Comma-separated allowed origins |
-| `REDIS_URL` | Yes | `redis://redis:6379` | Redis connection URL (container-internal port) |
 | `HIAI_DOCS_API_KEY` | **Yes** | — | Admin API key for `/api/admin/*` endpoints |
-| `OWNER_ID` | **Yes** | — | Owner user UUID (first registered user from auth) |
+| `OWNER_ID` | No | `api-key-user` | Owner user UUID (first registered user from auth); only needed for multi-tenant setups with `ADMIN_CROSS_TENANT=false` |
 
 ### GraphRAG Configuration
 
@@ -103,6 +101,51 @@ Copy `.env.example` and fill in:
 |----------|----------|---------|-------------|
 | `ATTACHMENT_MAX_SIZE_MB` | No | `25` | Maximum allowed upload size in MB |
 | `ATTACHMENT_PRESIGN_EXPIRY_SECONDS` | No | `900` | Presigned URL expiry in seconds (15 minutes) |
+
+### Smart Re-Embed
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `REEMBED_MIN_WORD_CHANGES` | No | `20` | Min word-change delta to trigger re-embed |
+| `REEMBED_MIN_CHAR_CHANGES` | No | `100` | Min char-change delta to trigger re-embed |
+| `REEMBED_MAX_IDLE_HOURS` | No | `24` | Max hours before forced re-embed eligibility |
+| `REEMBED_CRON_INTERVAL_MINUTES` | No | `15` | Content re-embed cron frequency (minutes) |
+| `METADATA_REEMBED_CRON_INTERVAL_MINUTES` | No | `1` | Metadata re-embed cron frequency (minutes) |
+
+### Version Retention
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `VERSION_RETENTION_COUNT` | No | `50` | Number of auto-saved (non-snapshot) versions to retain per document |
+
+### Admin Security
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `ADMIN_CROSS_TENANT` | No | `true` | Allow cross-tenant admin operations (set `false` to require explicit `?ownerId=` on admin endpoints) |
+
+### Fallback Embedding
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `EMBEDDING_FALLBACK_BASE_URL` | No | — | Fallback embedding provider base URL |
+| `EMBEDDING_FALLBACK_API_KEY` | No | — | Fallback embedding provider API key |
+| `EMBEDDING_FALLBACK_MODEL` | No | — | Fallback embedding model name |
+
+### Fallback GraphRAG Extraction
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `GRAPH_EXTRACT_FALLBACK_BASE_URL` | No | — | Fallback extraction LLM base URL |
+| `GRAPH_EXTRACT_FALLBACK_API_KEY` | No | — | Fallback extraction LLM API key |
+| `GRAPH_EXTRACT_FALLBACK_MODEL` | No | — | Fallback extraction model name |
+
+### MinIO Public Endpoint
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `MINIO_PUBLIC_ENDPOINT` | No | `localhost` | Public MinIO host (used for presigned attachment URLs) |
+| `MINIO_PUBLIC_PORT` | No | `9020` | Public MinIO port |
 
 > **⚠️ Secret hygiene:** All secrets in `.env.example` use `change-me` placeholders with `CHANGE-ME` markers. Run `openssl rand -hex 32` to generate values for `BETTER_AUTH_SECRET`, `CSRF_SECRET`, `WEBHOOK_SECRET`, and `HIAI_DOCS_API_KEY`. The `OWNER_ID` should be your first registered user's UUID from the auth system. Never commit real secrets to `.env.example` or documentation.
 

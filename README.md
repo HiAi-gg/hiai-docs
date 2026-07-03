@@ -122,7 +122,7 @@ GraphRAG layers a knowledge graph over the existing vector search. It is optiona
 2. **Search** — when `GRAPH_SEARCH_ENABLED=true`, `GET /api/search?graph=true` walks the graph from each merged seed document (1-3 hops, controlled by `?graphHops=N`). Discovered neighbors are merged into the result list with a multiplicative boost of `GRAPH_EXPANSION_BOOST` (default `0.3`).
 3. **Operator tooling** — `GET /api/admin/graph/stats` reports current AGE inventory (node and edge counts).
 
-> **⚠️ GraphRAG health note:** As of v0.1.6, the AGE shared library auto-loading is a known gap — see [GraphRAG Infrastructure Audit](docs/GRAPHRAG_AUDIT.md) for current status. GraphRAG degrades gracefully; all other features work normally when GraphRAG is disabled.
+> **⚠️ GraphRAG health note:** As of v0.1.8, the AGE shared library auto-loading is a known gap — see [GraphRAG Infrastructure Audit](docs/GRAPHRAG_AUDIT.md) for current status. GraphRAG degrades gracefully; all other features work normally when GraphRAG is disabled.
 
 ### Where AGE lives
 
@@ -153,6 +153,9 @@ cp .env.example .env
 
 docker compose up -d
 ```
+
+> **Note:** To enable the Caddy reverse proxy (TLS, production), run with `--profile caddy`:
+> `docker compose --profile caddy up -d`
 
 Open http://localhost:50701
 
@@ -207,6 +210,29 @@ bunx @hiai-gg/hiai-docs-mcp               # run the MCP server
 | `bunx @hiai-gg/hiai-docs-mcp` | MCP server (10 tools for AI agents) |
 
 The SDK has **no runtime dependencies** — it uses the platform `fetch` built into Bun, Node 18+, and modern browsers.
+
+#### Subpath imports for advanced integration
+
+The npm package exposes deep imports for consumers who want to reuse hiai-docs infrastructure (DB client, RLS tenant context, Redis/MinIO factories) without coupling to hiai-docs' own `.env` validation:
+
+```ts
+// RLS-tenant-scoped DB queries (from shared package)
+import { withTenant, adminTenantContext } from "@hiai-gg/hiai-docs/db/with-tenant";
+
+// Drizzle DB client
+import { db } from "@hiai-gg/hiai-docs/db/client";
+import { documents, folders } from "@hiai-gg/hiai-docs/schema";
+
+// Pure factories — no hiai-docs config dependency (ideal for docsmint / external consumers)
+import { createRedis, type RedisConfig } from "@hiai-gg/hiai-docs/backend/lib/redis";
+import { createMinio, ensureBucket, type MinioConfig } from "@hiai-gg/hiai-docs/backend/lib/minio";
+
+// Example: create your own Redis/MinIO instance with custom config
+const redis = createRedis({ url: "redis://localhost:6384", maxRetriesPerRequest: 3 });
+const minio = createMinio({ endpoint: "localhost", port: 9000, accessKey: "minioadmin", secretKey: "change-me", useSSL: false, region: "us-east-1" });
+```
+
+> **Note:** `backend/lib/redis` and `backend/lib/minio` resolve to the pure factory files (`redis-factory.ts`, `minio-factory.ts`). Importing from `backend/lib/redis.ts` or `backend/lib/minio.ts` directly is also supported and equivalent — both re-export from the factory. The `packages/db/with-tenant` path goes through a re-export shim at `backend/src/lib/with-tenant.ts`.
 
 ## Agentic Quickstart (AI-Powered Setup)
 
@@ -338,7 +364,13 @@ hiai-docs/
 ├── backend/              # Elysia REST API
 │   ├── src/
 │   │   ├── api/          # Routes + middleware
-│   │   ├── lib/          # Shared utilities (includes reembed.ts)
+│   │   ├── lib/          # Shared utilities
+│   │   │   ├── redis-factory.ts   # Pure createRedis(cfg) factory
+│   │   │   ├── minio-factory.ts   # Pure createMinio(cfg) + ensureBucket() factory
+│   │   │   ├── redis.ts           # Singleton re-export wrapper (→ redis-factory)
+│   │   │   ├── minio.ts           # Singleton re-export wrapper (→ minio-factory)
+│   │   │   ├── with-tenant.ts     # Re-export shim (→ packages/db/src/with-tenant)
+│   │   │   └── reembed.ts         # Smart re-embed entry point
 │   │   ├── embedding/    # Embedding pipeline
 │   │   └── index.ts      # Entry point
 │   ├── package.json
@@ -353,8 +385,10 @@ hiai-docs/
 ├── packages/db/          # Drizzle schema + migrations
 │   ├── src/
 │   │   ├── schema.ts     # Table definitions
+│   │   ├── client.ts     # Drizzle client instance
+│   │   ├── with-tenant.ts # RLS context (withTenant, TenantContext, adminTenantContext)
 │   │   ├── migrations/   # SQL migrations
-│   │   └── index.ts      # DB client
+│   │   └── index.ts      # Re-exports
 │   └── package.json
 ├── postgres/             # Custom PostgreSQL image (pgvector + vectorscale + age) — see postgres/Dockerfile
 ├── docker-compose.yml    # Production Docker setup
@@ -373,22 +407,48 @@ All configuration via environment variables. Copy `.env.example` to `.env` and c
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `DB_USER` | aiuser | PostgreSQL username |
-| `DB_PASSWORD` | changeme | PostgreSQL password |
+| `DATABASE_URL` | postgresql://hiai_app:changeme@localhost:5437/hiai_docs | PostgreSQL connection string |
+| `REDIS_URL` | redis://localhost:6384 | Redis connection URL |
 | `BETTER_AUTH_SECRET` | — | Auth secret (generate random) |
 | `BETTER_AUTH_URL` | http://localhost:50700 | Auth base URL |
+| `CSRF_SECRET` | — | CSRF signing secret |
+| `WEBHOOK_SECRET` | — | Webhook HMAC secret |
+| `MINIO_ENDPOINT` | localhost | MinIO host |
+| `MINIO_PORT` | 9020 | MinIO port |
+| `MINIO_PUBLIC_ENDPOINT` | localhost | Public MinIO host (for presigned URLs) |
+| `MINIO_PUBLIC_PORT` | 9020 | Public MinIO port |
 | `MINIO_ACCESS_KEY` | minioadmin | MinIO access key |
 | `MINIO_SECRET_KEY` | minioadmin | MinIO secret key |
+| `MINIO_BUCKET` | hiai-docs | MinIO bucket name |
 | `EMBEDDING_BASE_URL` | — | Base URL for OpenAI-compatible embedding API (optional) |
 | `EMBEDDING_API_KEY` | — | API key for embedding service (leave empty for local inference) |
 | `EMBEDDING_MODEL` | — | Embedding model name |
+| `EMBEDDING_FALLBACK_BASE_URL` | — | Fallback embedding URL |
+| `EMBEDDING_FALLBACK_API_KEY` | — | Fallback embedding API key |
+| `EMBEDDING_FALLBACK_MODEL` | — | Fallback embedding model |
 | `CORS_ORIGINS` | http://localhost:50701 | Comma-separated allowed origins (required for local dev) |
 | `GRAPH_EXTRACT_ENABLED` | false | Enable LLM entity extraction into AGE |
 | `GRAPH_SEARCH_ENABLED` | false | Enable graph-neighbor expansion in search |
 | `GRAPH_EXPANSION_BOOST` | 0.3 | Multiplier on graph-neighbor scores (0..2) |
+| `GRAPH_EXTRACT_BASE_URL` | — | Chat-completion URL for entity extraction LLM |
+| `GRAPH_EXTRACT_API_KEY` | — | API key for entity extraction LLM |
+| `GRAPH_EXTRACT_MODEL` | — | Entity extraction model (defaults to EMBEDDING_MODEL) |
+| `GRAPH_EXTRACT_MIN_CONFIDENCE` | 0.5 | Minimum entity confidence threshold |
+| `GRAPH_EXTRACT_FALLBACK_BASE_URL` | — | Fallback extraction LLM URL |
+| `GRAPH_EXTRACT_FALLBACK_API_KEY` | — | Fallback extraction LLM API key |
+| `GRAPH_EXTRACT_FALLBACK_MODEL` | — | Fallback extraction model |
 | `FOLDER_REEMBED_BATCH_SIZE` | 100 | Cap on docs re-embedded per folder mutation |
 | `CATEGORY_REEMBED_BATCH_SIZE` | 100 | Cap on docs re-embedded per category mutation |
 | `TAG_REEMBED_BATCH_SIZE` | 500 | Cap on docs re-embedded per tag mutation |
+| `REEMBED_MIN_WORD_CHANGES` | 20 | Min word-change delta to trigger re-embed |
+| `REEMBED_MIN_CHAR_CHANGES` | 100 | Min char-change delta to trigger re-embed |
+| `REEMBED_MAX_IDLE_HOURS` | 24 | Max hours before forced re-embed eligibility |
+| `REEMBED_CRON_INTERVAL_MINUTES` | 15 | Content re-embed cron frequency |
+| `METADATA_REEMBED_CRON_INTERVAL_MINUTES` | 1 | Metadata re-embed cron frequency |
+| `VERSION_RETENTION_COUNT` | 50 | Auto-saved version history size per document |
+| `ADMIN_CROSS_TENANT` | true | Allow cross-tenant admin operations |
+| `ATTACHMENT_MAX_SIZE_MB` | 25 | Max attachment upload size in MB |
+| `ATTACHMENT_PRESIGN_EXPIRY_SECONDS` | 900 | Presigned URL lifetime (seconds) |
 
 See [`.env.example`](.env.example) for the full list with comments and defaults.
 

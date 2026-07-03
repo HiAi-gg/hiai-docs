@@ -4,7 +4,15 @@
 
 ## Pre-Release
 
-- [ ] **Bump version** — Update version in all 8 files: `package.json`, `backend/package.json`, `frontend/package.json`, `packages/db/package.json`, `packages/cli/package.json`, `packages/mcp-server/package.json`, `package.public.json`, `backend/src/index.ts` (swagger version)
+- [ ] **Bump version** — Update version in all 8 files:
+  - `package.json`
+  - `backend/package.json`
+  - `frontend/package.json`
+  - `packages/db/package.json`
+  - `packages/cli/package.json`
+  - `packages/mcp-server/package.json`
+  - `package.public.json`
+  - `backend/src/index.ts` (swagger version)
 - [ ] **Regenerate secrets** — Generate fresh values for `BETTER_AUTH_SECRET`, `CSRF_SECRET`, `WEBHOOK_SECRET`, `HIAI_DOCS_API_KEY`:
       ```bash
       openssl rand -hex 32   # repeat for each secret

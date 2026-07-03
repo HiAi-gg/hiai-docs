@@ -95,6 +95,7 @@ bun run typecheck
 - [ ] Code compiles without errors (`bun run typecheck`)
 - [ ] Linting passes (`bun run lint`)
 - [ ] Tests pass (`bun test`)
+- [ ] SDK builds successfully (`cd packages/sdk && bun run build`)
 - [ ] No hardcoded secrets or paths
 - [ ] Commit messages follow Conventional Commits
 - [ ] Changes are focused — one feature/fix per PR

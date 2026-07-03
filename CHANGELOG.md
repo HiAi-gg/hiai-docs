@@ -7,6 +7,17 @@ All notable changes to hiai-docs are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.9] - 2026-07-03
+
+### Documentation
+- Updated all docs to reflect v0.1.8 architecture (B.1/B.4/B.3 refactors)
+- Fixed DATABASE_URL default port (5433 → 5437) in config-schema.ts
+- Added subpath import examples to README
+- Documented factories and module boundaries in ARCHITECTURE.md
+- Added missing env vars to DEPLOYMENT.md and README
+- Documented /api/admin/metrics endpoint in API.md
+- Fixed PRODUCTION_STATUS.md version (v0.1.6 → v0.1.8)
+
 ## [0.1.8] - 2026-07-03
 
 ### Fixed

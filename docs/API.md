@@ -613,6 +613,31 @@ Response:
 { "available": true, "nodes": 312, "edges": 547 }
 ```
 
+### `GET /api/admin/metrics`
+
+Process-local embedding metrics snapshot. Returns counter values and duration histogram samples from the in-process registry. Auth: API key via `x-api-key` header only (no session cookie). Rate-limited: shares the `searchRateLimiter` bucket.
+
+```bash
+curl -H "x-api-key: $HIAI_DOCS_API_KEY" \
+  http://localhost:50700/api/admin/metrics
+```
+
+Response:
+
+```json
+{
+  "metrics": {
+    "embedAttempts": 142,
+    "embedSuccesses": 140,
+    "embedFailures": 2,
+    "embedDurationMs": { "p50": 120, "p95": 340, "p99": 890 }
+  },
+  "uptime": 86423.4
+}
+```
+
+The endpoint returns 401 when the `x-api-key` header is missing or does not match `HIAI_DOCS_API_KEY`.
+
 ### `POST /api/admin/reindex/folder/:folderId?dryRun=true`
 
 Bulk re-embed every document in a folder. Operator-scoped (cross-user). Bounded by `FOLDER_REEMBED_BATCH_SIZE` (default `100`). Set `?dryRun=true` to preview the count without enqueuing.

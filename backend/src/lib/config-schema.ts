@@ -10,7 +10,7 @@ import { z } from "zod";
 export const envSchema = z.object({
 	DATABASE_URL: z
 		.string()
-		.default("postgresql://hiai_app:changeme@localhost:5433/hiai_docs"),
+		.default("postgresql://hiai_app:changeme@localhost:5437/hiai_docs"),
 	REDIS_URL: z.string().default("redis://localhost:6384"),
 	MINIO_ENDPOINT: z.string().default("localhost"),
 	MINIO_PORT: z.coerce.number().default(9020),
