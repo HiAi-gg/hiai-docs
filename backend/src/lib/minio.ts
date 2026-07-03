@@ -1,40 +1,19 @@
-import { Client } from "minio";
+/**
+ * hiai-docs' own MinIO singletons.
+ *
+ * External consumers should NOT import this module — it pulls in
+ * `./config` and crashes the process if any required env var is missing.
+ * Use the npm export `@hiai-gg/hiai-docs/backend/lib/minio` instead,
+ * which resolves to `./minio-factory.ts` (pure, side-effect-free).
+ */
 import { config } from "./config";
-import { logger } from "./logger";
+import { createMinio } from "./minio-factory";
 
-export interface MinioConfig {
-	endpoint: string;
-	port: number;
-	accessKey: string;
-	secretKey: string;
-	useSSL: boolean;
-	region: string;
-}
-
-export function createMinio(cfg: MinioConfig): Client {
-	return new Client({
-		endPoint: cfg.endpoint,
-		port: cfg.port,
-		useSSL: cfg.useSSL,
-		accessKey: cfg.accessKey,
-		secretKey: cfg.secretKey,
-		region: cfg.region,
-	});
-}
-
-export async function ensureBucket(
-	client: Client,
-	bucket: string,
-): Promise<void> {
-	const exists = await client.bucketExists(bucket);
-	if (!exists) {
-		await client.makeBucket(bucket, "us-east-1");
-		logger.info({ bucket }, "Created MinIO bucket");
-	}
-}
+export type { MinioConfig } from "./minio-factory";
+export { createMinio, ensureBucket } from "./minio-factory";
 
 // Backwards-compatible optional singletons:
-const defaultMinioConfig: MinioConfig = {
+const defaultMinioConfig = {
 	endpoint: config.MINIO_ENDPOINT,
 	port: config.MINIO_PORT,
 	accessKey: config.MINIO_ACCESS_KEY,
@@ -43,7 +22,7 @@ const defaultMinioConfig: MinioConfig = {
 	region: "us-east-1",
 };
 
-const defaultMinioPublicConfig: MinioConfig = {
+const defaultMinioPublicConfig = {
 	endpoint: config.MINIO_PUBLIC_ENDPOINT,
 	port: config.MINIO_PUBLIC_PORT,
 	accessKey: config.MINIO_ACCESS_KEY,
@@ -56,7 +35,7 @@ if (!config.MINIO_ENDPOINT) throw new Error("MINIO_ENDPOINT is required");
 if (!config.MINIO_PUBLIC_ENDPOINT)
 	throw new Error("MINIO_PUBLIC_ENDPOINT is required");
 
-export const minio: Client = createMinio(defaultMinioConfig);
-export const minioPublic: Client = createMinio(defaultMinioPublicConfig);
+export const minio = createMinio(defaultMinioConfig);
+export const minioPublic = createMinio(defaultMinioPublicConfig);
 
 export const BUCKET = config.MINIO_BUCKET;

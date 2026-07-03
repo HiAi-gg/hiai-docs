@@ -8,15 +8,23 @@ export interface TenantContext {
 
 export const ZERO_UUID = "00000000-0000-0000-0000-000000000000";
 
-export function adminTenantContext(): TenantContext {
-	const ownerId = process.env.OWNER_ID;
-	if (!ownerId) {
+/**
+ * Build an admin TenantContext.
+ *
+ * `ownerId` SHOULD be passed explicitly by the caller (typically resolved
+ * from the hiai-docs `config.OWNER_ID` via the `tenant.ts` middleware).
+ * If omitted, falls back to `process.env.OWNER_ID` so this package can
+ * remain dependency-free while still working stand-alone.
+ */
+export function adminTenantContext(ownerId?: string): TenantContext {
+	const resolved = ownerId ?? process.env.OWNER_ID;
+	if (!resolved) {
 		console.warn(
-			"[hiai-docs/db] adminTenantContext: OWNER_ID env not set, using empty string",
+			"[hiai-docs/db] adminTenantContext: ownerId not provided and OWNER_ID env not set, using empty string",
 		);
 	}
 	return {
-		userId: ownerId ?? "",
+		userId: resolved ?? "",
 		role: "admin",
 	};
 }

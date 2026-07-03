@@ -7,6 +7,14 @@ All notable changes to hiai-docs are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.8] - 2026-07-03
+
+### Fixed
+- **Pure DI factories** — `createRedis` and `createMinio` (+`ensureBucket`) extracted into `backend/src/lib/redis-factory.ts` and `minio-factory.ts`. These new modules import only `ioredis`/`minio`/`pino`-logger — **no `./config` import**, so no `envSchema.parse` + `process.exit(1)` runs when an external consumer (e.g. docsmint) imports them. The npm subpath exports `./backend/lib/redis` and `./backend/lib/minio` now resolve to these factory files. The original `redis.ts`/`minio.ts` keep their hiai-env-gated singletons for the internal runtime and re-export the factories for backwards compatibility.
+- **peerDependencies** — `ioredis`, `minio`, `pino`, `zod` added to `package.public.json` (all optional). Previously a docsmint `import { createRedis } from '@hiai-gg/hiai-docs/backend/lib/redis'` failed to resolve `ioredis` because it was undeclared.
+- **bin/files mismatch** — `packages/cli/src` and `packages/mcp-server/src` were removed from `files[]` in v0.1.6 but the `bin` field still pointed at them. Re-added so `npx hiai-docs` / `npx hiai-docs-mcp` work again.
+- **`adminTenantContext`** now accepts an optional `ownerId` parameter; the host middleware passes `config.OWNER_ID` explicitly so `packages/db` no longer needs to read `process.env` directly (the env fallback remains for stand-alone use).
+
 ## [0.1.7] - 2026-07-03
 
 ### Features

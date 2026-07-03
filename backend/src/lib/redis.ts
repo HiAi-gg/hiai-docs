@@ -1,31 +1,17 @@
-import Redis from "ioredis";
+/**
+ * hiai-docs' own Redis singleton.
+ *
+ * External consumers should NOT import this module — it pulls in
+ * `./config` and crashes the process if any required env var is missing.
+ * Use the npm export `@hiai-gg/hiai-docs/backend/lib/redis` instead,
+ * which resolves to `./redis-factory.ts` (pure, side-effect-free).
+ */
+import type Redis from "ioredis";
 import { config } from "./config";
-import { logger } from "./logger";
+import { createRedis } from "./redis-factory";
 
-export interface RedisConfig {
-	url: string;
-	maxRetriesPerRequest: number;
-}
-
-export function createRedis(cfg: RedisConfig): Redis {
-	const instance = new Redis(cfg.url, {
-		maxRetriesPerRequest: cfg.maxRetriesPerRequest,
-		retryStrategy(times) {
-			const delay = Math.min(times * 200, 2000);
-			return delay;
-		},
-	});
-
-	instance.on("error", (err) => {
-		logger.error({ err }, "Redis connection error");
-	});
-
-	instance.on("connect", () => {
-		logger.info("Redis connected");
-	});
-
-	return instance;
-}
+export type { RedisConfig } from "./redis-factory";
+export { createRedis } from "./redis-factory";
 
 // Backwards-compatible singleton (crash at import-time if REDIS_URL is missing — same
 // behaviour as before the DI refactor, when the constructor was always called).

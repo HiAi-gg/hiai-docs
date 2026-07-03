@@ -1,6 +1,6 @@
 {
   "name": "@hiai-gg/hiai-docs",
-  "version": "0.1.7",
+  "version": "0.1.8",
   "type": "module",
   "license": "MIT",
   "description": "The lightweight, AI-native self-hosted knowledge base \u2014 built-in RAG, hybrid semantic search, and a clean REST API for AI agents.",
@@ -55,12 +55,12 @@
       "types": "./packages/db/src/with-tenant.ts"
     },
     "./backend/lib/redis": {
-      "import": "./backend/src/lib/redis.ts",
-      "types": "./backend/src/lib/redis.ts"
+      "import": "./backend/src/lib/redis-factory.ts",
+      "types": "./backend/src/lib/redis-factory.ts"
     },
     "./backend/lib/minio": {
-      "import": "./backend/src/lib/minio.ts",
-      "types": "./backend/src/lib/minio.ts"
+      "import": "./backend/src/lib/minio-factory.ts",
+      "types": "./backend/src/lib/minio-factory.ts"
     },
     "./backend/lib/logger": {
       "import": "./backend/src/lib/logger.ts",
@@ -95,7 +95,11 @@
     "drizzle-orm": "^0.45.2",
     "postgres": "^3.4.9",
     "commander": "^13.1.0",
-    "@modelcontextprotocol/sdk": "^1.12.1"
+    "@modelcontextprotocol/sdk": "^1.12.1",
+    "ioredis": "^5.4.0",
+    "minio": "^8.0.0",
+    "pino": "^10.0.0",
+    "zod": "^4.0.0"
   },
   "peerDependenciesMeta": {
     "drizzle-orm": {
@@ -108,6 +112,18 @@
       "optional": true
     },
     "@modelcontextprotocol/sdk": {
+      "optional": true
+    },
+    "ioredis": {
+      "optional": true
+    },
+    "minio": {
+      "optional": true
+    },
+    "pino": {
+      "optional": true
+    },
+    "zod": {
       "optional": true
     }
   }

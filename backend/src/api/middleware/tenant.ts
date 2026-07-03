@@ -42,8 +42,15 @@ import {
 } from "../../lib/with-tenant";
 
 export type { TenantContext };
-// Re-export from the canonical source in @hiai-docs/db/with-tenant
-export { adminTenantContext, shareGuestTenantContext };
+// Re-export from the canonical source in @hiai-docs/db/with-tenant.
+// Pass `config.OWNER_ID` explicitly so `packages/db` does not need to
+// read `process.env` directly.
+export const adminTenantContextBound = () =>
+	adminTenantContext(config.OWNER_ID);
+export {
+	adminTenantContextBound as adminTenantContext,
+	shareGuestTenantContext,
+};
 
 /**
  * Resolve the caller's `TenantContext` from the request headers.
