@@ -1,4 +1,5 @@
 <script lang="ts">
+import type { Snippet } from "svelte";
 import type { JSONContent } from "@tiptap/core";
 import Collaboration from "@tiptap/extension-collaboration";
 import CollaborationCursor from "@tiptap/extension-collaboration-cursor";
@@ -24,6 +25,7 @@ const {
 	editable = true,
 	collaboration = null,
 	documentId = "",
+	toolbarExtensions = null,
 }: {
 	content?: string;
 	contentJson?: object;
@@ -32,6 +34,20 @@ const {
 	editable?: boolean;
 	collaboration?: CollaborationSession | null;
 	documentId?: string;
+	/**
+	 * Optional snippet forwarded to EditorToolbar's extension zone.
+	 * Receives the live editor instance so custom buttons can call commands.
+	 *
+	 * @example
+	 * ```svelte
+	 * <HiAiEditor {content} {onUpdate}>
+	 *   {#snippet toolbarExtensions({ editor })}
+	 *     <MyAiButton {editor} />
+	 *   {/snippet}
+	 * </HiAiEditor>
+	 * ```
+	 */
+	toolbarExtensions?: Snippet<[{ editor: import("@tiptap/core").Editor | null }]> | null;
 } = $props();
 
 let editorStore: ReturnType<typeof createEditor> | null = null;
@@ -256,7 +272,7 @@ function handleWrapperClick(event: MouseEvent) {
 
 <div class="editor-wrapper" onclick={handleWrapperClick} role="presentation">
   {#if ready && editor}
-    <EditorToolbar {editor} {documentId} />
+    <EditorToolbar {editor} {documentId} {toolbarExtensions} />
     <div class="editor-content">
       <EditorContent {editor} />
     </div>

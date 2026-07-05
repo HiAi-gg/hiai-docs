@@ -1,5 +1,6 @@
 <!-- EditorToolbar.svelte — Formatting toolbar for TipTap editor -->
 <script lang="ts">
+import type { Snippet } from "svelte";
 import type { Editor } from "@tiptap/core";
 // biome-ignore lint/style/useImportType: Bold is used as a value in the Svelte template
 import {
@@ -48,9 +49,25 @@ import LinkDialog from "./LinkDialog.svelte";
 const {
 	editor = null,
 	documentId = "",
+	toolbarExtensions = null,
 }: {
 	editor?: Editor | null;
 	documentId?: string;
+	/**
+	 * Optional snippet rendered in the toolbar between the built-in tools and
+	 * the actions divider. Use this to inject custom buttons/menus (e.g. an AI
+	 * menu) from an external project without modifying this file.
+	 *
+	 * @example
+	 * ```svelte
+	 * <EditorToolbar {editor} {documentId}>
+	 *   {#snippet toolbarExtensions({ editor })}
+	 *     <MyAiButton {editor} />
+	 *   {/snippet}
+	 * </EditorToolbar>
+	 * ```
+	 */
+	toolbarExtensions?: Snippet<[{ editor: Editor | null }]> | null;
 } = $props();
 
 interface ToolbarAction {
@@ -1135,6 +1152,12 @@ $effect(() => {
 						{@render tablePicker()}
 						{@render imageBtn()}
 						
+						{#if toolbarExtensions}
+							<div class="toolbar-divider" aria-hidden="true"></div>
+							<!-- Extension zone: custom buttons from external projects -->
+							{@render toolbarExtensions({ editor })}
+						{/if}
+						
 						<div class="toolbar-divider" aria-hidden="true"></div>
 						
 						{@render actionsSnippet()}
@@ -1153,6 +1176,11 @@ $effect(() => {
 				{@render emojiPicker()}
 				{@render tablePicker()}
 				{@render imageBtn()}
+				{#if toolbarExtensions}
+					<div class="toolbar-divider" aria-hidden="true"></div>
+					<!-- Extension zone: custom buttons from external projects -->
+					{@render toolbarExtensions({ editor })}
+				{/if}
 				<div class="toolbar-divider" aria-hidden="true"></div>
 				{@render actionsSnippet()}
 			{/if}

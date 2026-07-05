@@ -55,6 +55,7 @@ import TagCreateDialog from "$lib/components/TagCreateDialog.svelte";
 import VersionHistory from "$lib/components/VersionHistory.svelte";
 import * as m from "$lib/paraglide/messages.js";
 import { refreshDocs, refreshTags } from "$lib/stores/tag-store.svelte";
+import { docTabRegistry } from "$lib/stores/doc-tab-registry.svelte";
 
 const { data } = $props();
 
@@ -64,6 +65,9 @@ let contentJson = $state<object | undefined>(undefined);
 let mode = $state<"wysiwyg" | "markdown">("wysiwyg");
 let saveStatus = $state<"saved" | "saving" | "unsaved">("saved");
 let showMenu = $state(false);
+// "editor" is always the default/built-in tab; extension tabs are appended
+// by registerDocTab() calls in the consuming project's layout.
+let activeTab = $state("editor");
 let loading = $state(true);
 let error = $state<string | null>(null);
 let showShareDialog = $state(false);
@@ -842,6 +846,30 @@ $effect(() => {
       </div>
     {/if}
 
+    <!-- Extension tab bar — only rendered when external projects register tabs -->
+    {#if docTabRegistry.length > 0}
+      <nav class="doc-tab-bar" aria-label="Document view tabs">
+        <button
+          class="doc-tab"
+          class:active={activeTab === "editor"}
+          onclick={() => (activeTab = "editor")}
+          type="button"
+        >
+          Editor
+        </button>
+        {#each docTabRegistry as tab (tab.id)}
+          <button
+            class="doc-tab"
+            class:active={activeTab === tab.id}
+            onclick={() => (activeTab = tab.id)}
+            type="button"
+          >
+            {tab.label}
+          </button>
+        {/each}
+      </nav>
+    {/if}
+
     <!-- Editor area -->
     <div class="editor-body">
       <main class="editor-main">
@@ -1021,16 +1049,30 @@ $effect(() => {
 
       <!-- Editor -->
       <div class="editor-container">
-        {#if mode === "wysiwyg"}
-          <HiAiEditor
-            {content}
-            {contentJson}
-            onUpdate={debounceContentSave}
-            editable={true}
-            documentId={data.document.id}
-          />
+        {#if activeTab === "editor"}
+          {#if mode === "wysiwyg"}
+            <HiAiEditor
+              {content}
+              {contentJson}
+              onUpdate={debounceContentSave}
+              editable={true}
+              documentId={data.document.id}
+            />
+          {:else}
+            <MarkdownToggle {content} onUpdate={debounceContentSave} />
+          {/if}
         {:else}
-          <MarkdownToggle {content} onUpdate={debounceContentSave} />
+          <!-- Extension tab panels registered by external projects -->
+          {#each docTabRegistry as tab (tab.id)}
+            {#if activeTab === tab.id}
+              {@const TabPanel = tab.component}
+              <TabPanel
+                documentId={data.document.id}
+                {content}
+                {contentJson}
+              />
+            {/if}
+          {/each}
         {/if}
       </div>
         </div>
@@ -1349,6 +1391,43 @@ $effect(() => {
     font-size: 18px;
     line-height: 1;
     padding: 0 4px;
+  }
+
+  /* Extension tab bar — only visible when external projects register custom tabs */
+  .doc-tab-bar {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    padding: 0 24px;
+    border-bottom: 1px solid var(--border);
+    background: var(--card);
+    overflow-x: auto;
+    flex-shrink: 0;
+  }
+
+  .doc-tab {
+    display: inline-flex;
+    align-items: center;
+    padding: 8px 16px;
+    border: none;
+    border-bottom: 2px solid transparent;
+    background: transparent;
+    color: var(--muted-foreground);
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: color 0.15s, border-color 0.15s;
+    margin-bottom: -1px;
+  }
+
+  .doc-tab:hover {
+    color: var(--foreground);
+  }
+
+  .doc-tab.active {
+    color: var(--foreground);
+    border-bottom-color: var(--primary);
   }
 
   /* Editor main area */
