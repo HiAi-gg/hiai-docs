@@ -48,6 +48,12 @@ const searchQuerySchema = z.object({
 	 * env var (default 0.3).
 	 */
 	graphBoost: z.coerce.number().min(0).max(2).optional(),
+	/**
+	 * When `true`, include the top-3 most relevant text chunks per
+	 * document in the result items. Each chunk carries its character
+	 * offsets and a cosine-distance score against the query embedding.
+	 */
+	includeChunks: z.coerce.boolean().optional().default(false),
 });
 
 const suggestQuerySchema = z.object({
@@ -88,6 +94,13 @@ type SearchResult = {
 	created_at: string;
 	updated_at: string;
 	tags?: Array<{ id: string; name: string; color: string | null }>;
+	chunks?: Array<{
+		chunkIndex: number;
+		chunkText: string;
+		charStart: number;
+		charEnd: number;
+		score: number;
+	}>;
 };
 
 /**
@@ -132,6 +145,7 @@ export const searchRoutes = new Elysia({ prefix: "/api/search" })
 				graph,
 				graphHops,
 				graphBoost,
+				includeChunks,
 			} = parsed.data;
 			const q = rawQ ?? "";
 			const offset = (page - 1) * limit;
@@ -198,6 +212,75 @@ export const searchRoutes = new Elysia({ prefix: "/api/search" })
 					logger.warn(
 						{ err },
 						"Graph expansion failed — returning non-graph results",
+					);
+				}
+			}
+
+			// When includeChunks=true, fetch the top-3 most relevant text
+			// chunks per document using the same query embedding used for
+			// semantic search. We re-compute the embedding here (vs. passing
+			// it from semanticSearch) so each stage remains independently
+			// callable and the graph-expansion path is unaffected.
+			if (includeChunks && merged.size > 0) {
+				const docIds = Array.from(merged.keys());
+				try {
+					const queryEmbedding = await getEmbedding(q);
+					if (!queryEmbedding.every((v) => v === 0)) {
+						const embeddingStr = `[${queryEmbedding.join(",")}]`;
+						const chunkRows = await withTenant(ctx, async (tx) => {
+							return tx.execute(sql`
+								SELECT de.document_id, de.chunk_index, de.chunk_text,
+								       de.char_start, de.char_end,
+								       de.embedding <=> ${embeddingStr}::vector AS score
+								FROM document_embeddings de
+								WHERE de.document_id = ANY(${docIds})
+								ORDER BY de.document_id, de.embedding <=> ${embeddingStr}::vector
+							`);
+						});
+
+						// Group rows by document and keep only top-3 per doc
+						const chunksByDoc = new Map<
+							string,
+							Array<{
+								chunkIndex: number;
+								chunkText: string;
+								charStart: number;
+								charEnd: number;
+								score: number;
+							}>
+						>();
+						for (const raw of chunkRows as unknown as Array<{
+							document_id: string;
+							chunk_index: number;
+							chunk_text: string;
+							char_start: number;
+							char_end: number;
+							score: number;
+						}>) {
+							const existing = chunksByDoc.get(raw.document_id) ?? [];
+							if (existing.length < 3) {
+								existing.push({
+									chunkIndex: raw.chunk_index,
+									chunkText: raw.chunk_text,
+									charStart: raw.char_start,
+									charEnd: raw.char_end,
+									score: raw.score,
+								});
+								chunksByDoc.set(raw.document_id, existing);
+							}
+						}
+
+						for (const [docId, chunks] of chunksByDoc) {
+							const result = merged.get(docId);
+							if (result) {
+								result.chunks = chunks;
+							}
+						}
+					}
+				} catch (err) {
+					logger.warn(
+						{ err },
+						"Chunk fetch failed — continuing without chunks",
 					);
 				}
 			}

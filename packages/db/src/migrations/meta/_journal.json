@@ -92,6 +92,48 @@
       "when": 1783000000000,
       "tag": "0012_create_hiai_app_role",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1784000000000,
+      "tag": "0013_rename_minio_key_to_storage_key",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1785000000000,
+      "tag": "0014_add_chunk_offsets",
+      "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "7",
+      "when": 1785000000001,
+      "tag": "0015_create_api_keys",
+      "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1785000000002,
+      "tag": "0016_add_document_visibility",
+      "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1785000000003,
+      "tag": "0017_add_share_roles",
+      "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1785000000004,
+      "tag": "0018_create_audit_log",
+      "breakpoints": true
     }
   ]
 }

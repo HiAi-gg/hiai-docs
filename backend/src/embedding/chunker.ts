@@ -24,6 +24,8 @@ const OVERLAP_CHARS = OVERLAP_TOKENS * CHARS_PER_TOKEN; // 200
 export interface ChunkResult {
 	text: string;
 	hash: string;
+	charStart: number;
+	charEnd: number;
 }
 
 /**
@@ -56,26 +58,41 @@ export function chunkText(text: string): ChunkResult[] {
 	}
 
 	const strings: string[] = [];
+	const startPositions: number[] = [];
 	let currentChunk = "";
+	let currentChunkStartPos = 0;
+	let currentPos = 0;
 
 	for (const paragraph of normalizedParagraphs) {
+		const prefix = currentChunk ? "\n\n" : "";
 		const candidate = currentChunk
-			? `${currentChunk}\n\n${paragraph}`
+			? `${currentChunk}${prefix}${paragraph}`
 			: paragraph;
 
 		if (candidate.length <= TARGET_CHARS) {
+			if (currentChunk.length === 0) {
+				currentChunkStartPos = currentPos;
+			}
 			currentChunk = candidate;
+			currentPos += prefix.length + paragraph.length;
 		} else {
 			// Flush current chunk if non-empty
 			if (currentChunk.length > 0) {
-				strings.push(currentChunk.trim());
+				const trimmed = currentChunk.trim();
+				strings.push(trimmed);
+				startPositions.push(currentChunkStartPos);
 			}
 			// Start new chunk with overlap from end of previous chunk
 			if (OVERLAP_CHARS > 0 && currentChunk.length > 0) {
 				const overlap = currentChunk.slice(-OVERLAP_CHARS);
 				currentChunk = `${overlap}\n\n${paragraph}`;
+				// Overlap chars are recycled; the new content starts at currentPos
+				currentChunkStartPos = currentPos - OVERLAP_CHARS;
+				currentPos += OVERLAP_CHARS + prefix.length + paragraph.length;
 			} else {
 				currentChunk = paragraph;
+				currentChunkStartPos = currentPos;
+				currentPos += paragraph.length;
 			}
 		}
 	}
@@ -83,7 +100,16 @@ export function chunkText(text: string): ChunkResult[] {
 	// Flush remaining chunk
 	if (currentChunk.trim().length > 0) {
 		strings.push(currentChunk.trim());
+		startPositions.push(currentChunkStartPos);
 	}
 
-	return strings.map((text) => ({ text, hash: chunkHash(text) }));
+	return strings.map((text, i) => {
+		const pos = startPositions[i] ?? 0;
+		return {
+			text,
+			hash: chunkHash(text),
+			charStart: pos,
+			charEnd: pos + text.length,
+		};
+	});
 }

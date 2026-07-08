@@ -1,11 +1,8 @@
 import { config } from "../../lib/config";
-import { redis } from "../../lib/redis";
-
-interface RateLimitConfig {
-	windowSec: number;
-	max: number;
-	keyPrefix: string;
-}
+import {
+	createRateLimiter as createRateLimiterFromLib,
+	type RateLimitConfig,
+} from "../../lib/rate-limit-factory";
 
 function _getClientIp(request: Request): string {
 	return (
@@ -21,49 +18,22 @@ function isInternalRequest(request?: Request): boolean {
 	return apiKey === config.HIAI_DOCS_API_KEY;
 }
 
-export function createRateLimiter(config: RateLimitConfig) {
-	return async (
-		ip: string,
-		request?: Request,
-	): Promise<{ allowed: boolean; remaining: number; retryAfter?: number }> => {
-		// Bypass rate limiting for internal API key requests
+export type { RateLimitConfig } from "../../lib/rate-limit-factory";
+// Re-export factory from lib
+export { createRateLimiterFromLib as createRateLimiter };
+
+// Bypass wrapper — adds internal-request skip over the pure lib factory
+function _limiterWithBypass(config: RateLimitConfig) {
+	const base = createRateLimiterFromLib(config);
+	return async (ip: string, request?: Request) => {
 		if (request && isInternalRequest(request)) {
 			return { allowed: true, remaining: 999 };
 		}
-		const key = `hiai-docs:${config.keyPrefix}:${ip}`;
-		try {
-			const count = await redis.incr(key);
-			if (count === 1) {
-				await redis.expire(key, config.windowSec);
-			} else {
-				// Defensive: if a key exists with no TTL (TTL === -1), it
-				// would block forever once we hit `max`. This can happen
-				// if a previous `expire` call silently failed (Redis
-				// restart, network blip, or a key that was set by a
-				// different process). Re-apply the window so the bucket
-				// eventually resets.
-				const ttl = await redis.ttl(key);
-				if (ttl === -1) {
-					await redis.expire(key, config.windowSec);
-				}
-			}
-			const remaining = Math.max(0, config.max - count);
-			if (count > config.max) {
-				const ttl = await redis.ttl(key);
-				return {
-					allowed: false,
-					remaining: 0,
-					retryAfter: ttl > 0 ? ttl : config.windowSec,
-				};
-			}
-			return { allowed: true, remaining };
-		} catch {
-			return { allowed: false, remaining: 0, retryAfter: 60 };
-		}
+		return base(ip);
 	};
 }
 
-export const searchRateLimiter = createRateLimiter({
+export const searchRateLimiter = _limiterWithBypass({
 	windowSec: 60,
 	max: 20,
 	keyPrefix: "search",
@@ -83,22 +53,22 @@ export const searchRateLimiter = createRateLimiter({
 // RecentDocs and Dashboard both ask for limit=6 with no tag) collapse to
 // a single network request, so this 1000/60s budget is more than enough
 // for any realistic session burst.
-export const documentRateLimiter = createRateLimiter({
+export const documentRateLimiter = _limiterWithBypass({
 	windowSec: 60,
 	max: 1000,
 	keyPrefix: "docs",
 });
-export const writeRateLimiter = createRateLimiter({
+export const writeRateLimiter = _limiterWithBypass({
 	windowSec: 60,
 	max: 60,
 	keyPrefix: "write",
 });
-export const shareRateLimiter = createRateLimiter({
+export const shareRateLimiter = _limiterWithBypass({
 	windowSec: 60,
 	max: 5,
 	keyPrefix: "share",
 });
-export const healthRateLimiter = createRateLimiter({
+export const healthRateLimiter = _limiterWithBypass({
 	windowSec: 60,
 	max: 120,
 	keyPrefix: "health",

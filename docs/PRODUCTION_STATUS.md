@@ -1,7 +1,7 @@
 # Production Status Report
 
-> **Status:** ✅ Production Ready — v0.2.2 released
-> **Last verified:** 2026-07-07
+> **Status:** ✅ Production Ready — v0.2.3 released
+> **Last verified:** 2026-07-08
 
 ---
 
@@ -59,4 +59,4 @@ Authentication, CSRF, rate limiting, Zod validation, owner scoping, CORS, HSTS, 
 
 ---
 
-*Status: ✅ Production Ready — v0.2.2 released*
+*Status: ✅ Production Ready — v0.2.3 released*

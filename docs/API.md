@@ -289,18 +289,19 @@ curl "http://localhost:50700/api/search?q=query&folder=UUID&tags=tag1,tag2&dateF
 
 Query parameters:
 
-| Param      | Type     | Description                                                   |
-| ---------- | -------- | ------------------------------------------------------------- |
-| `q`        | string   | Search query                                                  |
-| `folder`   | UUID     | Filter by folder                                              |
-| `tags`     | string   | Comma-separated tag names (ANY match)                         |
-| `dateFrom` | ISO date | Filter docs created after                                     |
-| `dateTo`   | ISO date | Filter docs created before                                    |
-| `sort`     | enum     | `relevance`, `date_desc`, `date_asc`, `name_asc`, `name_desc` |
-| `page`     | int      | Page number (default 1)                                       |
-| `limit`    | int      | Per page (default 20, max 100)                                |
+| Param          | Type     | Description                                                   |
+| -------------- | -------- | ------------------------------------------------------------- |
+| `q`            | string   | Search query                                                  |
+| `folder`       | UUID     | Filter by folder                                              |
+| `tags`         | string   | Comma-separated tag names (ANY match)                         |
+| `dateFrom`     | ISO date | Filter docs created after                                     |
+| `dateTo`       | ISO date | Filter docs created before                                    |
+| `sort`         | enum     | `relevance`, `date_desc`, `date_asc`, `name_asc`, `name_desc` |
+| `page`         | int      | Page number (default 1)                                       |
+| `limit`        | int      | Per page (default 20, max 100)                                |
+| `includeChunks` | boolean  | If true, include top-3 chunk snippets per result (default false) |
 
-Response: `{ items: SearchResult[], total, page, limit }` where each item has `id, title, snippet, score, folderId, createdAt, updatedAt`.
+Response: `{ items: SearchResult[], total, page, limit }` where each item has `id, title, snippet, score, folderId, createdAt, updatedAt`. When `includeChunks=true`, each item also includes a `chunks` array with `charStart`, `charEnd`, and `text` fields.
 
 ### Quick suggest
 
@@ -326,10 +327,22 @@ DELETE /api/share/:id/guests/:email  # Remove guest access
 ```bash
 curl -X POST http://localhost:50700/api/share \
   -H "Content-Type: application/json" \
-  -d '{"documentId": "UUID", "password": "optional", "expiresIn": "7d"}'
+  -d '{"documentId": "UUID", "password": "optional", "expiresIn": "7d", "role": "viewer"}'
 ```
 
 Expires options: `1h`, `1d`, `7d`, `30d`, `never`.
+
+Available roles: `viewer` (default), `commenter`, `editor`.
+
+### Update share link role
+
+```bash
+curl -X PATCH http://localhost:50700/api/share/SHARE_ID \
+  -H "Content-Type: application/json" \
+  -d '{"role": "editor"}'
+```
+
+Changes the role on an existing share link. Only the owner can update the role.
 
 ### Access shared content
 
@@ -345,6 +358,171 @@ curl http://localhost:50700/api/share/TOKEN \
 Returns 410 Gone if expired, 401 if password required/invalid.
 
 ## Tags
+
+```
+GET    /api/tags                        # List tags with counts
+POST   /api/tags                       # Create tag
+PATCH  /api/tags/:id                   # Update tag
+DELETE /api/tags/:id                   # Delete tag
+POST   /api/documents/:docId/tags      # Tag document
+DELETE /api/documents/:docId/tags/:tagId # Untag document
+```
+
+### List tags with counts
+
+```bash
+curl "http://localhost:50700/api/tags"
+```
+
+Returns tags with document counts.
+
+## API Keys
+
+User-scoped API keys for programmatic access via `Authorization: Bearer <key>`.
+
+```
+GET    /api/keys           # List user's API keys
+POST   /api/keys           # Create API key
+DELETE /api/keys/:id       # Revoke API key
+```
+
+### Create API key
+
+```bash
+curl -X POST http://localhost:50700/api/keys \
+  -H "Content-Type: application/json" \
+  -d '{"name": "CI Deploy Key", "scopes": ["documents:read", "documents:write"], "expiresIn": "90d"}'
+```
+
+Body:
+- `name` (required) — Human-readable label
+- `scopes` (optional) — Array of scope strings: `documents:read`, `documents:write`, `search:read`. Defaults to all scopes.
+- `expiresIn` (optional) — Duration string: `30d`, `90d`, `180d`, `1y`, `never`. Defaults to `90d`.
+
+Response includes the full `key` value — store it securely, it is only shown once.
+
+### List API keys
+
+```bash
+curl http://localhost:50700/api/keys
+```
+
+Returns key metadata (name, scopes, expiry, createdAt). The raw key value is never stored — only a SHA-256 prefix for identification.
+
+### Revoke API key
+
+```bash
+curl -X DELETE http://localhost:50700/api/keys/KEY_ID
+```
+
+Irreversibly revokes the key. Active requests using the key receive 401 immediately.
+
+## Document Visibility
+
+Control whether documents are public, private, or shared.
+
+```
+POST /api/documents/:id/publish    # Make document public
+POST /api/documents/:id/unpublish  # Revert to private
+```
+
+### Publish document
+
+```bash
+curl -X POST http://localhost:50700/api/documents/UUID/publish
+```
+
+Makes the document publicly readable by all authenticated users (no share token required). The owner and editors retain full access.
+
+### Unpublish document
+
+```bash
+curl -X POST http://localhost:50700/api/documents/UUID/unpublish
+```
+
+Reverts the document to private. Any active public share tokens are revoked.
+
+## Plugin Registry
+
+```
+GET /api/plugins    # List available editor plugins (read-only)
+```
+
+Returns the list of available svelte-tiptap extensions installed in the frontend. Used by the editor UI to populate the plugin panel.
+
+```bash
+curl http://localhost:50700/api/plugins
+```
+
+Response:
+
+```json
+{
+  "plugins": [
+    {
+      "name": "highlight",
+      "displayName": "Highlight",
+      "description": "Highlight text with background color",
+      "enabled": true
+    }
+  ]
+}
+```
+
+## Audit Log
+
+Admin-only endpoint for querying the append-only audit trail.
+
+```
+GET /api/admin/audit                       # List all audit events (paginated)
+GET /api/admin/audit/:resourceType/:resourceId  # Events for a specific resource
+```
+
+### Query audit log
+
+```bash
+curl -H "x-api-key: $HIAI_DOCS_API_KEY" \
+  "http://localhost:50700/api/admin/audit?page=1&limit=50"
+```
+
+Query parameters:
+
+| Param    | Type      | Description                                      |
+| -------- | --------- | ------------------------------------------------ |
+| `page`   | int       | Page number (default 1)                          |
+| `limit`  | int       | Per page (default 50, max 200)                  |
+| `userId` | UUID      | Filter events by actor                           |
+| `action` | string    | Filter by action type (e.g. `document.create`)  |
+
+Response:
+
+```json
+{
+  "items": [
+    {
+      "id": "...",
+      "action": "document.create",
+      "resourceType": "document",
+      "resourceId": "UUID",
+      "userId": "UUID",
+      "metadata": {},
+      "createdAt": "2026-07-08T10:00:00Z"
+    }
+  ],
+  "total": 142,
+  "page": 1,
+  "limit": 50
+}
+```
+
+### Query resource audit trail
+
+```bash
+curl -H "x-api-key: $HIAI_DOCS_API_KEY" \
+  "http://localhost:50700/api/admin/audit/document/DOC_UUID"
+```
+
+Returns all audit events for a specific document, share link, or API key.
 
 ```
 GET    /api/tags                        # List tags with counts

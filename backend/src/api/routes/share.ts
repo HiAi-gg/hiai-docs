@@ -8,6 +8,7 @@ import { and, eq, sql } from "drizzle-orm";
 import { Elysia } from "elysia";
 import { nanoid } from "nanoid";
 import { z } from "zod";
+import { recordAuditEvent } from "../../lib/audit";
 import { logger } from "../../lib/logger";
 import { redis } from "../../lib/redis";
 import { withTenant } from "../../lib/with-tenant";
@@ -27,6 +28,7 @@ const createShareSchema = z
 		folderId: z.string().uuid().optional(),
 		password: z.string().min(1).optional(),
 		expiresIn: z.enum(["1h", "1d", "7d", "30d", "never"]).default("never"),
+		role: z.enum(["viewer", "commenter", "editor"]).default("viewer"),
 	})
 	.refine((d) => d.documentId || d.folderId, {
 		message: "Either documentId or folderId must be provided",
@@ -34,6 +36,11 @@ const createShareSchema = z
 
 const addGuestSchema = z.object({
 	email: z.string().email("Invalid email address"),
+});
+
+const updateShareSchema = z.object({
+	role: z.enum(["viewer", "commenter", "editor"]).optional(),
+	expiresIn: z.enum(["1h", "1d", "7d", "30d", "never"]).optional(),
 });
 
 // ============================================
@@ -136,7 +143,7 @@ export const shareRoutes = new Elysia({ prefix: "/api/share" })
 			};
 		}
 
-		const { documentId, folderId, password, expiresIn } = parsed.data;
+		const { documentId, folderId, password, expiresIn, role } = parsed.data;
 
 		// Verify ownership of the target document or folder
 		const ownerCheck = await withTenant(ctx, async (tx) => {
@@ -188,6 +195,7 @@ export const shareRoutes = new Elysia({ prefix: "/api/share" })
 					passwordHash,
 					expiresAt,
 					createdBy: userId,
+					role,
 				})
 				.returning();
 			return row ?? null;
@@ -203,11 +211,27 @@ export const shareRoutes = new Elysia({ prefix: "/api/share" })
 			"Share link created",
 		);
 
+		const ipAddress =
+			request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
+			request.headers.get("x-real-ip") ??
+			"";
+		const userAgent = request.headers.get("user-agent") ?? "";
+		recordAuditEvent({
+			actorId: userId,
+			action: "share.create",
+			resourceType: "share",
+			resourceId: link.id,
+			details: { documentId, folderId, role },
+			ipAddress,
+			userAgent,
+		}).catch(() => {});
+
 		return {
 			id: link.id,
 			token: link.token,
 			documentId: link.documentId,
 			folderId: link.folderId,
+			role: link.role,
 			expiresAt: link.expiresAt?.toISOString() ?? null,
 			hasPassword: !!link.passwordHash,
 			createdAt: link.createdAt.toISOString(),
@@ -230,6 +254,7 @@ export const shareRoutes = new Elysia({ prefix: "/api/share" })
 					token: shareLinks.token,
 					documentId: shareLinks.documentId,
 					folderId: shareLinks.folderId,
+					role: shareLinks.role,
 					hasPassword: sql<boolean>`${shareLinks.passwordHash} IS NOT NULL`,
 					expiresAt: shareLinks.expiresAt,
 					createdAt: shareLinks.createdAt,
@@ -249,6 +274,7 @@ export const shareRoutes = new Elysia({ prefix: "/api/share" })
 				token: link.token,
 				documentId: link.documentId,
 				folderId: link.folderId,
+				role: link.role,
 				hasPassword: link.hasPassword,
 				expiresAt: link.expiresAt?.toISOString() ?? null,
 				createdAt: link.createdAt.toISOString(),
@@ -463,7 +489,106 @@ export const shareRoutes = new Elysia({ prefix: "/api/share" })
 
 		logger.info({ shareId: id, userId }, "Share link revoked");
 
+		const ipAddress =
+			request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
+			request.headers.get("x-real-ip") ??
+			"";
+		const userAgent = request.headers.get("user-agent") ?? "";
+		recordAuditEvent({
+			actorId: userId,
+			action: "share.delete",
+			resourceType: "share",
+			resourceId: id,
+			details: {},
+			ipAddress,
+			userAgent,
+		}).catch(() => {});
+
 		return { success: true };
+	})
+
+	// PATCH /api/share/:id — Update share link (role, expiresAt)
+	.patch("/:id", async ({ params, request, set }) => {
+		const ctx = await buildTenantContext(request);
+		if (ctx.role === "none") {
+			set.status = 401;
+			return { error: "Unauthorized" };
+		}
+		const userId = ctx.userId;
+
+		const { id } = params;
+
+		let body: unknown;
+		try {
+			body = await request.json();
+		} catch {
+			set.status = 400;
+			return { error: "Invalid JSON body" };
+		}
+
+		const parsed = updateShareSchema.safeParse(body);
+		if (!parsed.success) {
+			set.status = 400;
+			return {
+				error: "Validation failed",
+				details: parsed.error.flatten().fieldErrors,
+			};
+		}
+
+		// Verify ownership
+		const link = await withTenant(ctx, async (tx) => {
+			const [row] = await tx
+				.select({ id: shareLinks.id, createdBy: shareLinks.createdBy })
+				.from(shareLinks)
+				.where(eq(shareLinks.id, id))
+				.limit(1);
+			return row ?? null;
+		});
+
+		if (!link) {
+			set.status = 404;
+			return { error: "Share link not found" };
+		}
+
+		if (link.createdBy !== userId) {
+			set.status = 403;
+			return {
+				error: "Forbidden: you can only update your own share links",
+			};
+		}
+
+		const { role, expiresIn } = parsed.data;
+		const expiresAt = expiresIn ? calculateExpiresAt(expiresIn) : undefined;
+
+		const updated = await withTenant(ctx, async (tx) => {
+			const [row] = await tx
+				.update(shareLinks)
+				.set({
+					...(role !== undefined && { role }),
+					...(expiresAt !== undefined && { expiresAt }),
+				})
+				.where(eq(shareLinks.id, id))
+				.returning();
+			return row ?? null;
+		});
+
+		if (!updated) {
+			set.status = 500;
+			return { error: "Failed to update share link" };
+		}
+
+		logger.info({ shareId: id, userId, role, expiresIn }, "Share link updated");
+
+		return {
+			id: updated.id,
+			token: updated.token,
+			documentId: updated.documentId,
+			folderId: updated.folderId,
+			role: updated.role,
+			expiresAt: updated.expiresAt?.toISOString() ?? null,
+			hasPassword: !!updated.passwordHash,
+			createdAt: updated.createdAt.toISOString(),
+		};
 	})
 
 	// POST /api/share/:id/guests — Add guest email access (auth required)

@@ -1,6 +1,6 @@
 {
   "name": "@hiai-gg/hiai-docs",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "type": "module",
   "license": "MIT",
   "description": "The lightweight, AI-native self-hosted knowledge base \u2014 built-in RAG, hybrid semantic search, and a clean REST API for AI agents.",
@@ -65,6 +65,18 @@
     "./backend/lib/logger": {
       "import": "./backend/src/lib/logger.ts",
       "types": "./backend/src/lib/logger.ts"
+    },
+    "./backend/lib/rate-limit": {
+      "import": "backend/src/lib/rate-limit-factory.ts",
+      "types": "backend/src/lib/rate-limit-factory.ts"
+    },
+    "./backend/lib/api-keys": {
+      "import": "backend/src/lib/api-keys.ts",
+      "types": "backend/src/lib/api-keys.ts"
+    },
+    "./backend/lib/audit": {
+      "import": "backend/src/lib/audit.ts",
+      "types": "backend/src/lib/audit.ts"
     }
   },
   "bin": {

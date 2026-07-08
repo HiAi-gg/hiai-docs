@@ -10,11 +10,12 @@
  * is never throttled but a misconfigured caller still gets 429s.
  */
 import {
+	auditLog,
 	documentEmbeddings,
 	documents,
 	documentTags,
 } from "@hiai-docs/db/schema";
-import { and, count, eq, ne, sql } from "drizzle-orm";
+import { and, count, desc, eq, ne, sql } from "drizzle-orm";
 import { Elysia } from "elysia";
 import { getEmbedding } from "../../embedding";
 import { config } from "../../lib/config";
@@ -607,4 +608,138 @@ export const adminRoutes = new Elysia({ prefix: "/api/admin" })
 			set.status = 500;
 			return { error: "Failed to reindex tag" };
 		}
-	});
+	})
+	/**
+	 * GET /api/admin/audit
+	 *
+	 * Query the audit log (admin-only, paginated).
+	 * Optional filters: resourceType, resourceId, actorId, action.
+	 */
+	.get("/audit", async ({ query, set, request }) => {
+		const ip = clientIp(request);
+		const rl = await searchRateLimiter(ip, request);
+		if (!rl.allowed) {
+			set.status = 429;
+			set.headers = rateLimitHeaders(0, rl.retryAfter);
+			return { error: "Too many requests" };
+		}
+		set.headers = rateLimitHeaders(rl.remaining);
+
+		if (!verifyAdminKey(request)) {
+			set.status = 401;
+			return { error: "Invalid or missing admin API key" };
+		}
+
+		const page = Math.max(1, Number(query?.page ?? 1));
+		const limit = Math.min(200, Math.max(1, Number(query?.limit ?? 50)));
+		const offset = (page - 1) * limit;
+
+		const resourceType = query?.resourceType;
+		const resourceId = query?.resourceId;
+		const actorId = query?.actorId;
+		const action = query?.action;
+
+		try {
+			const conditions = [];
+			if (resourceType)
+				conditions.push(eq(auditLog.resourceType, resourceType));
+			if (resourceId) conditions.push(eq(auditLog.resourceId, resourceId));
+			if (actorId) conditions.push(eq(auditLog.actorId, actorId));
+			if (action) conditions.push(eq(auditLog.action, action));
+
+			const whereClause =
+				conditions.length > 0 ? and(...conditions) : undefined;
+
+			const [items, [totalRow]] = await Promise.all([
+				withTenant(adminTenantContext(), async (tx) => {
+					return tx
+						.select()
+						.from(auditLog)
+						.where(whereClause)
+						.orderBy(desc(auditLog.createdAt))
+						.limit(limit)
+						.offset(offset);
+				}),
+				withTenant(adminTenantContext(), async (tx) => {
+					return tx
+						.select({ total: count() })
+						.from(auditLog)
+						.where(whereClause);
+				}),
+			]);
+
+			return {
+				items,
+				total: Number(totalRow?.total ?? 0),
+				page,
+				limit,
+			};
+		} catch (err) {
+			logger.error({ err }, "Admin audit query failed");
+			set.status = 500;
+			return { error: "Failed to query audit log" };
+		}
+	})
+	/**
+	 * GET /api/admin/audit/:resourceType/:resourceId
+	 *
+	 * Audit trail for a specific resource, ordered by created_at DESC.
+	 */
+	.get(
+		"/audit/:resourceType/:resourceId",
+		async ({ params, query, set, request }) => {
+			const ip = clientIp(request);
+			const rl = await searchRateLimiter(ip, request);
+			if (!rl.allowed) {
+				set.status = 429;
+				set.headers = rateLimitHeaders(0, rl.retryAfter);
+				return { error: "Too many requests" };
+			}
+			set.headers = rateLimitHeaders(rl.remaining);
+
+			if (!verifyAdminKey(request)) {
+				set.status = 401;
+				return { error: "Invalid or missing admin API key" };
+			}
+
+			const page = Math.max(1, Number(query?.page ?? 1));
+			const limit = Math.min(200, Math.max(1, Number(query?.limit ?? 50)));
+			const offset = (page - 1) * limit;
+
+			try {
+				const whereClause = and(
+					eq(auditLog.resourceType, params.resourceType),
+					eq(auditLog.resourceId, params.resourceId),
+				);
+
+				const [items, [totalRow]] = await Promise.all([
+					withTenant(adminTenantContext(), async (tx) => {
+						return tx
+							.select()
+							.from(auditLog)
+							.where(whereClause)
+							.orderBy(desc(auditLog.createdAt))
+							.limit(limit)
+							.offset(offset);
+					}),
+					withTenant(adminTenantContext(), async (tx) => {
+						return tx
+							.select({ total: count() })
+							.from(auditLog)
+							.where(whereClause);
+					}),
+				]);
+
+				return {
+					items,
+					total: Number(totalRow?.total ?? 0),
+					page,
+					limit,
+				};
+			} catch (err) {
+				logger.error({ err }, "Admin audit resource query failed");
+				set.status = 500;
+				return { error: "Failed to query resource audit trail" };
+			}
+		},
+	);

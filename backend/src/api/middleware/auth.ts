@@ -1,6 +1,7 @@
 import { documents, users } from "@hiai-docs/db/schema";
 import { eq, sql } from "drizzle-orm";
 import { Elysia } from "elysia";
+import { validateApiKey } from "../../lib/api-keys";
 import { auth } from "../../lib/auth";
 import { config } from "../../lib/config";
 import { type TenantContext, withTenant } from "../../lib/with-tenant";
@@ -71,6 +72,42 @@ export const authMiddleware = new Elysia()
 			}
 		}
 
+		// User API key check (after admin key, before Better Auth)
+		// Graceful: if validateApiKey throws (missing table, test env), fall through
+		const userAuthHeader = request.headers.get("authorization");
+		if (userAuthHeader?.startsWith("Bearer ")) {
+			const token = userAuthHeader.slice(7);
+			try {
+				const userKeyResult = await validateApiKey(token);
+				if (userKeyResult) {
+					return {
+						session: {
+							session: {
+								id: "api-key-session",
+								userId: userKeyResult.ownerId,
+								expiresAt: new Date(Date.now() + 60 * 60 * 24 * 365 * 10),
+								token: "api-key",
+								ipAddress: "",
+								userAgent: "",
+								createdAt: new Date(),
+								updatedAt: new Date(),
+							},
+							user: {
+								id: userKeyResult.ownerId,
+								name: "API Key User",
+								email: `${userKeyResult.ownerId}@hiai-docs.local`,
+								emailVerified: true,
+								createdAt: new Date(),
+								updatedAt: new Date(),
+							},
+						},
+					};
+				}
+			} catch {
+				// DB query failed — not a valid key, fall through
+			}
+		}
+
 		// Fall through to Better Auth session check
 		const session = await auth.api.getSession({
 			headers: request.headers,
@@ -131,6 +168,42 @@ export function requireUser() {
 					}
 				}
 			}
+
+			// User API key check (after admin key, before Better Auth)
+			const userAuthHeader = request.headers.get("authorization");
+			if (userAuthHeader?.startsWith("Bearer ")) {
+				const token = userAuthHeader.slice(7);
+				try {
+					const userKeyResult = await validateApiKey(token);
+					if (userKeyResult) {
+						return {
+							session: {
+								session: {
+									id: "api-key-session",
+									userId: userKeyResult.ownerId,
+									expiresAt: new Date(Date.now() + 60 * 60 * 24 * 365 * 10),
+									token: "api-key",
+									ipAddress: "",
+									userAgent: "",
+									createdAt: new Date(),
+									updatedAt: new Date(),
+								},
+								user: {
+									id: userKeyResult.ownerId,
+									name: "API Key User",
+									email: `${userKeyResult.ownerId}@hiai-docs.local`,
+									emailVerified: true,
+									createdAt: new Date(),
+									updatedAt: new Date(),
+								},
+							},
+						};
+					}
+				} catch {
+					// DB query failed — not a valid key, fall through
+				}
+			}
+
 			const session = await auth.api.getSession({ headers: request.headers });
 			return { session };
 		})
@@ -190,6 +263,42 @@ export function requireTier(minLevel: number) {
 					}
 				}
 			}
+
+			// User API key check (after admin key, before Better Auth)
+			const userAuthHeader = request.headers.get("authorization");
+			if (userAuthHeader?.startsWith("Bearer ")) {
+				const token = userAuthHeader.slice(7);
+				try {
+					const userKeyResult = await validateApiKey(token);
+					if (userKeyResult) {
+						return {
+							session: {
+								session: {
+									id: "api-key-session",
+									userId: userKeyResult.ownerId,
+									expiresAt: new Date(Date.now() + 60 * 60 * 24 * 365 * 10),
+									token: "api-key",
+									ipAddress: "",
+									userAgent: "",
+									createdAt: new Date(),
+									updatedAt: new Date(),
+								},
+								user: {
+									id: userKeyResult.ownerId,
+									name: "API Key User",
+									email: `${userKeyResult.ownerId}@hiai-docs.local`,
+									emailVerified: true,
+									createdAt: new Date(),
+									updatedAt: new Date(),
+								},
+							},
+						};
+					}
+				} catch {
+					// DB query failed — not a valid key, fall through
+				}
+			}
+
 			const session = await auth.api.getSession({ headers: request.headers });
 			return { session };
 		})
@@ -275,6 +384,42 @@ export function requireOwner(
 					}
 				}
 			}
+
+			// User API key check (after admin key, before Better Auth)
+			const userAuthHeader = request.headers.get("authorization");
+			if (userAuthHeader?.startsWith("Bearer ")) {
+				const token = userAuthHeader.slice(7);
+				try {
+					const userKeyResult = await validateApiKey(token);
+					if (userKeyResult) {
+						return {
+							session: {
+								session: {
+									id: "api-key-session",
+									userId: userKeyResult.ownerId,
+									expiresAt: new Date(Date.now() + 60 * 60 * 24 * 365 * 10),
+									token: "api-key",
+									ipAddress: "",
+									userAgent: "",
+									createdAt: new Date(),
+									updatedAt: new Date(),
+								},
+								user: {
+									id: userKeyResult.ownerId,
+									name: "API Key User",
+									email: `${userKeyResult.ownerId}@hiai-docs.local`,
+									emailVerified: true,
+									createdAt: new Date(),
+									updatedAt: new Date(),
+								},
+							},
+						};
+					}
+				} catch {
+					// DB query failed — not a valid key, fall through
+				}
+			}
+
 			const session = await auth.api.getSession({ headers: request.headers });
 			return { session };
 		})

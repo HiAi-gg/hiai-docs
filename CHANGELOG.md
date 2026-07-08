@@ -7,6 +7,34 @@ All notable changes to hiai-docs are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.3] - 2026-07-08
+
+### Added
+- **Chunk offsets** (HIAI-1): charStart/charEnd tracking through the embedding pipeline
+- **Search chunks** (HIAI-2): `includeChunks` parameter in search to get top-3 chunk snippets per result
+- **API keys** (HIAI-3): create, list, revoke, and Bearer-auth user API keys with scopes and expiry
+- **Document visibility** (HIAI-4): public/private/shared visibility per document with RLS for public reads
+- **Editor plugins** (HIAI-5): read-only Plugin Registry API exposing available editor plugins
+- **Reusable rate-limit factory** (HIAI-6): extracted `createRateLimiter` to backend lib for external consumers
+- **Share roles** (HIAI-7): viewer/commenter/editor roles on share links with PATCH endpoint
+- **Audit log** (HIAI-8): append-only audit trail with admin query endpoints and fire-and-forget integration
+
+### Changed
+- ChunkResult extended with charStart/charEnd positional tracking
+- Search response extended with optional `chunks` array per document
+- Rate-limit middleware now re-exports from reusable lib factory
+- Share link schemas accept `role` parameter (default viewer)
+- API key auth integrated into auth pipeline (admin key → user API key → Better Auth)
+
+### Security
+- API key Bearer auth for user-scoped API access
+- Document visibility RLS: public documents readable by all authenticated users
+- Audit trail records document/share/API-key lifecycle events
+
+### Migration Notes
+- New migrations: 0014 (chunk offsets), 0015 (api_keys table), 0016 (document visibility enum), 0017 (share roles), 0018 (audit_log table)
+- Run `bun run db:migrate` after upgrade
+
 ## [0.2.2] - 2026-07-07
 
 ### Fixed

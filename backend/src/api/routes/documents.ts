@@ -8,6 +8,7 @@ import {
 import { and, count, desc, eq, inArray, sql } from "drizzle-orm";
 import { Elysia } from "elysia";
 import { z } from "zod";
+import { recordAuditEvent } from "../../lib/audit";
 import { contentHash } from "../../lib/content-hash";
 import {
 	cacheGetOrSet,
@@ -34,6 +35,7 @@ const createDocumentSchema = z.object({
 	content: z.string().optional(),
 	folderId: z.string().uuid().optional(),
 	categoryId: z.string().uuid().nullable().optional(),
+	visibility: z.enum(["private", "shared", "public"]).optional(),
 });
 
 const updateDocumentSchema = z.object({
@@ -43,6 +45,7 @@ const updateDocumentSchema = z.object({
 	metadata: z.unknown().optional(),
 	folderId: z.string().uuid().nullable().optional(),
 	categoryId: z.string().uuid().nullable().optional(),
+	visibility: z.enum(["private", "shared", "public"]).optional(),
 });
 
 const listQuerySchema = z.object({
@@ -235,6 +238,7 @@ export const documentRoutes = new Elysia({ prefix: "/api" })
 									),
 									folderId: documents.folderId,
 									categoryId: documents.categoryId,
+									visibility: documents.visibility,
 									createdAt: documents.createdAt,
 									updatedAt: documents.updatedAt,
 								})
@@ -272,6 +276,7 @@ export const documentRoutes = new Elysia({ prefix: "/api" })
 								),
 								folderId: documents.folderId,
 								categoryId: documents.categoryId,
+								visibility: documents.visibility,
 								createdAt: documents.createdAt,
 								updatedAt: documents.updatedAt,
 							})
@@ -349,6 +354,7 @@ export const documentRoutes = new Elysia({ prefix: "/api" })
 						contentJson: initialDocJson,
 						folderId,
 						categoryId,
+						...(body.data.visibility && { visibility: body.data.visibility }),
 					})
 					.returning();
 				if (!row) {
@@ -366,6 +372,22 @@ export const documentRoutes = new Elysia({ prefix: "/api" })
 			enqueueEmbedding(created.id);
 			invalidateDocListCache(userId);
 			set.status = 201;
+
+			const ipAddress =
+				request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
+				request.headers.get("x-real-ip") ??
+				"";
+			const userAgent = request.headers.get("user-agent") ?? "";
+			recordAuditEvent({
+				actorId: userId,
+				action: "document.create",
+				resourceType: "document",
+				resourceId: created.id,
+				details: { title: created.title },
+				ipAddress,
+				userAgent,
+			}).catch(() => {});
+
 			return created;
 		} catch (err) {
 			logger.error({ err }, "Failed to create document");
@@ -411,6 +433,7 @@ export const documentRoutes = new Elysia({ prefix: "/api" })
 								content: documents.content,
 								contentJson: documents.contentJson,
 								metadata: documents.metadata,
+								visibility: documents.visibility,
 								createdAt: documents.createdAt,
 								updatedAt: documents.updatedAt,
 							})
@@ -544,6 +567,9 @@ export const documentRoutes = new Elysia({ prefix: "/api" })
 						...(body.data.categoryId !== undefined && {
 							categoryId: body.data.categoryId,
 						}),
+						...(body.data.visibility !== undefined && {
+							visibility: body.data.visibility,
+						}),
 						updatedAt: new Date(),
 					})
 					.where(
@@ -603,6 +629,22 @@ export const documentRoutes = new Elysia({ prefix: "/api" })
 			}
 			invalidateDocCache(params.id);
 			invalidateDocListCache(userId);
+
+			const ipAddress =
+				request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
+				request.headers.get("x-real-ip") ??
+				"";
+			const userAgent = request.headers.get("user-agent") ?? "";
+			recordAuditEvent({
+				actorId: userId,
+				action: "document.update",
+				resourceType: "document",
+				resourceId: params.id,
+				details: { title: updated?.title },
+				ipAddress,
+				userAgent,
+			}).catch(() => {});
+
 			return updated;
 		} catch (err) {
 			logger.error({ err }, "Failed to update document");
@@ -732,6 +774,22 @@ export const documentRoutes = new Elysia({ prefix: "/api" })
 			}
 			invalidateDocCache(params.id);
 			invalidateDocListCache(userId);
+
+			const ipAddress =
+				request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
+				request.headers.get("x-real-ip") ??
+				"";
+			const userAgent = request.headers.get("user-agent") ?? "";
+			recordAuditEvent({
+				actorId: userId,
+				action: "document.delete",
+				resourceType: "document",
+				resourceId: params.id,
+				details: {},
+				ipAddress,
+				userAgent,
+			}).catch(() => {});
+
 			return { success: true };
 		} catch (err) {
 			logger.error({ err }, "Failed to delete document");

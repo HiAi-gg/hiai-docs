@@ -139,6 +139,8 @@ export function buildMetadataPreamble(metadata?: EmbeddingMetadata): string {
 export interface EmbeddingChunk {
 	chunkText: string;
 	embedding: number[];
+	charStart: number;
+	charEnd: number;
 }
 
 /**
@@ -161,7 +163,12 @@ export async function embedDocument(
 
 	if (chunks.length === 0) {
 		return [
-			{ chunkText: "", embedding: new Array(EMBEDDING_DIMENSIONS).fill(0) },
+			{
+				chunkText: "",
+				embedding: new Array(EMBEDDING_DIMENSIONS).fill(0),
+				charStart: 0,
+				charEnd: 0,
+			},
 		];
 	}
 
@@ -184,6 +191,8 @@ export async function embedDocument(
 			results.push({
 				chunkText: chunk.text,
 				embedding,
+				charStart: chunk.charStart,
+				charEnd: chunk.charEnd,
 			});
 		}
 	}

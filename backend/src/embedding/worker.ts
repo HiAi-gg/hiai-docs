@@ -186,6 +186,8 @@ async function processDocument(documentId: string): Promise<void> {
 				chunkText: string;
 				chunkHash: string;
 				embedding: number[];
+				charStart: number;
+				charEnd: number;
 				embeddingModel: string;
 			}> = [];
 			for (const idx of affectedIndices) {
@@ -197,6 +199,8 @@ async function processDocument(documentId: string): Promise<void> {
 					chunkText: chunk.chunkText,
 					chunkHash: chunkHash(chunk.chunkText),
 					embedding: chunk.embedding,
+					charStart: chunk.charStart,
+					charEnd: chunk.charEnd,
 					// Record which embedding model produced this vector. Empty string
 					// means EMBEDDING_MODEL was not configured when this row was
 					// written (semantic search was disabled) - those rows are also

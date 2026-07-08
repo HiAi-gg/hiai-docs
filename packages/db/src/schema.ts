@@ -1,4 +1,4 @@
-import { pgTable, uuid, text, timestamp, bigint, jsonb, index, uniqueIndex, customType, boolean, integer, type AnyPgColumn } from "drizzle-orm/pg-core";
+import { pgTable, uuid, text, timestamp, bigint, jsonb, index, uniqueIndex, customType, boolean, integer, pgEnum, type AnyPgColumn } from "drizzle-orm/pg-core";
 
 // pgvector vector type — maps to PostgreSQL vector(n) column
 const vector = customType<{ data: number[] }>({
@@ -22,6 +22,12 @@ const tsvector = customType<{ data: string }>({
 });
 
 import { relations, sql } from "drizzle-orm";
+
+// ============================================
+// Enums
+// ============================================
+export const documentVisibilityEnum = pgEnum("document_visibility", ["private", "shared", "public"]);
+export const shareRoleEnum = pgEnum("share_role", ["viewer", "commenter", "editor"]);
 
 // ============================================
 // users — managed by Better Auth
@@ -151,6 +157,7 @@ export const documents = pgTable(
     content: text("content").default(""),
     contentJson: jsonb("content_json"),
     metadata: jsonb("metadata"),
+    visibility: documentVisibilityEnum("visibility").notNull().default("private"),
     contentHash: text("content_hash"),  // SHA-256 of title+content for smart re-embed
     // Smart-reembed fields (added by migration 0009_lying_hardball.sql).
     // These four columns are required by `backend/src/lib/reembed.ts` and
@@ -287,6 +294,7 @@ export const shareLinks = pgTable(
     }),
     token: text("token").notNull().unique(),
     passwordHash: text("password_hash"),
+    role: shareRoleEnum("role").notNull().default("viewer"),
     expiresAt: timestamp("expires_at"),
     createdBy: uuid("created_by")
       .notNull()
@@ -406,6 +414,8 @@ export const documentEmbeddings = pgTable(
     chunkIndex: bigint("chunk_index", { mode: "number" }).notNull(),
     chunkText: text("chunk_text").notNull(),
     chunkHash: text("chunk_hash"),
+    charStart: integer("char_start").notNull().default(0),
+    charEnd: integer("char_end").notNull().default(0),
     embedding: vector("embedding"),
     // Identifier of the embedding model that produced the vector above.
     // Empty string ("") means "unknown / legacy row" (pre-v1 rows that
@@ -442,6 +452,57 @@ export const documentEmbeddingRelations = relations(documentEmbeddings, ({ one }
     references: [documents.id],
   }),
 }));
+
+// ============================================
+// api_keys — user API keys
+// ============================================
+export const apiKeys = pgTable(
+  "api_keys",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    ownerId: uuid("owner_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    keyHash: text("key_hash").notNull().unique(),
+    prefix: text("prefix").notNull(),
+    scopes: jsonb("scopes").notNull().default("[]"),
+    lastUsedAt: timestamp("last_used_at"),
+    expiresAt: timestamp("expires_at"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("idx_api_keys_owner").on(table.ownerId),
+    index("idx_api_keys_prefix").on(table.prefix),
+  ]
+);
+
+export const apiKeyRelations = relations(apiKeys, ({ one }) => ({
+  owner: one(users, { fields: [apiKeys.ownerId], references: [users.id] }),
+}));
+
+// ============================================
+// audit_log — append-only audit trail
+// ============================================
+export const auditLog = pgTable(
+  "audit_log",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    actorId: uuid("actor_id").notNull(),
+    action: text("action").notNull(),
+    resourceType: text("resource_type").notNull(),
+    resourceId: uuid("resource_id"),
+    details: jsonb("details").notNull().default("{}"),
+    ipAddress: text("ip_address"),
+    userAgent: text("user_agent"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("idx_audit_log_actor").on(table.actorId),
+    index("idx_audit_log_resource").on(table.resourceType, table.resourceId),
+    index("idx_audit_log_created").on(table.createdAt),
+  ]
+);
 
 export const versionRelations = relations(versions, ({ one }) => ({
   document: one(documents, {

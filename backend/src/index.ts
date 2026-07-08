@@ -16,11 +16,14 @@ import { collaborationRoutes } from "./api/routes/collaboration";
 import { documentRoutes } from "./api/routes/documents";
 import { folderRoutes } from "./api/routes/folders";
 import { graphRoutes } from "./api/routes/graph";
+import { keysRoutes } from "./api/routes/keys";
 import { metricsRoutes } from "./api/routes/metrics";
+import { pluginsRoutes } from "./api/routes/plugins";
 import { searchRoutes } from "./api/routes/search";
 import { shareRoutes } from "./api/routes/share";
 import { tagRoutes } from "./api/routes/tags";
 import { versionRoutes } from "./api/routes/versions";
+import { visibilityRoutes } from "./api/routes/visibility";
 import { webhookRoutes } from "./api/routes/webhooks";
 import { config } from "./lib/config";
 import { startEmbeddingWorker } from "./lib/embedding-queue";
@@ -81,7 +84,7 @@ const swaggerConfig = {
 	documentation: {
 		info: {
 			title: "hiai-docs API",
-			version: "0.2.2",
+			version: "0.2.3",
 			description:
 				"Self-hosted AI-first documentation platform. Full-text + semantic search, version history, sharing, and folder organization.",
 			contact: { name: "hiai-gg", url: "https://github.com/hiai-gg/hiai-docs" },
@@ -180,6 +183,9 @@ const app = new Elysia()
 	.use(webhookRoutes)
 	.use(collaborationRoutes)
 	.use(graphRoutes)
+	.use(keysRoutes)
+	.use(pluginsRoutes)
+	.use(visibilityRoutes)
 	.use(adminRoutes)
 	.use(metricsRoutes);
 
