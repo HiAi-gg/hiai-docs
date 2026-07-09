@@ -11,6 +11,10 @@ export interface Category {
 	id: string;
 	name: string;
 	order: number;
+	apiMode?: "unavailable" | "global" | "general" | "category" | null;
+	apiPermissionRead?: boolean | null;
+	apiPermissionEdit?: boolean | null;
+	apiPermissionWrite?: boolean | null;
 	createdAt: string;
 	updatedAt: string;
 	/** Count of documents the user owns that have this category. */
@@ -25,6 +29,10 @@ export const createCategoryInputSchema = z.object({
 		.trim()
 		.min(1, "Name is required")
 		.max(255, "Name must be 255 characters or less"),
+	apiMode: z.enum(["unavailable", "global", "general", "category"]).optional(),
+	apiPermissionRead: z.boolean().optional(),
+	apiPermissionEdit: z.boolean().optional(),
+	apiPermissionWrite: z.boolean().optional(),
 });
 
 export const updateCategoryInputSchema = z.object({
@@ -33,6 +41,10 @@ export const updateCategoryInputSchema = z.object({
 		.trim()
 		.min(1, "Name is required")
 		.max(255, "Name must be 255 characters or less"),
+	apiMode: z.enum(["unavailable", "global", "general", "category"]).optional(),
+	apiPermissionRead: z.boolean().optional(),
+	apiPermissionEdit: z.boolean().optional(),
+	apiPermissionWrite: z.boolean().optional(),
 });
 
 export type CreateCategoryInput = z.infer<typeof createCategoryInputSchema>;
@@ -47,8 +59,12 @@ export function listCategories(fetcher?: typeof fetch): Promise<Category[]> {
  * Create a new category. The backend enforces name uniqueness per owner
  * and returns 409 if a category with the same name already exists.
  */
-export function createCategory(name: string): Promise<Category> {
-	const input = createCategoryInputSchema.parse({ name });
+export function createCategory(
+	inputOrName: string | CreateCategoryInput,
+): Promise<Category> {
+	const input = createCategoryInputSchema.parse(
+		typeof inputOrName === "string" ? { name: inputOrName } : inputOrName,
+	);
 	return apiFetch<Category>("/api/categories", {
 		method: "POST",
 		body: JSON.stringify(input),
@@ -58,11 +74,12 @@ export function createCategory(name: string): Promise<Category> {
 /** Rename a category or update its order. */
 export function updateCategory(
 	id: string,
-	data: { name?: string; order?: number },
+	data: { name?: string; order?: number } & Partial<CreateCategoryInput>,
 ): Promise<Category> {
+	const input = updateCategoryInputSchema.partial().parse(data);
 	return apiFetch<Category>(`/api/categories/${encodeURIComponent(id)}`, {
 		method: "PATCH",
-		body: JSON.stringify(data),
+		body: JSON.stringify(input),
 	});
 }
 

@@ -9,7 +9,9 @@ import {
 	TextRun,
 } from "docx";
 import {
+	DocxSerializerAsync,
 	DocxSerializer,
+	defaultAsyncNodes,
 	defaultMarks,
 	defaultNodes,
 	MAX_IMAGE_WIDTH,
@@ -113,6 +115,75 @@ export const customNodes = {
 	tableHeader: () => {},
 };
 
+export const customAsyncNodes = {
+	...defaultAsyncNodes,
+	horizontalRule: defaultAsyncNodes.horizontal_rule,
+	hardBreak: defaultAsyncNodes.hard_break,
+	codeBlock: defaultAsyncNodes.code_block,
+	orderedList: defaultAsyncNodes.ordered_list,
+	bulletList: defaultAsyncNodes.bullet_list,
+	listItem: defaultAsyncNodes.list_item,
+
+	async paragraph(state, node) {
+		await state.renderInline(node);
+		const alignment = getAlignment(node);
+		state.closeBlock(node, alignment ? { alignment } : {});
+	},
+	async heading(state, node) {
+		await state.renderInline(node);
+		const heading = getHeadingLevel(node);
+		const alignment = getAlignment(node);
+		state.closeBlock(node, alignment ? { heading, alignment } : { heading });
+	},
+	async taskItem(state, node) {
+		const isChecked = node?.attrs?.checked ?? false;
+		const checkboxChar = isChecked ? "☑ " : "☐ ";
+		state.addParagraphOptions({});
+		state.current.push(new TextRun({ text: checkboxChar }));
+		await state.renderContent(node);
+	},
+	async table(state, node) {
+		const actualChildren = state.children;
+		const rows = [];
+		for (let rowIndex = 0; rowIndex < node.content.childCount; rowIndex += 1) {
+			const row = node.content.child(rowIndex);
+			const cells = [];
+			let isHeaderRow = true;
+			row.content.forEach((cell) => {
+				if (
+					cell.type.name !== "tableHeader" &&
+					cell.type.name !== "table_header"
+				) {
+					isHeaderRow = false;
+				}
+			});
+			state.maxImageWidth = MAX_IMAGE_WIDTH / (row.content.childCount || 1);
+			for (let cellIndex = 0; cellIndex < row.content.childCount; cellIndex += 1) {
+				const cell = row.content.child(cellIndex);
+				const oldChildren = state.children;
+				state.children = [];
+				await state.renderContent(cell);
+				const tableCellOpts = { children: state.children };
+				const colspan = cell.attrs.colspan ?? 1;
+				const rowspan = cell.attrs.rowspan ?? 1;
+				if (colspan > 1) tableCellOpts.columnSpan = colspan;
+				if (rowspan > 1) tableCellOpts.rowSpan = rowspan;
+				cells.push(new TableCell(tableCellOpts));
+				state.children = oldChildren;
+			}
+			rows.push(new TableRow({ children: cells, tableHeader: isHeaderRow }));
+		}
+		state.maxImageWidth = MAX_IMAGE_WIDTH;
+		const table = new Table({ rows });
+		actualChildren.push(table);
+		actualChildren.push(new Paragraph(""));
+		state.children = actualChildren;
+	},
+	tableRow: async () => {},
+	tableCell: async () => {},
+	tableHeader: async () => {},
+};
+
 export const customMarks = {
 	...defaultMarks,
 	strike: defaultMarks.strikethrough,
@@ -122,3 +193,4 @@ export const customMarks = {
 };
 
 export const customSerializer = new DocxSerializer(customNodes, customMarks);
+export const customSerializerAsync = new DocxSerializerAsync(customAsyncNodes, customMarks);

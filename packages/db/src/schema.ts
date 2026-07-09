@@ -239,11 +239,16 @@ export const categories = pgTable(
       .references(() => users.id, { onDelete: "cascade" }),
     name: text("name").notNull(),
     order: integer("order").notNull().default(0),
+    apiMode: text("api_mode").notNull().default("unavailable"),
+    apiPermissionRead: boolean("api_permission_read").notNull().default(false),
+    apiPermissionEdit: boolean("api_permission_edit").notNull().default(false),
+    apiPermissionWrite: boolean("api_permission_write").notNull().default(false),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
   },
   (table) => [
     index("categories_owner_id_idx").on(table.ownerId),
+    index("categories_api_mode_idx").on(table.apiMode),
   ]
 );
 

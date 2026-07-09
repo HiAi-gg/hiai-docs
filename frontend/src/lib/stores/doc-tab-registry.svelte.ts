@@ -19,7 +19,10 @@
  * Breaking changes to these will be announced as major version bumps.
  */
 
-import type { Component } from "svelte";
+import type { Component, ComponentType, SvelteComponent } from "svelte";
+import type { IconProps } from "lucide-svelte";
+
+export type DocTabIcon = ComponentType<SvelteComponent<IconProps>>;
 
 /**
  * Props passed to every registered tab panel component.
@@ -58,7 +61,7 @@ export interface DocTabDefinition {
 	/**
 	 * Optional icon component (e.g. from Lucide-Svelte) rendered next to the tab label.
 	 */
-	icon?: any;
+	icon?: DocTabIcon;
 	/**
 	 * Optional flag to disable the tab button (renders greyed out and unclickable).
 	 */

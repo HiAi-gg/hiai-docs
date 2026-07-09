@@ -3,8 +3,8 @@
      category CRUD without leaving the docs panel.
 
      Modes:
-       - "create": empty name input, calls `onSave(name)`.
-       - "edit":   pre-filled name input, calls `onSave(name)`.
+       - "create": empty name input, calls `onSave({ ... })`.
+       - "edit":   pre-filled name input, calls `onSave({ ... })`.
        - "delete": confirmation copy + destructive confirm button,
                    calls `onDelete()`.
 
@@ -28,6 +28,22 @@ import { Loader2 } from "lucide-svelte";
 import * as m from "$lib/paraglide/messages.js";
 
 type Mode = "create" | "edit" | "delete";
+type ApiMode = "unavailable" | "general" | "category";
+
+type CategoryAccessState = {
+	apiMode?: string | null;
+	apiPermissionRead?: boolean | null;
+	apiPermissionEdit?: boolean | null;
+	apiPermissionWrite?: boolean | null;
+};
+
+type SavePayload = {
+	name: string;
+	apiMode: "unavailable" | "global" | "category";
+	apiPermissionRead: boolean;
+	apiPermissionEdit: boolean;
+	apiPermissionWrite: boolean;
+};
 
 let {
 	open = $bindable(false),
@@ -39,8 +55,8 @@ let {
 }: {
 	open: boolean;
 	mode: Mode;
-	category?: { id: string; name: string };
-	onSave?: (name: string) => Promise<void> | void;
+	category?: { id: string; name: string } & CategoryAccessState;
+	onSave?: (payload: SavePayload) => Promise<void> | void;
 	onDelete?: () => Promise<void> | void;
 	onClose?: () => void;
 } = $props();
@@ -51,17 +67,38 @@ let {
 let name = $state("");
 let error = $state<string | null>(null);
 let busy = $state(false);
+let apiMode = $state<ApiMode>("unavailable");
+let apiPermissionRead = $state(false);
+let apiPermissionEdit = $state(false);
+let apiPermissionWrite = $state(false);
 
 $effect(() => {
 	// Only reset the input when the dialog actually opens — we don't
 	// want to clobber the user's in-progress text while typing.
 	if (!open) return;
 	name = category?.name ?? "";
+	apiMode =
+		category?.apiMode === "category"
+			? "category"
+			: category?.apiMode === "global" || category?.apiMode === "general"
+				? "general"
+				: "unavailable";
+	apiPermissionRead = Boolean(category?.apiPermissionRead);
+	apiPermissionEdit = Boolean(category?.apiPermissionEdit);
+	apiPermissionWrite = Boolean(category?.apiPermissionWrite);
+	if (apiMode === "unavailable") {
+		apiPermissionRead = false;
+		apiPermissionEdit = false;
+		apiPermissionWrite = false;
+	}
 	error = null;
 });
 
 const trimmedName = $derived(name.trim());
 const isDeleteMode = $derived(mode === "delete");
+const hasAnyPermission = $derived(
+	apiPermissionRead || apiPermissionEdit || apiPermissionWrite,
+);
 const title = $derived(
 	isDeleteMode
 		? m.categories_delete_title()
@@ -76,6 +113,38 @@ const submitLabel = $derived(
 			? m.action_save()
 			: m.action_create(),
 );
+
+function normalizeApiMode(value: ApiMode): "unavailable" | "global" | "category" {
+	if (value === "category") return "category";
+	if (value === "general") return "global";
+	return "unavailable";
+}
+
+function applyPermissionPreset(
+	preset: "read" | "write" | "read-write" | "read-edit-write",
+) {
+	if (preset === "read") {
+		apiPermissionRead = true;
+		apiPermissionEdit = false;
+		apiPermissionWrite = false;
+		return;
+	}
+	if (preset === "write") {
+		apiPermissionRead = false;
+		apiPermissionEdit = false;
+		apiPermissionWrite = true;
+		return;
+	}
+	if (preset === "read-write") {
+		apiPermissionRead = true;
+		apiPermissionEdit = false;
+		apiPermissionWrite = true;
+		return;
+	}
+	apiPermissionRead = true;
+	apiPermissionEdit = true;
+	apiPermissionWrite = true;
+}
 
 async function handleSubmit(e?: Event) {
 	e?.preventDefault();
@@ -102,13 +171,23 @@ async function handleSubmit(e?: Event) {
 		error = "Name is required";
 		return;
 	}
+	if (apiMode !== "unavailable" && !hasAnyPermission) {
+		error = "Select at least one permission";
+		return;
+	}
 	if (!onSave) {
 		close();
 		return;
 	}
 	busy = true;
 	try {
-		await onSave(trimmedName);
+		await onSave({
+			name: trimmedName,
+			apiMode: normalizeApiMode(apiMode),
+			apiPermissionRead: apiMode === "unavailable" ? false : apiPermissionRead,
+			apiPermissionEdit: apiMode === "unavailable" ? false : apiPermissionEdit,
+			apiPermissionWrite: apiMode === "unavailable" ? false : apiPermissionWrite,
+		});
 		close();
 	} catch (err) {
 		console.error("CategoryDialog: save failed", err);
@@ -165,6 +244,51 @@ function close() {
 					<p id="category-dialog-name-error" class="text-xs text-destructive" role="alert">{error}</p>
 				{/if}
 			</div>
+
+			<div class="space-y-2">
+				<Label for="category-dialog-api-mode">API access</Label>
+				<select
+					id="category-dialog-api-mode"
+					name="apiMode"
+					bind:value={apiMode}
+					disabled={busy}
+					class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+				>
+					<option value="unavailable">Unavailable</option>
+					<option value="general">General</option>
+					<option value="category">Category API</option>
+				</select>
+			</div>
+
+			{#if apiMode !== "unavailable"}
+				<div class="space-y-3 rounded-md border border-border/70 bg-muted/30 p-3">
+					<div class="flex flex-wrap items-center justify-between gap-2">
+						<Label class="text-sm">Permissions</Label>
+						<div class="flex flex-wrap gap-2">
+							<Button type="button" variant="outline" size="sm" onclick={() => applyPermissionPreset("read-write")}>
+								Read / Write
+							</Button>
+							<Button type="button" variant="outline" size="sm" onclick={() => applyPermissionPreset("read-edit-write")}>
+								Read / Edit / Write
+							</Button>
+						</div>
+					</div>
+					<div class="grid gap-2 sm:grid-cols-3">
+						<label class="flex items-center gap-2 rounded-md border border-border/60 bg-background px-3 py-2 text-sm">
+							<input bind:checked={apiPermissionRead} disabled={busy} type="checkbox" class="size-4 rounded border-input" />
+							<span>Read</span>
+						</label>
+						<label class="flex items-center gap-2 rounded-md border border-border/60 bg-background px-3 py-2 text-sm">
+							<input bind:checked={apiPermissionEdit} disabled={busy} type="checkbox" class="size-4 rounded border-input" />
+							<span>Edit</span>
+						</label>
+						<label class="flex items-center gap-2 rounded-md border border-border/60 bg-background px-3 py-2 text-sm">
+							<input bind:checked={apiPermissionWrite} disabled={busy} type="checkbox" class="size-4 rounded border-input" />
+							<span>Write</span>
+						</label>
+					</div>
+				</div>
+			{/if}
 		</form>
 	{:else if error}
 		<p class="text-xs text-destructive" role="alert">{error}</p>

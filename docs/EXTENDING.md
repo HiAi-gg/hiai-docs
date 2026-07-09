@@ -58,7 +58,7 @@ In your external project's document page or editor wrapper:
 
 ## 3. Document Tab Extension
 
-You can add completely new view tabs (such as an HTML preview, PDF export tab, or version audit view) next to the standard **Editor** tab on the document page. 
+You can add completely new view tabs (such as an HTML preview, PDF export tab, or version audit view) next to the standard **Editor** tab on the document page.
 
 To register a tab, import `registerDocTab` from the public barrel package/path and call it (typically in your main layout or router initialization).
 
@@ -102,8 +102,8 @@ Call `registerDocTab()` to append your tab to the registry:
     id: "html-preview",
     label: "HTML View",
     component: HtmlPreviewPanel,
-    order: 10,               // Determines tab placement (lower = left)
-    icon: CodeIcon,          // Optional Svelte component for Lucide icon
+    order: 10,               // Lower values render first; omitted order behaves like 0
+    icon: CodeIcon,          // Optional Svelte icon component (Lucide or custom)
     disabled: false,         // Optional flag to disable the tab
   });
 </script>
@@ -118,6 +118,9 @@ Call `registerDocTab()` to append your tab to the registry:
 ### `DocTabDefinition` Interface
 
 ```ts
+import type { Component, ComponentType, SvelteComponent } from "svelte";
+import type { IconProps } from "lucide-svelte";
+
 export interface DocTabDefinition {
   /** Unique stable ID. Used in URL routing or state and must not change. */
   id: string;
@@ -128,11 +131,11 @@ export interface DocTabDefinition {
   /** Svelte component rendered when active. Receives DocTabPanelProps. */
   component: Component<DocTabPanelProps>;
   
-  /** Optional sorting order. Defaults to undefined (order is insertion order). */
+  /** Optional sorting order. Smaller values render first. Default is 0 when omitted. */
   order?: number;
   
-  /** Optional Svelte component for Lucide or custom icon. */
-  icon?: Component<any>;
+  /** Optional Svelte icon component. */
+  icon?: ComponentType<SvelteComponent<IconProps>>;
   
   /** Optional flag to render the tab button in a greyed-out, disabled state. */
   disabled?: boolean;

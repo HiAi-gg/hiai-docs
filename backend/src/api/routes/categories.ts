@@ -18,11 +18,19 @@ import { buildTenantContext } from "../middleware/tenant";
  */
 export const createCategorySchema = z.object({
 	name: z.string().trim().min(1).max(255),
+	apiMode: z.enum(["unavailable", "global", "general", "category"]).optional(),
+	apiPermissionRead: z.boolean().optional(),
+	apiPermissionEdit: z.boolean().optional(),
+	apiPermissionWrite: z.boolean().optional(),
 });
 
 export const updateCategorySchema = z.object({
 	name: z.string().trim().min(1).max(255).optional(),
 	order: z.number().int().nonnegative().optional(),
+	apiMode: z.enum(["unavailable", "global", "general", "category"]).optional(),
+	apiPermissionRead: z.boolean().optional(),
+	apiPermissionEdit: z.boolean().optional(),
+	apiPermissionWrite: z.boolean().optional(),
 });
 
 export const listQuerySchema = z.object({
@@ -39,6 +47,66 @@ export const categorySchemas = {
 	update: updateCategorySchema,
 	list: listQuerySchema,
 };
+
+function normalizeApiMode(apiMode?: string | null): "unavailable" | "global" | "category" {
+	if (apiMode === "category") return "category";
+	if (apiMode === "global" || apiMode === "general") return "global";
+	return "unavailable";
+}
+
+function buildApiAccessValues(input: {
+	apiMode?: string | null;
+	apiPermissionRead?: boolean;
+	apiPermissionEdit?: boolean;
+	apiPermissionWrite?: boolean;
+	existing?: {
+		apiMode: string;
+		apiPermissionRead: boolean;
+		apiPermissionEdit: boolean;
+		apiPermissionWrite: boolean;
+	};
+}) {
+	const existing = input.existing ?? {
+		apiMode: "unavailable",
+		apiPermissionRead: false,
+		apiPermissionEdit: false,
+		apiPermissionWrite: false,
+	};
+
+	const apiMode =
+		input.apiMode !== undefined
+			? normalizeApiMode(input.apiMode)
+			: normalizeApiMode(existing.apiMode);
+
+	const apiPermissionRead =
+		input.apiPermissionRead !== undefined
+			? input.apiPermissionRead
+			: existing.apiPermissionRead;
+	const apiPermissionEdit =
+		input.apiPermissionEdit !== undefined
+			? input.apiPermissionEdit
+			: existing.apiPermissionEdit;
+	const apiPermissionWrite =
+		input.apiPermissionWrite !== undefined
+			? input.apiPermissionWrite
+			: existing.apiPermissionWrite;
+
+	if (apiMode === "unavailable") {
+		return {
+			apiMode,
+			apiPermissionRead: false,
+			apiPermissionEdit: false,
+			apiPermissionWrite: false,
+		};
+	}
+
+	return {
+		apiMode,
+		apiPermissionRead,
+		apiPermissionEdit,
+		apiPermissionWrite,
+	};
+}
 
 /**
  * Categories CRUD — all routes are user-scoped (`owner_id` enforced on every
@@ -61,6 +129,10 @@ export const categoryRoutes = new Elysia({ prefix: "/api" })
 						id: categories.id,
 						name: categories.name,
 						order: categories.order,
+						apiMode: categories.apiMode,
+						apiPermissionRead: categories.apiPermissionRead,
+						apiPermissionEdit: categories.apiPermissionEdit,
+						apiPermissionWrite: categories.apiPermissionWrite,
 						createdAt: categories.createdAt,
 						updatedAt: categories.updatedAt,
 						documentCount: sql<number>`(
@@ -139,6 +211,12 @@ export const categoryRoutes = new Elysia({ prefix: "/api" })
 					.values({
 						ownerId: userId,
 						name: parsed.data.name,
+						...buildApiAccessValues({
+							apiMode: parsed.data.apiMode,
+							apiPermissionRead: parsed.data.apiPermissionRead,
+							apiPermissionEdit: parsed.data.apiPermissionEdit,
+							apiPermissionWrite: parsed.data.apiPermissionWrite,
+						}),
 					})
 					.returning();
 				return { row };
@@ -176,9 +254,16 @@ export const categoryRoutes = new Elysia({ prefix: "/api" })
 			set.status = 400;
 			return { error: "Invalid input", details: parsed.error.flatten() };
 		}
-		if (parsed.data.name === undefined && parsed.data.order === undefined) {
+		if (
+			parsed.data.name === undefined &&
+			parsed.data.order === undefined &&
+			parsed.data.apiMode === undefined &&
+			parsed.data.apiPermissionRead === undefined &&
+			parsed.data.apiPermissionEdit === undefined &&
+			parsed.data.apiPermissionWrite === undefined
+		) {
 			set.status = 400;
-			return { error: "At least one field (name or order) is required" };
+			return { error: "At least one field is required" };
 		}
 		const newName = parsed.data.name;
 		try {
@@ -201,6 +286,12 @@ export const categoryRoutes = new Elysia({ prefix: "/api" })
 						...(parsed.data.name !== undefined && { name: parsed.data.name }),
 						...(parsed.data.order !== undefined && {
 							order: parsed.data.order,
+						}),
+						...buildApiAccessValues({
+							apiMode: parsed.data.apiMode,
+							apiPermissionRead: parsed.data.apiPermissionRead,
+							apiPermissionEdit: parsed.data.apiPermissionEdit,
+							apiPermissionWrite: parsed.data.apiPermissionWrite,
 						}),
 						updatedAt: new Date(),
 					})

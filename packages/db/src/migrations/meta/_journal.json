@@ -134,6 +134,13 @@
       "when": 1785000000004,
       "tag": "0018_create_audit_log",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1785000000005,
+      "tag": "0019_category_api_access",
+      "breakpoints": true
     }
   ]
 }

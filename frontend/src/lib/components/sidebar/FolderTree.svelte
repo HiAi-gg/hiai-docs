@@ -51,9 +51,9 @@ import { onDestroy, onMount } from "svelte";
 import { flip } from "svelte/animate";
 import { goto } from "$app/navigation";
 import { page } from "$app/state";
+import { apiFetch } from "$lib/api/client";
 import {
 	type Category,
-	createCategory,
 	deleteCategory,
 	listCategories,
 	updateCategory,
@@ -139,7 +139,13 @@ const FOLDER_EXPAND_DELAY_MS = 400;
 const INITIAL_FETCH_DELAY_MS = 500;
 
 let folders = $state<FolderItem[]>([]);
-let categories = $state<Category[]>([]);
+type CategoryWithApiAccess = Category & {
+	apiMode?: string | null;
+	apiPermissionRead?: boolean | null;
+	apiPermissionEdit?: boolean | null;
+	apiPermissionWrite?: boolean | null;
+};
+let categories = $state<CategoryWithApiAccess[]>([]);
 // Source of truth from the server. `rootItems` and `folderDocs` are the
 // per-zone working copies that `svelte-dnd-action` mutates during a drag.
 let documents = $state<DndDoc[]>([]);
@@ -220,7 +226,7 @@ let bucketFoldersMap = $state<Record<string, FolderItem[]>>({});
 let orderedBuckets = $state<
 	Array<{
 		id: string;
-		category: Category | null;
+		category: CategoryWithApiAccess | null;
 		folders: FolderItem[];
 	}>
 >([]);
@@ -260,7 +266,7 @@ let shareFolderName = $state("");
 type CategoryDialogMode = "create" | "edit" | "delete";
 let showCategoryDialog = $state(false);
 let categoryDialogMode = $state<CategoryDialogMode>("create");
-let selectedCategory = $state<{ id: string; name: string } | null>(null);
+let selectedCategory = $state<CategoryWithApiAccess | null>(null);
 let categoryBusy = $state(false);
 
 let expandTimer: ReturnType<typeof setTimeout> | null = null;
@@ -487,7 +493,7 @@ async function loadFolders() {
 
 async function loadCategories() {
 	try {
-		categories = await listCategories();
+		categories = (await listCategories()) as CategoryWithApiAccess[];
 	} catch (e) {
 		// Don't surface category-load failures as a hard error — the
 		// folder tree must still render even if the categories endpoint
@@ -1163,7 +1169,7 @@ async function persistFolderChanges(zoneKey: string, zoneItems: FolderItem[]) {
 // draggable.
 type CategoryBucket = {
 	id: string;
-	category: Category | null;
+	category: CategoryWithApiAccess | null;
 	folders: FolderItem[];
 };
 
@@ -1317,15 +1323,15 @@ function openNewCategoryDialog() {
 	showCategoryDialog = true;
 }
 
-function openEditCategoryDialog(category: Category) {
+function openEditCategoryDialog(category: CategoryWithApiAccess) {
 	categoryDialogMode = "edit";
-	selectedCategory = { id: category.id, name: category.name };
+	selectedCategory = category;
 	showCategoryDialog = true;
 }
 
-function openDeleteCategoryDialog(category: Category) {
+function openDeleteCategoryDialog(category: CategoryWithApiAccess) {
 	categoryDialogMode = "delete";
-	selectedCategory = { id: category.id, name: category.name };
+	selectedCategory = category;
 	showCategoryDialog = true;
 }
 
@@ -1336,13 +1342,32 @@ function closeCategoryDialog() {
 	categoryBusy = false;
 }
 
-async function handleCategorySave(name: string) {
+async function handleCategorySave(payload: {
+	name: string;
+	apiMode: "unavailable" | "global" | "category";
+	apiPermissionRead: boolean;
+	apiPermissionEdit: boolean;
+	apiPermissionWrite: boolean;
+}) {
 	categoryBusy = true;
 	try {
+		const body = {
+			name: payload.name,
+			apiMode: payload.apiMode,
+			apiPermissionRead: payload.apiPermissionRead,
+			apiPermissionEdit: payload.apiPermissionEdit,
+			apiPermissionWrite: payload.apiPermissionWrite,
+		};
 		if (categoryDialogMode === "edit" && selectedCategory) {
-			await updateCategory(selectedCategory.id, { name });
+			await apiFetch(`/api/categories/${encodeURIComponent(selectedCategory.id)}`, {
+				method: "PATCH",
+				body,
+			});
 		} else {
-			await createCategory(name);
+			await apiFetch("/api/categories", {
+				method: "POST",
+				body,
+			});
 		}
 		await refresh();
 	} finally {
@@ -1376,7 +1401,7 @@ const UNCATEGORIZED_KEY = "__uncategorized__";
 // Uncategorized is excluded so it can never be dragged away.
 const categoryBuckets = $derived(
 	orderedBuckets.filter(
-		(b): b is { id: string; category: Category; folders: FolderItem[] } =>
+		(b): b is { id: string; category: CategoryWithApiAccess; folders: FolderItem[] } =>
 			b.id !== UNCATEGORIZED_KEY && b.category !== null,
 	),
 );
@@ -1396,7 +1421,7 @@ const buckets = $derived.by(() => {
 	}
 	const items: Array<{
 		id: string;
-		category: Category | null;
+		category: CategoryWithApiAccess | null;
 		folders: FolderItem[];
 	}> = [];
 	for (const cat of categories) {

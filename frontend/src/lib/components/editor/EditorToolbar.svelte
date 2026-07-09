@@ -550,12 +550,6 @@ $effect(() => {
 				alignDropdownOpen = false;
 			}
 		}
-		if (listDropdownOpen) {
-			listDropdownOpen = false;
-		}
-		if (alignDropdownOpen) {
-			alignDropdownOpen = false;
-		}
 	}
 	function onKey(e: KeyboardEvent) {
 		if (e.key === "Escape") {
