@@ -131,6 +131,42 @@ describe("config schema", () => {
 			expect(result.data.OPENROUTER_API_KEY).toBe("test-openrouter-key");
 		}
 	});
+
+	test("loads adaptive search defaults", () => {
+		const result = realEnvSchema.safeParse({});
+		expect(result.success).toBe(true);
+		if (result.success) {
+			expect(result.data.SEARCH_EXPANSION_ENABLED).toBe(true);
+			expect(result.data.SEARCH_EXPANSION_MODEL).toBe(
+				"mistralai/ministral-14b-2512",
+			);
+			expect(result.data.SEARCH_EXPANSION_FALLBACK_MODEL).toBe(
+				"google/gemma-4-31b-it",
+			);
+			expect(result.data.SEARCH_EXPANSION_TIMEOUT_MS).toBe(2_000);
+			expect(result.data.SEARCH_EXPANSION_MAX_VARIANTS).toBe(12);
+			expect(result.data.SEARCH_RRF_K).toBe(60);
+		}
+	});
+
+	test("accepts custom search expansion provider settings", () => {
+		const result = realEnvSchema.safeParse({
+			SEARCH_EXPANSION_ENABLED: "false",
+			SEARCH_EXPANSION_BASE_URL: "http://ollama:11434/v1",
+			SEARCH_EXPANSION_API_KEY: "",
+			SEARCH_EXPANSION_TIMEOUT_MS: "5000",
+			SEARCH_VECTOR_MIN_SIMILARITY: "0.4",
+		});
+		expect(result.success).toBe(true);
+		if (result.success) {
+			expect(result.data.SEARCH_EXPANSION_ENABLED).toBe(false);
+			expect(result.data.SEARCH_EXPANSION_BASE_URL).toBe(
+				"http://ollama:11434/v1",
+			);
+			expect(result.data.SEARCH_EXPANSION_TIMEOUT_MS).toBe(5_000);
+			expect(result.data.SEARCH_VECTOR_MIN_SIMILARITY).toBe(0.4);
+		}
+	});
 });
 
 // Production secret guards — the real schema (config-schema.ts) must reject

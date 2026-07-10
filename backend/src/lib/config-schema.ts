@@ -160,6 +160,53 @@ export const envSchema = z.object({
 	// reach AGE. Default 0.5 keeps moderate-confidence extractions while
 	// discarding speculative ones.
 	GRAPH_EXTRACT_MIN_CONFIDENCE: z.coerce.number().min(0).max(1).default(0.5),
+	// Adaptive multilingual query expansion. The public profile uses the same
+	// OpenRouter credential as embeddings and GraphRAG; custom endpoints only
+	// receive an explicitly configured provider key.
+	SEARCH_EXPANSION_ENABLED: z
+		.string()
+		.optional()
+		.default("true")
+		.transform((v) => v === "true"),
+	SEARCH_EXPANSION_BASE_URL: z.string().default("https://openrouter.ai/api/v1"),
+	SEARCH_EXPANSION_API_KEY: z.string().optional(),
+	SEARCH_EXPANSION_MODEL: z.string().default("mistralai/ministral-14b-2512"),
+	SEARCH_EXPANSION_FALLBACK_BASE_URL: z
+		.string()
+		.default("https://openrouter.ai/api/v1"),
+	SEARCH_EXPANSION_FALLBACK_API_KEY: z.string().optional(),
+	SEARCH_EXPANSION_FALLBACK_MODEL: z.string().default("google/gemma-4-31b-it"),
+	SEARCH_EXPANSION_TIMEOUT_MS: z.coerce
+		.number()
+		.int()
+		.min(1_000)
+		.max(300_000)
+		.default(2_000),
+	SEARCH_EXPANSION_CACHE_TTL_SECONDS: z.coerce
+		.number()
+		.int()
+		.min(0)
+		.max(2_592_000)
+		.default(86_400),
+	SEARCH_EXPANSION_MAX_VARIANTS: z.coerce
+		.number()
+		.int()
+		.min(1)
+		.max(100)
+		.default(12),
+	SEARCH_RRF_K: z.coerce.number().int().min(1).default(60),
+	SEARCH_EXACT_BOOST: z.coerce.number().min(0).max(1).default(0.02),
+	SEARCH_CHANNEL_AGREEMENT_BOOST: z.coerce.number().min(0).max(1).default(0.01),
+	SEARCH_GRAPH_MAX_CONTRIBUTION: z.coerce.number().min(0).max(1).default(0.03),
+	SEARCH_VECTOR_MIN_SIMILARITY: z.coerce.number().min(-1).max(1).default(0.35),
+	SEARCH_FUZZY_MIN_SIMILARITY: z.coerce.number().min(0).max(1).default(0.25),
+	SEARCH_MIN_CHANNEL_AGREEMENT: z.coerce
+		.number()
+		.int()
+		.min(1)
+		.max(10)
+		.default(2),
+	SEARCH_GRAPH_SEED_LIMIT: z.coerce.number().int().min(1).max(100).default(10),
 	// Hybrid search weights — applied to the merged text + semantic score.
 	// Both must be in [0, 1]; defaults preserve the historical 0.4 text /
 	// 0.6 semantic balance from the README contract.
