@@ -17,8 +17,9 @@
 #   - pg_trgm       1.6  (PostgreSQL contrib)
 #
 # Schema, indexes, and FKs are applied via Drizzle migrations from
-# packages/db/src/migrations (run by the api container on first start).
-# This image only installs extensions and creates the AGE graph.
+# packages/db/src/migrations (run by the one-shot migration job after the
+# database is healthy). This image only installs extensions; GraphRAG graph
+# DDL is owned by the Drizzle migration journal.
 
 # --- Stage 1: build pgvector + pgvectorscale from source
 FROM postgres:18.1 AS builder

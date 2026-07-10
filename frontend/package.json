@@ -1,9 +1,29 @@
 {
   "name": "@hiai-docs/frontend",
-  "version": "0.2.6",
+  "version": "0.2.7",
   "private": true,
   "type": "module",
   "license": "MIT",
+  "exports": {
+    ".": {
+      "types": "./src/lib/index.ts",
+      "import": "./src/lib/index.ts"
+    },
+    "./shared-document": {
+      "types": "./src/lib/components/editor/shared-document.ts",
+      "import": "./src/lib/components/editor/shared-document.ts"
+    },
+    "./extensions": {
+      "types": "./src/lib/extensions/types.ts",
+      "import": "./src/lib/extensions/types.ts"
+    }
+  },
+  "files": [
+    "src/lib/index.ts",
+    "src/lib/extensions",
+    "src/lib/stores/doc-tab-registry.svelte.ts",
+    "src/lib/components/editor/shared-document.ts"
+  ],
   "scripts": {
     "dev": "vite dev",
     "build": "vite build",

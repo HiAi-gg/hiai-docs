@@ -1,10 +1,11 @@
 -- hiai-docs unified init.sql
 -- Runs on first PostgreSQL startup via docker-entrypoint-initdb.d.
 --
--- Installs the four extensions we need and creates the AGE graph. All
--- relational tables / indexes / FKs are applied later via Drizzle
--- migrations (packages/db/src/migrations), so this file is purely the
--- extension layer.
+-- Installs the four extensions we need. Graph objects, labels, graph indexes,
+-- and all relational tables / indexes / FKs are applied later via Drizzle
+-- migrations (packages/db/src/migrations). This file is intentionally
+-- extension-only: it MUST NOT create graph objects, labels, graph indexes, or
+-- grant GraphRAG object privileges.
 
 -- Vector search + StreamingDiskANN (pgvectorscale requires pgvector).
 CREATE EXTENSION IF NOT EXISTS vector;

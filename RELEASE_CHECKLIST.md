@@ -19,6 +19,9 @@
       openssl rand -hex 32   # repeat for each secret
       ```
 - [ ] **Update `.env.example`** if any new env vars were added
+- [ ] **Verify public contracts** — `@hiai-gg/hiai-docs/frontend` exports only the SSR-safe extension barrel and shared-document helpers; `MIGRATION_DATABASE_URL` is explicit and runtime uses `hiai_app`
+- [ ] **Verify migration job** — `docker compose run --rm migrate` applies the upstream journal before the API starts; `DATABASE_URL` is never used for DDL
+- [ ] **Verify PostgreSQL bootstrap** — `postgres/init.sql` contains extensions only; graph/labels/indexes are created by Drizzle migrations
 - [ ] **Build SDK** — `cd packages/sdk && bun run build` (ensures `dist/` is current before publishing)
 - [ ] **Run full typecheck** — `bun run typecheck` (0 errors)
 - [ ] **Run full test suite** — `bun test` (all passing)
@@ -26,7 +29,7 @@
 
 ## Build
 
-- [ ] **Build Docker images** — `docker compose build` (both `api` and `web`)
+- [ ] **Build Docker images** — `docker compose build` (api, migration target, and web)
 - [ ] **Verify Docker health** — `docker compose up -d && curl -fsS http://localhost:50700/api/health`
 - [ ] **Run DB migrations** — `bun run db:migrate` (loads the root `.env` and applies the canonical Drizzle migration journal)
 

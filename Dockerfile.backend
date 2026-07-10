@@ -36,6 +36,19 @@ COPY backend/tsconfig.json ./backend/
 COPY backend/package.json ./backend/
 RUN cd backend && bun run build
 
+# --- Migration job ---
+# This target contains only the DB workspace and its migration runner. It is
+# used by docker-compose's one-shot `migrate` service and deliberately runs
+# with MIGRATION_DATABASE_URL (the owner role), never DATABASE_URL.
+FROM base AS migration
+COPY package.json tsconfig.json ./
+COPY --from=deps /app/node_modules ./node_modules
+COPY --from=deps /app/packages/db/node_modules ./packages/db/node_modules
+COPY packages/db/ ./packages/db/
+ENV NODE_ENV=production
+WORKDIR /app/packages/db
+CMD ["bun", "run", "scripts/migrate.ts"]
+
 # --- Runtime ---
 # Slim image: only the compiled dist + the node_modules needed at runtime.
 # backend/node_modules must be copied too because the per-workspace install

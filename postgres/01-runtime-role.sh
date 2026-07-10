@@ -14,5 +14,6 @@ END
 $$;
 
 SELECT format('ALTER ROLE hiai_app PASSWORD %L', :'app_password') \gexec
+ALTER ROLE hiai_app NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS;
 ALTER ROLE hiai_app SET search_path = public, ag_catalog;
 SQL

@@ -14,6 +14,7 @@
   },
   "scripts": {
     "dev": "bun run --parallel dev:api dev:web",
+    "build": "bun run --filter '*' build",
     "dev:api": "bun --env-file=.env run --filter '@hiai-docs/backend' dev",
     "dev:web": "bun --env-file=.env run --filter '@hiai-docs/frontend' dev",
     "lint": "bun run --filter '*' lint",

@@ -1,17 +1,21 @@
 /**
- * public entrypoint / barrel file for hiai-docs frontend package
+ * Public entrypoint for the hiai-docs frontend extension package.
+ *
+ * Keep this barrel limited to SSR-safe contracts and pure helpers. Hosts such
+ * as DocsMint import this path from the published package; route modules and
+ * mutable app singletons are intentionally not part of the public surface.
  */
 
+export type {
+	ProseMirrorDoc,
+	ProseMirrorNode,
+	SharedAttachmentObjectUrls,
+} from "./components/editor/shared-document";
 export {
-	type DocTabDefinition,
-	type DocTabIcon,
-	type DocTabPanelProps,
-	createDocTabRegistry,
-	docTabRegistry,
-	registerDocTabIn,
-	registerDocTab,
-} from "./stores/doc-tab-registry.svelte";
-
+	hydrateSharedAttachmentImages,
+	renderSharedDocument,
+	sharedAttachmentHeaders,
+} from "./components/editor/shared-document";
 export {
 	createFrontendExtensions,
 	getFrontendExtensions,
@@ -42,12 +46,11 @@ export type {
 	SettingsSectionProps,
 } from "./extensions/types";
 export {
-	hydrateSharedAttachmentImages,
-	renderSharedDocument,
-	sharedAttachmentHeaders,
-} from "./components/editor/shared-document";
-export type {
-	ProseMirrorDoc,
-	ProseMirrorNode,
-	SharedAttachmentObjectUrls,
-} from "./components/editor/shared-document";
+	createDocTabRegistry,
+	type DocTabDefinition,
+	type DocTabIcon,
+	type DocTabPanelProps,
+	docTabRegistry,
+	registerDocTab,
+	registerDocTabIn,
+} from "./stores/doc-tab-registry.svelte";

@@ -38,5 +38,4 @@ describe("frontend extension manifest", () => {
 		navigation.push({ id: "billing", label: "Billing" });
 		expect(extensions.navigation).toHaveLength(1);
 	});
-
 });

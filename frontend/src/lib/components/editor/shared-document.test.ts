@@ -151,7 +151,9 @@ describe("shared document renderer", () => {
 		const originalFetch = globalThis.fetch;
 		const originalUrl = globalThis.URL;
 		globalThis.fetch = (async () =>
-			new Response(new Blob(["image"]), { status: 200 })) as unknown as typeof fetch;
+			new Response(new Blob(["image"]), {
+				status: 200,
+			})) as unknown as typeof fetch;
 		globalThis.URL = {
 			...originalUrl,
 			createObjectURL: () => "blob:shared-image",

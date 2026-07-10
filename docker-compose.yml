@@ -11,7 +11,7 @@ services:
       - "${DB_PORT:-5437}:5432"
     volumes:
       - pgdata:/var/lib/postgresql
- # init.sql now inside the build image
+      # init.sql and the runtime-role bootstrap live in the build image.
     environment:
       POSTGRES_DB: ${DB_NAME:-hiai_docs}
       POSTGRES_USER: ${DB_USER:-aiuser}
@@ -65,7 +65,7 @@ services:
         exec /usr/bin/weed server -s3 -s3.port=8333 -s3.config=/data/s3.json -filer -filer.port=8888 -master.port=9333 -volume.port=8080 -dir=/data -ip=seaweedfs
     environment:
       SEAWEEDFS_S3_CONFIG: >-
-        {"identities":[{"name":"hiai-docs","credentials":[{"accessKey":"${STORAGE_ACCESS_KEY:-minioadmin}","secretKey":"${STORAGE_SECRET_KEY:-minioadmin}"}],"actions":["Admin","Read","List","Tagging","Write"]}]}
+        {"identities":[{"name":"hiai-docs","credentials":[{"accessKey":"${STORAGE_ACCESS_KEY:-hiai-docs}","secretKey":"${STORAGE_SECRET_KEY:-change-me-to-random-32-chars}"}],"actions":["Admin","Read","List","Tagging","Write"]}]}
       SEAWEEDFS_S3_CORS_ALLOW_ORIGIN: ${STORAGE_CORS_ALLOW_ORIGIN:-http://localhost:50701,http://127.0.0.1:50701}
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8888/"]
@@ -80,6 +80,21 @@ services:
           memory: 512M
           cpus: "1"
 
+  migrate:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+      target: migration
+      network: host
+    restart: "no"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      MIGRATION_DATABASE_URL: postgresql://aiuser:${DB_PASSWORD:?DB_PASSWORD must be set}@postgres:5432/${DB_NAME:-hiai_docs}
+    networks:
+      - hiai-docs-net
+
   api:
     build:
       context: .
@@ -93,6 +108,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
       redis:
         condition: service_healthy
       seaweedfs:
@@ -111,8 +128,8 @@ services:
       REDIS_URL: ${REDIS_URL:-redis://redis:6379}
       STORAGE_ENDPOINT: ${STORAGE_ENDPOINT:-seaweedfs}
       STORAGE_PORT: 8333
-      STORAGE_ACCESS_KEY: ${STORAGE_ACCESS_KEY:-minioadmin}
-      STORAGE_SECRET_KEY: ${STORAGE_SECRET_KEY:-minioadmin}
+      STORAGE_ACCESS_KEY: ${STORAGE_ACCESS_KEY:-hiai-docs}
+      STORAGE_SECRET_KEY: ${STORAGE_SECRET_KEY:-change-me-to-random-32-chars}
       STORAGE_BUCKET: ${STORAGE_BUCKET:-hiai-docs}
       STORAGE_PUBLIC_ENDPOINT: ${STORAGE_PUBLIC_ENDPOINT:-localhost}
       STORAGE_PUBLIC_PORT: ${STORAGE_PORT:-9000}
@@ -226,7 +243,7 @@ networks:
 
 volumes:
   pgdata:
- # AGE graph now lives in the unified postgres database
+  # AGE graph now lives in the unified postgres database.
   redis_data:
   seaweedfs_data:
   caddy_data:

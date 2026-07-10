@@ -1,6 +1,6 @@
 {
   "name": "@hiai-gg/hiai-docs",
-  "version": "0.2.6",
+  "version": "0.2.7",
   "type": "module",
   "license": "MIT",
   "description": "The lightweight, AI-native self-hosted knowledge base \u2014 built-in RAG, hybrid semantic search, and a clean REST API for AI agents.",
@@ -37,6 +37,18 @@
     "./sdk": {
       "import": "./packages/sdk/dist/index.js",
       "types": "./packages/sdk/dist/index.d.ts"
+    },
+    "./frontend": {
+      "import": "./frontend/src/lib/index.ts",
+      "types": "./frontend/src/lib/index.ts"
+    },
+    "./frontend/shared-document": {
+      "import": "./frontend/src/lib/components/editor/shared-document.ts",
+      "types": "./frontend/src/lib/components/editor/shared-document.ts"
+    },
+    "./frontend/extensions": {
+      "import": "./frontend/src/lib/extensions/types.ts",
+      "types": "./frontend/src/lib/extensions/types.ts"
     },
     "./schema": {
       "import": "./packages/db/src/schema.ts",
@@ -89,6 +101,10 @@
     "packages/cli/src",
     "packages/mcp-server/src",
     "backend/src",
+    "frontend/src/lib/index.ts",
+    "frontend/src/lib/extensions",
+    "frontend/src/lib/stores/doc-tab-registry.svelte.ts",
+    "frontend/src/lib/components/editor/shared-document.ts",
     "README.md",
     "LICENSE"
   ],
