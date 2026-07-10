@@ -70,6 +70,8 @@ Copy `.env.example` and fill in:
 | `GRAPH_EXTRACT_BASE_URL` | If extraction enabled | — | OpenAI-compatible chat-completion URL for entity extraction LLM |
 | `GRAPH_EXTRACT_API_KEY` | If extraction enabled | — | API key for extraction LLM |
 | `GRAPH_EXTRACT_MODEL` | No | `EMBEDDING_MODEL` | Extraction model name |
+| `GRAPH_EXTRACT_REASONING_EFFORT` | No | — | OpenAI-compatible reasoning control; use `none` for Ollama Qwen3 |
+| `GRAPH_EXTRACT_TIMEOUT_MS` | No | `120000` | Entity extraction request timeout in milliseconds |
 | `GRAPH_EXTRACT_MIN_CONFIDENCE` | No | `0.5` | Minimum entity confidence threshold (0.0–1.0) |
 | `GRAPH_EXPANSION_BOOST` | No | `0.3` | Multiplier on graph-neighbor discovery scores (0–2) |
 
