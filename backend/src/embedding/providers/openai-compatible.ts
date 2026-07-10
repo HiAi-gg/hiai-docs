@@ -5,7 +5,7 @@
  */
 
 import { logger } from "../../lib/logger";
-import { EMBEDDING_DIMENSIONS, normalizeDimensions } from "../utils";
+import { EMBEDDING_DIMENSIONS } from "../utils";
 
 interface OpenAICompatibleEmbeddingResponse {
 	data: Array<{ embedding: number[] }>;
@@ -42,7 +42,11 @@ export async function getOpenAICompatibleEmbedding(
 		const response = await fetch(url, {
 			method: "POST",
 			headers,
-			body: JSON.stringify({ model, input: text }),
+			body: JSON.stringify({
+				model,
+				input: text,
+				dimensions: EMBEDDING_DIMENSIONS,
+			}),
 			signal: controller.signal,
 		});
 
@@ -62,7 +66,13 @@ export async function getOpenAICompatibleEmbedding(
 			);
 		}
 
-		return normalizeDimensions(embedding, EMBEDDING_DIMENSIONS);
+		if (embedding.length !== EMBEDDING_DIMENSIONS) {
+			throw new Error(
+				`OpenAI-compatible provider returned ${embedding.length} dimensions; expected ${EMBEDDING_DIMENSIONS}`,
+			);
+		}
+
+		return embedding;
 	} catch (err) {
 		if (err instanceof Error && err.name === "AbortError") {
 			logger.error(
