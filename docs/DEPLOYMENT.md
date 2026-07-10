@@ -166,7 +166,7 @@ EMBEDDING_FALLBACK_BASE_URL=https://openrouter.ai/api/v1
 EMBEDDING_FALLBACK_MODEL=baai/bge-m3
 ```
 
-Both models are requested with `dimensions=1024`, matching the pgvector schema. The runtime uses `OPENROUTER_API_KEY` for both providers unless an explicit `EMBEDDING_API_KEY` or `EMBEDDING_FALLBACK_API_KEY` is supplied. If you prefer local inference, replace both base URLs and model names with an Ollama-compatible 1024-dimensional model (for example `bge-m3`) and remove the OpenRouter key from `.env`.
+Both models are requested with `dimensions=1024`, matching the pgvector schema. The runtime uses `OPENROUTER_API_KEY` for both OpenRouter providers unless an explicit `EMBEDDING_API_KEY` or `EMBEDDING_FALLBACK_API_KEY` is supplied. The shared key is never forwarded to a non-OpenRouter URL. If you prefer local inference, replace both base URLs and model names with an Ollama-compatible 1024-dimensional model (for example `bge-m3`); the Ollama path does not require an API key.
 
 ## Production Considerations
 
