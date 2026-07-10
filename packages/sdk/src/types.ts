@@ -65,6 +65,44 @@ export interface DocsFolder {
 	name: string;
 	createdAt: string;
 	updatedAt: string;
+	categoryId?: string | null;
+	order?: number;
+	documentCount?: number;
+	subfolderCount?: number;
+	children?: DocsFolder[];
+	documents?: DocsDocumentListItem[];
+}
+
+// ---------------------------------------------------------------------------
+// Categories
+// ---------------------------------------------------------------------------
+
+export type DocsCategoryApiMode = "unavailable" | "global" | "general" | "category";
+
+export interface DocsCategory {
+	id: string;
+	name: string;
+	order: number;
+	apiMode: DocsCategoryApiMode;
+	apiPermissionRead: boolean;
+	apiPermissionEdit: boolean;
+	apiPermissionWrite: boolean;
+	createdAt: string;
+	updatedAt: string;
+	documentCount?: number;
+	folderCount?: number;
+}
+
+export interface DocsCategoryInput {
+	name: string;
+	apiMode?: DocsCategoryApiMode;
+	apiPermissionRead?: boolean;
+	apiPermissionEdit?: boolean;
+	apiPermissionWrite?: boolean;
+}
+
+export interface DocsCategoryUpdate extends Partial<DocsCategoryInput> {
+	order?: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -112,6 +150,19 @@ export interface DocsSearchResponse {
 	limit: number;
 }
 
+export interface DocsSearchOptions {
+	folder?: string;
+	tags?: string;
+	category?: string;
+	dateFrom?: string;
+	dateTo?: string;
+	sort?: string;
+	page?: number;
+	limit?: number;
+	graph?: boolean;
+	graphHops?: number;
+}
+
 /**
  * Suggestion hit returned by `GET /api/search/suggest`.
  */
@@ -132,6 +183,7 @@ export interface DocsShareLink {
 	folderId: string | null;
 	expiresAt: string | null;
 	hasPassword: boolean;
+	role?: "viewer" | "editor";
 	createdAt: string;
 }
 
@@ -149,6 +201,7 @@ export interface DocsShareLinkListItem {
 	createdAt: string;
 	title: string;
 	type: "document" | "folder";
+	role?: "viewer" | "editor";
 }
 
 export interface DocsShareListResponse {
@@ -179,6 +232,12 @@ export type DocsSharedContent =
 				name: string;
 				createdAt: string;
 				updatedAt: string;
+				folders?: Array<{
+					id: string;
+					name: string;
+					createdAt: string;
+					updatedAt: string;
+				}>;
 				documents: Array<{
 					id: string;
 					title: string;
@@ -198,6 +257,8 @@ export interface DocsAttachment {
 	mimeType: string;
 	size: number;
 	url: string;
+	documentId?: string;
+	createdAt?: string;
 }
 
 export interface DocsAttachmentListResponse {
@@ -221,6 +282,13 @@ export interface DocsVersion {
 	restoredFrom?: string | null;
 }
 
+export interface DocsVersionDiff {
+	v1: { id: string; label?: string | null; createdAt: string };
+	v2: { id: string; label?: string | null; createdAt: string };
+	changes: { added: number; removed: number; modified: number };
+	hunks: Array<{ type: "add" | "remove" | "unchanged"; lines: string[] }>;
+}
+
 // ---------------------------------------------------------------------------
 // Health
 // ---------------------------------------------------------------------------
@@ -229,4 +297,22 @@ export interface DocsHealthResponse {
 	status: string;
 	service: string;
 	timestamp: string;
+}
+
+// ---------------------------------------------------------------------------
+// Request context
+// ---------------------------------------------------------------------------
+
+/**
+ * Request-scoped credentials and cancellation metadata. This is intentionally
+ * transport-shaped so a host can forward an incoming hiai-docs session without
+ * exposing auth internals to the SDK.
+ */
+export interface DocsRequestContext {
+	/** Raw Authorization header value, e.g. `Bearer <token>`. */
+	authorization?: string;
+	cookie?: string;
+	requestId?: string;
+	headers?: HeadersInit;
+	signal?: AbortSignal;
 }

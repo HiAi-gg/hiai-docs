@@ -11,17 +11,23 @@
 import type {
 	DocsAttachment,
 	DocsAttachmentListResponse,
+	DocsCategory,
+	DocsCategoryInput,
+	DocsCategoryUpdate,
 	DocsDocument,
 	DocsDocumentListResponse,
 	DocsFolder,
 	DocsHealthResponse,
 	DocsSearchResponse,
+	DocsSearchOptions,
 	DocsSearchSuggestItem,
 	DocsShareLink,
 	DocsShareListResponse,
 	DocsSharedContent,
 	DocsTag,
 	DocsVersion,
+	DocsVersionDiff,
+	DocsRequestContext,
 } from "./types.js";
 
 // ---------------------------------------------------------------------------
@@ -32,7 +38,11 @@ export interface DocsClientConfig {
 	/** Base URL of the hiai-docs API, e.g. `http://localhost:50700`. */
 	baseUrl: string;
 	/** Bearer token used as `Authorization: Bearer <apiKey>`. */
-	apiKey: string;
+	apiKey?: string;
+	/** Default request-scoped credentials forwarded to every request. */
+	requestContext?: DocsRequestContext;
+	/** Injectable fetch implementation for hosts and contract tests. */
+	fetch?: typeof fetch;
 	/** Per-request timeout in milliseconds. Default: 10 000. */
 	timeout?: number;
 	/** Retry attempts for transient failures. Default: 3. */
@@ -41,7 +51,15 @@ export interface DocsClientConfig {
 	retryBackoffMs?: number;
 }
 
-type ResolvedConfig = Required<DocsClientConfig>;
+type ResolvedConfig = {
+	baseUrl: string;
+	apiKey?: string;
+	requestContext?: DocsRequestContext;
+	fetch: typeof fetch;
+	timeout: number;
+	retries: number;
+	retryBackoffMs: number;
+};
 
 // ---------------------------------------------------------------------------
 // Errors
@@ -50,12 +68,41 @@ type ResolvedConfig = Required<DocsClientConfig>;
 export class DocsApiError extends Error {
 	readonly status: number;
 	readonly body: unknown;
+	readonly url?: string;
+	readonly requestId?: string;
 
-	constructor(status: number, body: unknown, message?: string) {
+	constructor(
+		status: number,
+		body: unknown,
+		message?: string,
+		metadata?: { url?: string; requestId?: string },
+	) {
 		super(message ?? `hiai-docs API error ${status}`);
 		this.name = "DocsApiError";
 		this.status = status;
 		this.body = body;
+		this.url = metadata?.url;
+		this.requestId = metadata?.requestId;
+	}
+}
+
+export class DocsNetworkError extends Error {
+	readonly requestId?: string;
+
+	constructor(message: string, options?: { cause?: unknown; requestId?: string }) {
+		super(message, { cause: options?.cause });
+		this.name = "DocsNetworkError";
+		this.requestId = options?.requestId;
+	}
+}
+
+export class DocsTimeoutError extends DocsNetworkError {
+	readonly timeout: number;
+
+	constructor(timeout: number, options?: { cause?: unknown; requestId?: string }) {
+		super(`hiai-docs request timed out after ${timeout}ms`, options);
+		this.name = "DocsTimeoutError";
+		this.timeout = timeout;
 	}
 }
 
@@ -70,16 +117,23 @@ export class DocsClient {
 		if (!config.baseUrl) {
 			throw new Error("DocsClient: `baseUrl` is required");
 		}
-		if (!config.apiKey) {
-			throw new Error("DocsClient: `apiKey` is required");
-		}
 		this.config = {
 			baseUrl: config.baseUrl.replace(/\/+$/, ""),
 			apiKey: config.apiKey,
+			requestContext: config.requestContext,
+			fetch: config.fetch ?? fetch,
 			timeout: config.timeout ?? 10_000,
 			retries: config.retries ?? 3,
 			retryBackoffMs: config.retryBackoffMs ?? 250,
 		};
+	}
+
+	/** Return a client with a merged request context for an incoming request. */
+	withRequestContext(context: DocsRequestContext): DocsClient {
+		return new DocsClient({
+			...this.config,
+			requestContext: this.mergeContext(this.config.requestContext, context),
+		});
 	}
 
 	// ── Documents ────────────────────────────────────────────────────────
@@ -88,20 +142,20 @@ export class DocsClient {
 		title?: string;
 		content?: string;
 		folderId?: string;
-	}): Promise<DocsDocument> {
-		return this.request<DocsDocument>("POST", "/api/documents", { json: input });
+	}, context?: DocsRequestContext): Promise<DocsDocument> {
+		return this.request<DocsDocument>("POST", "/api/documents", { json: input }, context);
 	}
 
-	async getDoc(id: string): Promise<DocsDocument> {
-		return this.request<DocsDocument>("GET", `/api/documents/${encodeURIComponent(id)}`);
+	async getDoc(id: string, context?: DocsRequestContext): Promise<DocsDocument> {
+		return this.request<DocsDocument>("GET", `/api/documents/${encodeURIComponent(id)}`, undefined, context);
 	}
 
 	/**
 	 * Fetch a document as raw markdown via the public export endpoint.
 	 * Returns just the markdown body as a string.
 	 */
-	async getDocMarkdown(id: string): Promise<string> {
-		const res = await this.fetchRaw("GET", `/api/documents/${encodeURIComponent(id)}/export`);
+	async getDocMarkdown(id: string, context?: DocsRequestContext): Promise<string> {
+		const res = await this.fetchRaw("GET", `/api/documents/${encodeURIComponent(id)}/export`, undefined, context);
 		if (!res.ok) {
 			throw await this.toApiError(res);
 		}
@@ -115,14 +169,15 @@ export class DocsClient {
 			content?: string;
 			folderId?: string | null;
 		},
+		context?: DocsRequestContext,
 	): Promise<DocsDocument> {
 		return this.request<DocsDocument>("PATCH", `/api/documents/${encodeURIComponent(id)}`, {
 			json: updates,
-		});
+		}, context);
 	}
 
-	async deleteDoc(id: string): Promise<void> {
-		await this.request<unknown>("DELETE", `/api/documents/${encodeURIComponent(id)}`);
+	async deleteDoc(id: string, context?: DocsRequestContext): Promise<void> {
+		await this.request<unknown>("DELETE", `/api/documents/${encodeURIComponent(id)}`, undefined, context);
 	}
 
 	async listDocs(options?: {
@@ -130,7 +185,7 @@ export class DocsClient {
 		tag?: string;
 		page?: number;
 		limit?: number;
-	}): Promise<DocsDocumentListResponse> {
+	}, context?: DocsRequestContext): Promise<DocsDocumentListResponse> {
 		return this.request<DocsDocumentListResponse>("GET", "/api/documents", {
 			query: this.cleanQuery({
 				folderId: options?.folderId,
@@ -138,13 +193,15 @@ export class DocsClient {
 				page: options?.page,
 				limit: options?.limit,
 			}),
-		});
+		}, context);
 	}
 
-	async duplicateDoc(id: string): Promise<DocsDocument> {
+	async duplicateDoc(id: string, context?: DocsRequestContext): Promise<DocsDocument> {
 		return this.request<DocsDocument>(
 			"POST",
 			`/api/documents/${encodeURIComponent(id)}/duplicate`,
+			undefined,
+			context,
 		);
 	}
 
@@ -152,8 +209,8 @@ export class DocsClient {
 	 * Convenience alias for `getDocMarkdown` — both go through the same
 	 * `/api/documents/:id/export` endpoint on the backend.
 	 */
-	async exportDoc(id: string): Promise<string> {
-		return this.getDocMarkdown(id);
+	async exportDoc(id: string, context?: DocsRequestContext): Promise<string> {
+		return this.getDocMarkdown(id, context);
 	}
 
 	/**
@@ -164,108 +221,126 @@ export class DocsClient {
 		title?: string;
 		content: string;
 		folderId?: string;
-	}): Promise<DocsDocument> {
-		return this.request<DocsDocument>("POST", "/api/documents/import", { json: input });
+	}, context?: DocsRequestContext): Promise<DocsDocument> {
+		return this.request<DocsDocument>("POST", "/api/documents/import", { json: input }, context);
 	}
 
 	// ── Folders ──────────────────────────────────────────────────────────
 
-	async listFolders(parentId?: string): Promise<DocsFolder[]> {
+	async listFolders(parentId?: string, context?: DocsRequestContext): Promise<DocsFolder[]> {
 		return this.request<DocsFolder[]>("GET", "/api/folders", {
 			query: this.cleanQuery({ parentId }),
-		});
+		}, context);
 	}
 
-	async getFolder(id: string): Promise<DocsFolder> {
-		return this.request<DocsFolder>("GET", `/api/folders/${encodeURIComponent(id)}`);
+	async getFolder(id: string, context?: DocsRequestContext): Promise<DocsFolder> {
+		return this.request<DocsFolder>("GET", `/api/folders/${encodeURIComponent(id)}`, undefined, context);
 	}
 
-	async createFolder(input: { name: string; parentId?: string | null }): Promise<DocsFolder> {
+	async createFolder(input: { name: string; parentId?: string | null }, context?: DocsRequestContext): Promise<DocsFolder> {
 		return this.request<DocsFolder>("POST", "/api/folders", {
 			json: { name: input.name, parentId: input.parentId ?? undefined },
-		});
+		}, context);
 	}
 
 	async updateFolder(
 		id: string,
 		updates: { name?: string; parentId?: string | null },
+		context?: DocsRequestContext,
 	): Promise<DocsFolder> {
 		return this.request<DocsFolder>("PATCH", `/api/folders/${encodeURIComponent(id)}`, {
 			json: updates,
-		});
+		}, context);
 	}
 
-	async deleteFolder(id: string): Promise<void> {
-		await this.request<unknown>("DELETE", `/api/folders/${encodeURIComponent(id)}`);
+	async deleteFolder(id: string, context?: DocsRequestContext): Promise<void> {
+		await this.request<unknown>("DELETE", `/api/folders/${encodeURIComponent(id)}`, undefined, context);
 	}
 
 	// ── Tags ─────────────────────────────────────────────────────────────
 
-	async listTags(): Promise<DocsTag[]> {
-		return this.request<DocsTag[]>("GET", "/api/tags");
+	async listTags(context?: DocsRequestContext): Promise<DocsTag[]> {
+		return this.request<DocsTag[]>("GET", "/api/tags", undefined, context);
 	}
 
-	async createTag(input: { name: string; color?: string }): Promise<DocsTag> {
-		return this.request<DocsTag>("POST", "/api/tags", { json: input });
+	async createTag(input: { name: string; color?: string }, context?: DocsRequestContext): Promise<DocsTag> {
+		return this.request<DocsTag>("POST", "/api/tags", { json: input }, context);
 	}
 
-	async updateTag(id: string, updates: { name?: string; color?: string }): Promise<DocsTag> {
+	async updateTag(id: string, updates: { name?: string; color?: string }, context?: DocsRequestContext): Promise<DocsTag> {
 		return this.request<DocsTag>("PATCH", `/api/tags/${encodeURIComponent(id)}`, {
 			json: updates,
-		});
+		}, context);
 	}
 
-	async deleteTag(id: string): Promise<void> {
-		await this.request<unknown>("DELETE", `/api/tags/${encodeURIComponent(id)}`);
+	async deleteTag(id: string, context?: DocsRequestContext): Promise<void> {
+		await this.request<unknown>("DELETE", `/api/tags/${encodeURIComponent(id)}`, undefined, context);
 	}
 
-	async addTagToDoc(documentId: string, tagId: string): Promise<void> {
+	async addTagToDoc(documentId: string, tagId: string, context?: DocsRequestContext): Promise<void> {
 		await this.request<unknown>(
 			"POST",
 			`/api/documents/${encodeURIComponent(documentId)}/tags`,
 			{ json: { tagId } },
+			context,
 		);
 	}
 
-	async removeTagFromDoc(documentId: string, tagId: string): Promise<void> {
+	async removeTagFromDoc(documentId: string, tagId: string, context?: DocsRequestContext): Promise<void> {
 		await this.request<unknown>(
 			"DELETE",
 			`/api/documents/${encodeURIComponent(documentId)}/tags/${encodeURIComponent(tagId)}`,
+			undefined,
+			context,
 		);
+	}
+
+	// ── Categories ───────────────────────────────────────────────────────
+
+	async listCategories(context?: DocsRequestContext): Promise<DocsCategory[]> {
+		return this.request<DocsCategory[]>("GET", "/api/categories", undefined, context);
+	}
+
+	async createCategory(input: DocsCategoryInput, context?: DocsRequestContext): Promise<DocsCategory> {
+		return this.request<DocsCategory>("POST", "/api/categories", { json: input }, context);
+	}
+
+	async updateCategory(id: string, updates: DocsCategoryUpdate, context?: DocsRequestContext): Promise<DocsCategory> {
+		return this.request<DocsCategory>("PATCH", `/api/categories/${encodeURIComponent(id)}`, { json: updates }, context);
+	}
+
+	async deleteCategory(id: string, context?: DocsRequestContext): Promise<void> {
+		await this.request<unknown>("DELETE", `/api/categories/${encodeURIComponent(id)}`, undefined, context);
 	}
 
 	// ── Search ───────────────────────────────────────────────────────────
 
 	async search(
 		query: string,
-		options?: {
-			folder?: string;
-			tags?: string;
-			dateFrom?: string;
-			dateTo?: string;
-			sort?: string;
-			page?: number;
-			limit?: number;
-		},
+		options?: DocsSearchOptions,
+		context?: DocsRequestContext,
 	): Promise<DocsSearchResponse> {
 		return this.request<DocsSearchResponse>("GET", "/api/search", {
 			query: this.cleanQuery({
 				q: query,
 				folder: options?.folder,
 				tags: options?.tags,
+				category: options?.category,
 				dateFrom: options?.dateFrom,
 				dateTo: options?.dateTo,
 				sort: options?.sort,
 				page: options?.page,
 				limit: options?.limit,
+				graph: options?.graph,
+				graphHops: options?.graphHops,
 			}),
-		});
+		}, context);
 	}
 
-	async suggest(query: string): Promise<DocsSearchSuggestItem[]> {
+	async suggest(query: string, context?: DocsRequestContext): Promise<DocsSearchSuggestItem[]> {
 		return this.request<DocsSearchSuggestItem[]>("GET", "/api/search/suggest", {
 			query: this.cleanQuery({ q: query }),
-		});
+		}, context);
 	}
 
 	// ── Share ────────────────────────────────────────────────────────────
@@ -275,26 +350,29 @@ export class DocsClient {
 		folderId?: string;
 		password?: string;
 		expiresIn?: "1h" | "1d" | "7d" | "30d" | "never";
-	}): Promise<DocsShareLink> {
-		return this.request<DocsShareLink>("POST", "/api/share", { json: input });
+		role?: "viewer" | "editor";
+	}, context?: DocsRequestContext): Promise<DocsShareLink> {
+		return this.request<DocsShareLink>("POST", "/api/share", { json: input }, context);
 	}
 
-	async listShares(): Promise<DocsShareListResponse> {
-		return this.request<DocsShareListResponse>("GET", "/api/share");
+	async listShares(context?: DocsRequestContext): Promise<DocsShareListResponse> {
+		return this.request<DocsShareListResponse>("GET", "/api/share", undefined, context);
 	}
 
-	async deleteShare(id: string): Promise<void> {
-		await this.request<unknown>("DELETE", `/api/share/${encodeURIComponent(id)}`);
+	async deleteShare(id: string, context?: DocsRequestContext): Promise<void> {
+		await this.request<unknown>("DELETE", `/api/share/${encodeURIComponent(id)}`, undefined, context);
 	}
 
 	/**
 	 * Public endpoint — still sends `Authorization` if configured, but
 	 * the backend does not require it.
 	 */
-	async getShareByToken(token: string): Promise<DocsSharedContent> {
+	async getShareByToken(token: string, context?: DocsRequestContext): Promise<DocsSharedContent> {
 		return this.request<DocsSharedContent>(
 			"GET",
 			`/api/share/${encodeURIComponent(token)}`,
+			undefined,
+			context,
 		);
 	}
 
@@ -305,6 +383,7 @@ export class DocsClient {
 		file: Blob | ArrayBuffer | Uint8Array,
 		filename: string,
 		mimeType: string,
+		context?: DocsRequestContext,
 	): Promise<DocsAttachment> {
 		const form = new FormData();
 		const blob = this.toBlob(file, mimeType);
@@ -314,6 +393,7 @@ export class DocsClient {
 			"POST",
 			`/api/documents/${encodeURIComponent(documentId)}/attachments`,
 			{ body: form },
+			context,
 		);
 		if (!res.ok) {
 			throw await this.toApiError(res);
@@ -321,11 +401,17 @@ export class DocsClient {
 		return (await res.json()) as DocsAttachment;
 	}
 
-	async listAttachments(documentId: string): Promise<DocsAttachmentListResponse> {
+	async listAttachments(documentId: string, context?: DocsRequestContext): Promise<DocsAttachmentListResponse> {
 		return this.request<DocsAttachmentListResponse>(
 			"GET",
 			`/api/documents/${encodeURIComponent(documentId)}/attachments`,
+			undefined,
+			context,
 		);
+	}
+
+	async deleteAttachment(id: string, context?: DocsRequestContext): Promise<void> {
+		await this.request<unknown>("DELETE", `/api/attachments/${encodeURIComponent(id)}`, undefined, context);
 	}
 
 	// ── Versions ─────────────────────────────────────────────────────────
@@ -333,6 +419,7 @@ export class DocsClient {
 	async listVersions(
 		documentId: string,
 		options?: { onlySnapshots?: boolean; limit?: number },
+		context?: DocsRequestContext,
 	): Promise<DocsVersion[]> {
 		return this.request<DocsVersion[]>(
 			"GET",
@@ -343,20 +430,35 @@ export class DocsClient {
 					limit: options?.limit,
 				}),
 			},
+			context,
 		);
 	}
 
-	async getVersion(documentId: string, versionId: string): Promise<DocsVersion> {
+	async getVersion(documentId: string, versionId: string, context?: DocsRequestContext): Promise<DocsVersion> {
 		return this.request<DocsVersion>(
 			"GET",
 			`/api/documents/${encodeURIComponent(documentId)}/versions/${encodeURIComponent(versionId)}`,
+			undefined,
+			context,
 		);
+	}
+
+	async createSnapshot(documentId: string, input: { label: string; description?: string }, context?: DocsRequestContext): Promise<DocsVersion> {
+		return this.request<DocsVersion>("POST", `/api/documents/${encodeURIComponent(documentId)}/versions`, { json: input }, context);
+	}
+
+	async restoreVersion(documentId: string, versionId: string, context?: DocsRequestContext): Promise<DocsDocument> {
+		return this.request<DocsDocument>("POST", `/api/documents/${encodeURIComponent(documentId)}/versions/${encodeURIComponent(versionId)}/restore`, undefined, context);
+	}
+
+	async diffVersions(documentId: string, from: string, to: string, context?: DocsRequestContext): Promise<DocsVersionDiff> {
+		return this.request<DocsVersionDiff>("GET", `/api/documents/${encodeURIComponent(documentId)}/versions/diff`, { query: { from, to } }, context);
 	}
 
 	// ── Health ───────────────────────────────────────────────────────────
 
-	async health(): Promise<DocsHealthResponse> {
-		return this.request<DocsHealthResponse>("GET", "/api/health");
+	async health(context?: DocsRequestContext): Promise<DocsHealthResponse> {
+		return this.request<DocsHealthResponse>("GET", "/api/health", undefined, context);
 	}
 
 	// ─────────────────────────────────────────────────────────────────────
@@ -367,11 +469,12 @@ export class DocsClient {
 		method: string,
 		path: string,
 		options?: { json?: unknown; query?: Record<string, string | number | boolean | undefined> },
+		context?: DocsRequestContext,
 	): Promise<T> {
 		const res = await this.fetchRaw(method, path, {
 			json: options?.json,
 			query: options?.query,
-		});
+		}, context);
 		if (!res.ok) {
 			throw await this.toApiError(res);
 		}
@@ -395,11 +498,17 @@ export class DocsClient {
 			query?: Record<string, string | number | boolean | undefined>;
 			body?: BodyInit;
 		},
+		context?: DocsRequestContext,
 	): Promise<Response> {
 		const url = this.buildUrl(path, options?.query);
-		const headers: Record<string, string> = {
-			Authorization: `Bearer ${this.config.apiKey}`,
-		};
+		const requestContext = this.mergeContext(this.config.requestContext, context);
+		const headers = new Headers(requestContext?.headers);
+		if (!headers.has("Authorization") && this.config.apiKey) {
+			headers.set("Authorization", `Bearer ${this.config.apiKey}`);
+		}
+		if (requestContext?.authorization) headers.set("Authorization", requestContext.authorization);
+		if (requestContext?.cookie) headers.set("Cookie", requestContext.cookie);
+		if (requestContext?.requestId) headers.set("X-Request-Id", requestContext.requestId);
 
 		let body: BodyInit | undefined;
 		if (options?.body !== undefined) {
@@ -407,7 +516,7 @@ export class DocsClient {
 			body = options.body;
 		} else if (options?.json !== undefined) {
 			body = JSON.stringify(options.json);
-			headers["Content-Type"] = "application/json";
+			headers.set("Content-Type", "application/json");
 		}
 
 		const init: RequestInit = { method, headers };
@@ -416,9 +525,12 @@ export class DocsClient {
 		let lastError: unknown = null;
 		const maxAttempts = Math.max(1, this.config.retries);
 		for (let attempt = 0; attempt < maxAttempts; attempt++) {
-			const signal = AbortSignal.timeout(this.config.timeout);
+			const timeoutSignal = AbortSignal.timeout(this.config.timeout);
+			const signal = requestContext?.signal
+				? AbortSignal.any([requestContext.signal, timeoutSignal])
+				: timeoutSignal;
 			try {
-				const res = await fetch(url, { ...init, signal });
+				const res = await this.config.fetch(url, { ...init, signal });
 				if (this.shouldRetryStatus(res.status) && attempt < maxAttempts - 1) {
 					await this.sleep(this.backoffDelay(attempt));
 					continue;
@@ -426,15 +538,21 @@ export class DocsClient {
 				return res;
 			} catch (err) {
 				lastError = err;
-				if (!this.isRetryableError(err) || attempt === maxAttempts - 1) {
-					throw this.wrapNetworkError(err);
+			if (!this.isRetryableError(err) || attempt === maxAttempts - 1) {
+				if (this.isTimeoutError(err)) {
+					throw new DocsTimeoutError(this.config.timeout, {
+						cause: err,
+						requestId: requestContext?.requestId,
+					});
+				}
+				throw this.wrapNetworkError(err, requestContext?.requestId);
 				}
 				await this.sleep(this.backoffDelay(attempt));
 			}
 		}
 
 		// Should be unreachable — the loop above either returns or throws.
-		throw this.wrapNetworkError(lastError);
+		throw this.wrapNetworkError(lastError, requestContext?.requestId);
 	}
 
 	private buildUrl(
@@ -505,19 +623,42 @@ export class DocsClient {
 		const message =
 			body && typeof body === "object" && "error" in body && typeof body.error === "string"
 				? body.error
-				: `hiai-docs API error ${res.status}`;
-		return new DocsApiError(res.status, body, message);
+				: body && typeof body === "object" && "message" in body && typeof body.message === "string"
+					? body.message
+					: `hiai-docs API error ${res.status}`;
+		return new DocsApiError(res.status, body, message, {
+			url: res.url || undefined,
+			requestId: res.headers.get("x-request-id") ?? undefined,
+		});
 	}
 
-	private wrapNetworkError(err: unknown): Error {
+	private wrapNetworkError(err: unknown, requestId?: string): Error {
 		if (err instanceof Error) {
-			// Preserve the original message for debugging while making the
-			// type explicit at the boundary.
-			const wrapped = new Error(`hiai-docs network error: ${err.message}`);
-			wrapped.cause = err;
-			return wrapped;
+			return new DocsNetworkError(`hiai-docs network error: ${err.message}`, {
+				cause: err,
+				requestId,
+			});
 		}
-		return new Error(`hiai-docs network error: ${String(err)}`);
+		return new DocsNetworkError(`hiai-docs network error: ${String(err)}`, { requestId });
+	}
+
+	private isTimeoutError(err: unknown): boolean {
+		return err instanceof Error && (err.name === "TimeoutError" || err.name === "AbortError");
+	}
+
+	private mergeContext(
+		base?: DocsRequestContext,
+		override?: DocsRequestContext,
+	): DocsRequestContext | undefined {
+		if (!base && !override) return undefined;
+		return {
+			...base,
+			...override,
+			headers: {
+				...(base?.headers ? Object.fromEntries(new Headers(base.headers).entries()) : {}),
+				...(override?.headers ? Object.fromEntries(new Headers(override.headers).entries()) : {}),
+			},
+		};
 	}
 
 	private toBlob(file: Blob | ArrayBuffer | Uint8Array, mimeType: string): Blob {
