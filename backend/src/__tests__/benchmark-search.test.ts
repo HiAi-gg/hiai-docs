@@ -1,10 +1,14 @@
 import { describe, expect, test } from "bun:test";
 import {
+	forbiddenResultIdsAtK,
 	mrrAtK,
+	type OwnerCredentialMap,
+	ownerCredentialHeaders,
 	parseArgs,
 	percentile,
 	type RelevanceFixture,
 	recallAtK,
+	requireOwnerCredentials,
 	resolveApiKey,
 	type SearchProbe,
 	summarizeBenchmark,
@@ -204,6 +208,87 @@ describe("search benchmark evaluation math", () => {
 		expect(resolveApiKey({ BENCHMARK_API_KEY: "fallback-secret" })).toBe(
 			"fallback-secret",
 		);
+	});
+
+	test("requires distinct scoped credentials for every fixture owner", () => {
+		const fixture: RelevanceFixture = {
+			version: "test",
+			description: "tenant scopes",
+			documents: [],
+			cases: [
+				{
+					id: "owner-a-case",
+					description: "owner a",
+					query: "a",
+					relevantDocumentIds: [],
+					ownerId: "owner-a",
+					forbiddenDocumentIds: ["owner-b-doc"],
+				},
+				{
+					id: "owner-b-case",
+					description: "owner b",
+					query: "b",
+					relevantDocumentIds: [],
+					ownerId: "owner-b",
+					forbiddenDocumentIds: ["owner-a-doc"],
+				},
+			],
+		};
+		const credentials: OwnerCredentialMap = {
+			"owner-a": "owner-a-token",
+			"owner-b": { authorization: "Bearer owner-b-token" },
+		};
+		const resolved = requireOwnerCredentials(fixture, credentials);
+		expect(resolved.get("owner-a")?.authorization).toBe("Bearer owner-a-token");
+		expect(resolved.get("owner-b")?.authorization).toBe("Bearer owner-b-token");
+		expect(resolved.get("owner-a")?.authorization).not.toBe(
+			resolved.get("owner-b")?.authorization,
+		);
+		expect(ownerCredentialHeaders({ cookie: "session-owner-a" }).cookie).toBe(
+			"session-owner-a",
+		);
+	});
+
+	test("fails setup when a fixture owner has no scoped credential", () => {
+		const fixture: RelevanceFixture = {
+			version: "test",
+			description: "tenant scopes",
+			documents: [],
+			cases: [
+				{
+					id: "owner-a-case",
+					description: "owner a",
+					query: "a",
+					relevantDocumentIds: [],
+					ownerId: "owner-a",
+					forbiddenDocumentIds: [],
+				},
+				{
+					id: "owner-b-case",
+					description: "owner b",
+					query: "b",
+					relevantDocumentIds: [],
+					ownerId: "owner-b",
+					forbiddenDocumentIds: [],
+				},
+			],
+		};
+		expect(() =>
+			requireOwnerCredentials(fixture, { "owner-a": "owner-a-token" }),
+		).toThrow("owner-b");
+	});
+
+	test("checks forbidden IDs only within each owner top-k response", () => {
+		expect(
+			forbiddenResultIdsAtK(
+				["owner-a-doc", "owner-a-other", "owner-b-doc"],
+				["owner-b-doc"],
+				2,
+			),
+		).toEqual([]);
+		expect(
+			forbiddenResultIdsAtK(["owner-a-doc", "owner-b-doc"], ["owner-b-doc"], 2),
+		).toEqual(["owner-b-doc"]);
 	});
 
 	test("keeps the package benchmark command free of credential arguments", async () => {

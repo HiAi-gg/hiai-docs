@@ -28,6 +28,26 @@ export interface RelevanceCase {
 	crossLanguage?: boolean;
 }
 
+/**
+ * Credentials used for one owner-scoped search probe.
+ *
+ * Values are intentionally accepted as either a bearer token shorthand or a
+ * header map so CI can use deterministic API keys while local smoke runs can
+ * use a Better Auth session cookie. The benchmark never serializes or prints
+ * these values.
+ */
+export type OwnerCredentialInput =
+	| string
+	| {
+			authorization?: string;
+			cookie?: string;
+			headers?: Record<string, string>;
+	  };
+
+export type OwnerCredentialMap = Record<string, OwnerCredentialInput>;
+
+export type OwnerCredentialHeaders = Record<string, string>;
+
 export interface RelevanceFixture {
 	version: string;
 	description: string;
@@ -38,6 +58,7 @@ export interface RelevanceFixture {
 
 export interface SearchProbe {
 	caseId: string;
+	ownerId?: string;
 	query: string;
 	resultIds: string[];
 	latencyMs: number;
@@ -286,6 +307,7 @@ interface CliArgs {
 	k: number;
 	apiKeyFile?: string;
 	apiKeyStdin: boolean;
+	ownerCredentialsFile?: string;
 }
 
 export function parseArgs(
@@ -315,12 +337,99 @@ export function parseArgs(
 			if (inlineValue === undefined) index += 1;
 		} else if (name === "--api-key-stdin") {
 			output.apiKeyStdin = true;
+		} else if (name === "--owner-credentials-file") {
+			if (!value || (inlineValue === undefined && value.startsWith("--"))) {
+				throw new Error("--owner-credentials-file requires a file path");
+			}
+			output.ownerCredentialsFile = value;
+			if (inlineValue === undefined) index += 1;
 		} else if (name === "--k" && value) {
 			output.k = Math.max(1, Number.parseInt(value, 10) || 10);
 			if (inlineValue === undefined) index += 1;
 		}
 	}
 	return output;
+}
+
+/** Convert one owner credential input into request headers without logging it. */
+export function ownerCredentialHeaders(
+	credential: OwnerCredentialInput,
+): OwnerCredentialHeaders {
+	const headers = new Headers();
+	if (typeof credential === "string") {
+		const token = credential.trim();
+		if (!token) throw new Error("Owner credential values must not be empty");
+		headers.set(
+			"authorization",
+			token.startsWith("Bearer ") ? token : `Bearer ${token}`,
+		);
+	} else if (!credential || typeof credential !== "object") {
+		throw new Error("Owner credentials must be a token or header object");
+	} else {
+		for (const [name, value] of Object.entries(credential.headers ?? {})) {
+			if (typeof value !== "string" || !value.trim()) {
+				throw new Error(
+					`Owner credential header ${name} must be a non-empty string`,
+				);
+			}
+			headers.set(name, value);
+		}
+		if (credential.authorization?.trim()) {
+			headers.set("authorization", credential.authorization.trim());
+		}
+		if (credential.cookie?.trim()) {
+			headers.set("cookie", credential.cookie.trim());
+		}
+	}
+	const normalized = Object.fromEntries(headers.entries());
+	if (Object.keys(normalized).length === 0) {
+		throw new Error(
+			"Owner credentials must include authorization, cookie, or headers",
+		);
+	}
+	return normalized;
+}
+
+/**
+ * Validate and normalize the fixture's required owner scopes.
+ *
+ * This is deliberately separate from the operator credential used for admin
+ * metrics. Missing owners fail before any search request is sent, preventing
+ * accidental fallback to OWNER_ID/admin scope.
+ */
+export function requireOwnerCredentials(
+	fixture: RelevanceFixture,
+	credentials: OwnerCredentialMap,
+): Map<string, OwnerCredentialHeaders> {
+	const owners = new Set(
+		fixture.cases
+			.map((item) => item.ownerId.trim())
+			.filter((ownerId) => ownerId.length > 0),
+	);
+	if (owners.size === 0) {
+		throw new Error("Relevance fixture must declare at least one ownerId");
+	}
+	const resolved = new Map<string, OwnerCredentialHeaders>();
+	for (const ownerId of owners) {
+		const input = credentials[ownerId];
+		if (input === undefined) {
+			throw new Error(
+				`Missing scoped benchmark credentials for owner ${ownerId}; refusing to use the operator credential`,
+			);
+		}
+		resolved.set(ownerId, ownerCredentialHeaders(input));
+	}
+	return resolved;
+}
+
+/** Check leakage only in the response portion counted by the benchmark. */
+export function forbiddenResultIdsAtK(
+	resultIds: readonly string[],
+	forbiddenIds: readonly string[],
+	k: number,
+): string[] {
+	const forbidden = new Set(forbiddenIds);
+	return resultIds.slice(0, Math.max(0, k)).filter((id) => forbidden.has(id));
 }
 
 export function resolveApiKey(
@@ -353,6 +462,36 @@ async function loadApiKey(args: CliArgs): Promise<string> {
 	return key;
 }
 
+async function loadOwnerCredentials(
+	args: CliArgs,
+	fixture: RelevanceFixture,
+): Promise<Map<string, OwnerCredentialHeaders>> {
+	const filePath =
+		args.ownerCredentialsFile ?? process.env.BENCHMARK_OWNER_CREDENTIALS_FILE;
+	let raw: unknown;
+	if (filePath) {
+		raw = await Bun.file(filePath).json();
+	} else if (process.env.BENCHMARK_OWNER_CREDENTIALS_JSON) {
+		try {
+			raw = JSON.parse(process.env.BENCHMARK_OWNER_CREDENTIALS_JSON);
+		} catch {
+			throw new Error(
+				"BENCHMARK_OWNER_CREDENTIALS_JSON must contain a valid JSON object",
+			);
+		}
+	} else {
+		throw new Error(
+			"Missing scoped benchmark credentials: provide --owner-credentials-file, BENCHMARK_OWNER_CREDENTIALS_FILE, or BENCHMARK_OWNER_CREDENTIALS_JSON",
+		);
+	}
+	if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+		throw new Error(
+			"Scoped benchmark credentials must be a JSON object keyed by ownerId",
+		);
+	}
+	return requireOwnerCredentials(fixture, raw as OwnerCredentialMap);
+}
+
 async function loadFixture(): Promise<RelevanceFixture> {
 	const path = new URL(
 		"../../tests/fixtures/search-relevance.json",
@@ -363,7 +502,7 @@ async function loadFixture(): Promise<RelevanceFixture> {
 
 async function querySearch(
 	baseUrl: string,
-	apiKey: string,
+	ownerHeaders: OwnerCredentialHeaders,
 	item: RelevanceCase,
 	k: number,
 ): Promise<SearchProbe> {
@@ -374,7 +513,7 @@ async function querySearch(
 			`${baseUrl.replace(/\/$/, "")}/api/search?${params}`,
 			{
 				headers: {
-					Authorization: `Bearer ${apiKey}`,
+					...ownerHeaders,
 					Accept: "application/json",
 				},
 			},
@@ -383,17 +522,20 @@ async function querySearch(
 		if (!response.ok) throw new Error(`search returned ${response.status}`);
 		const body = (await response.json()) as SearchApiResponse;
 		const items = Array.isArray(body.items) ? body.items : [];
-		const resultIds = items
+		const topItems = items.slice(0, k);
+		const resultIds = topItems
 			.map((result) => result.id)
-			.filter((id): id is string => typeof id === "string");
+			.filter((id): id is string => typeof id === "string")
+			.slice(0, k);
 		return {
 			caseId: item.id,
+			ownerId: item.ownerId,
 			query: item.query,
 			resultIds,
 			latencyMs,
 			expanded: body.diagnostics?.expansionUsed === true,
 			crossLanguageSuccess: body.diagnostics?.crossLanguageSuccess === true,
-			graphContributed: items.some(
+			graphContributed: topItems.some(
 				(result) =>
 					Array.isArray(result.explanations) &&
 					result.explanations.some(
@@ -402,17 +544,20 @@ async function querySearch(
 							(explanation as { channel?: unknown }).channel === "graph",
 					),
 			),
-			allResultsHaveExplanations: items.every(
+			allResultsHaveExplanations: topItems.every(
 				(result) =>
 					Array.isArray(result.explanations) && result.explanations.length > 0,
 			),
-			forbiddenResultIds: resultIds.filter((id) =>
-				item.forbiddenDocumentIds.includes(id),
+			forbiddenResultIds: forbiddenResultIdsAtK(
+				resultIds,
+				item.forbiddenDocumentIds,
+				k,
 			),
 		};
 	} catch (error) {
 		return {
 			caseId: item.id,
+			ownerId: item.ownerId,
 			query: item.query,
 			resultIds: [],
 			latencyMs: performance.now() - started,
@@ -501,10 +646,16 @@ async function main(): Promise<void> {
 	const args = parseArgs();
 	const apiKey = await loadApiKey(args);
 	const fixture = await loadFixture();
+	const ownerCredentials = await loadOwnerCredentials(args, fixture);
 	const metricsBefore = await readMetrics(args.baseUrl, apiKey);
 	const probes = await Promise.all(
 		fixture.cases.map((item) =>
-			querySearch(args.baseUrl, apiKey, item, args.k),
+			querySearch(
+				args.baseUrl,
+				ownerCredentials.get(item.ownerId) as OwnerCredentialHeaders,
+				item,
+				args.k,
+			),
 		),
 	);
 	const metricsAfter = await readMetrics(args.baseUrl, apiKey);

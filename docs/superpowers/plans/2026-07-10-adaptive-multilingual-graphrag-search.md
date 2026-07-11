@@ -706,7 +706,7 @@ git commit -m "feat(search): expose automatic GraphRAG results"
 
 **Interfaces:**
 - Produces per-channel latency/error/candidate metrics, expansion reason/model metrics, empty-result count, graph contribution, and embedding-state inventory.
-- Produces `bun run benchmark:search -- --base-url=...` with a non-zero exit when a release gate fails. The implementation reads the credential from `HIAI_DOCS_API_KEY`/`BENCHMARK_API_KEY`, stdin, or a file and rejects API-key command-line values.
+- Produces `bun run benchmark:search -- --base-url=... --owner-credentials-file=...` with a non-zero exit when a release gate fails. The operator credential is read from `HIAI_DOCS_API_KEY`/`BENCHMARK_API_KEY`, stdin, or a file and rejects API-key command-line values. Search probes require a separate JSON owner-credential map (or `BENCHMARK_OWNER_CREDENTIALS_FILE`/`BENCHMARK_OWNER_CREDENTIALS_JSON`) covering every fixture `ownerId`; the benchmark never falls back to the operator `OWNER_ID` scope.
 
 - [ ] **Step 1: Write metric registry tests**
 
@@ -728,7 +728,7 @@ Include judgments for the JSON-decoded queries `\u0430\u043d\u0433\u043b\u0438\u
 
 - [ ] **Step 4: Implement the benchmark**
 
-The script seeds or references deterministic fixture document IDs, executes the real HTTP search endpoint, records top ten IDs and diagnostics, and prints one JSON summary containing Recall@10, MRR@10, fast p95, expanded p95, expansion rate, graph contribution, empty count, and tenant leakage count.
+The script seeds or references deterministic fixture document IDs, executes the real HTTP search endpoint under the credential mapped to each case's `ownerId`, records top-ten IDs and diagnostics, and prints one JSON summary containing Recall@10, MRR@10, fast p95, expanded p95, expansion rate, graph contribution, empty count, and tenant leakage count. Forbidden IDs are evaluated only against each owner's top-ten response.
 
 Exit 1 unless all gates pass:
 
