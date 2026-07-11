@@ -1,5 +1,6 @@
 import { describe, expect, mock, test } from "bun:test";
 import type { TenantContext } from "@hiai-docs/db/with-tenant";
+import type { EmbeddingResult } from "../embedding/result";
 import {
 	folderCategoryMatchesOwner,
 	searchDocuments,
@@ -10,7 +11,6 @@ import type {
 	SearchCandidate,
 	SearchChannel,
 } from "../search/types";
-import type { EmbeddingResult } from "../embedding/result";
 
 const OWNER = "00000000-0000-4000-8000-000000000001";
 const ctx: TenantContext = { userId: OWNER, role: "user" };
@@ -112,6 +112,32 @@ describe("automatic GraphRAG search orchestration", () => {
 		expect(provider).toHaveBeenCalledTimes(1);
 		expect(requestEmbedding).toEqual(queryEmbedding);
 		expect(response.queryEmbedding).toEqual(queryEmbedding);
+	});
+
+	test("caches a provider rejection as a failure result for hydration", async () => {
+		const provider = mock(async () => {
+			throw new Error("embedding provider unavailable");
+		});
+		let first: EmbeddingResult | undefined;
+		let second: EmbeddingResult | undefined;
+		const response = await searchDocuments(
+			ctx,
+			{ query: "English", limit: 10 },
+			{
+				getEmbedding: provider,
+				retrieveFast: async (_ctx, _plan, options = {}) => {
+					first = await options.getEmbedding?.("English");
+					second = await options.getEmbedding?.("English");
+					return channels({});
+				},
+				expand: async () => null,
+				retrieveGraph: async () => [],
+			},
+		);
+		expect(provider).toHaveBeenCalledTimes(1);
+		expect(first).toEqual({ ok: false, code: "provider_error" });
+		expect(second).toEqual(first);
+		expect(response.queryEmbedding).toEqual(first);
 	});
 
 	test("confident exact plus vector fast pass does not call the LLM", async () => {

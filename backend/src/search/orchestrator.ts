@@ -1,13 +1,16 @@
 import { documents, documentTags, folders, tags } from "@hiai-docs/db/schema";
 import type { TenantContext } from "@hiai-docs/db/with-tenant";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, or } from "drizzle-orm";
 import { getEmbedding } from "../embedding";
 import type { EmbeddingResult } from "../embedding/result";
 import { config } from "../lib/config";
 import { withTenant } from "../lib/with-tenant";
 import { evaluateConfidence } from "./confidence";
-import type { GraphVisibilityScope } from "./graph-retriever";
-import { retrieveGraphCandidates } from "./graph-retriever";
+import {
+	_buildGraphVisibilityScope,
+	type GraphVisibilityScope,
+	retrieveGraphCandidates,
+} from "./graph-retriever";
 import { analyzeQuery } from "./query-analyzer";
 import { expandQuery } from "./query-expander";
 import { retrieveFastChannels } from "./retrievers";
@@ -46,6 +49,10 @@ export interface SearchDiagnostics {
 export interface SearchResponse {
 	items: RankedSearchResult[];
 	total: number;
+	/** Count of all filtered, visibility-authorized candidates before pagination. */
+	visibleTotal?: number;
+	/** Candidate IDs used to calculate visibleTotal across the complete result set. */
+	visibleDocumentIds?: string[];
 	page: number;
 	limit: number;
 	queryPlan: QueryPlan;
@@ -112,7 +119,18 @@ export async function searchDocuments(
 		const key = text.normalize("NFKC");
 		const cached = embeddingCache.get(key);
 		if (cached) return cached;
-		const pending = embeddingProvider(text);
+		// Resolve provider failures into a stable result. A rejected promise would
+		// be caught by the vector channel, but chunk hydration would then call the
+		// provider again because no queryEmbedding could be forwarded to the route.
+		// The resolved failure sentinel keeps this request scoped and single-flight.
+		const pending = Promise.resolve()
+			.then(() => embeddingProvider(text))
+			.catch(
+				(): EmbeddingResult => ({
+					ok: false,
+					code: "provider_error",
+				}),
+			);
 		embeddingCache.set(key, pending);
 		return pending;
 	};
@@ -211,8 +229,20 @@ export async function searchDocuments(
 			vectorMinSimilarity: config.SEARCH_VECTOR_MIN_SIMILARITY,
 		},
 	);
-	const filtered = request.filters
-		? await applySearchFilters(ctx, ranked, request.filters)
+	const filters = request.filters;
+	const hasFilters = Boolean(
+		filters &&
+			Object.values(filters).some((value) =>
+				Array.isArray(value) ? value.length > 0 : value !== undefined,
+			),
+	);
+	const filtered = hasFilters
+		? await applySearchFilters(
+				ctx,
+				ranked,
+				filters as SearchFilters,
+				request.visibilityScope,
+			)
 		: ranked;
 	const offset = (page - 1) * limit;
 	const items = filtered.slice(offset, offset + limit);
@@ -231,6 +261,8 @@ export async function searchDocuments(
 	return {
 		items,
 		total: filtered.length,
+		visibleTotal: filtered.length,
+		visibleDocumentIds: filtered.map((item) => item.documentId),
 		page,
 		limit,
 		queryPlan: plan,
@@ -299,9 +331,24 @@ async function applySearchFilters(
 	ctx: TenantContext,
 	items: RankedSearchResult[],
 	filters: SearchFilters,
+	visibilityScope?: GraphVisibilityScope,
 ): Promise<RankedSearchResult[]> {
 	if (items.length === 0) return [];
 	const ids = items.map((item) => item.documentId);
+	const scope = visibilityScope ?? _buildGraphVisibilityScope(ctx);
+	const visibility =
+		scope.kind === "admin"
+			? undefined
+			: scope.kind === "public"
+				? eq(documents.visibility, "public")
+				: scope.kind === "share"
+					? inArray(documents.id, scope.allowedDocumentIds)
+					: scope.includePublic
+						? or(
+								eq(documents.ownerId, scope.ownerId),
+								eq(documents.visibility, "public"),
+							)
+						: eq(documents.ownerId, scope.ownerId);
 	const rows = await withTenant(ctx, async (tx) =>
 		tx
 			.select({
@@ -321,23 +368,21 @@ async function applySearchFilters(
 					eq(folders.ownerId, ctx.userId),
 				),
 			)
-			.where(
-				and(eq(documents.ownerId, ctx.userId), inArray(documents.id, ids)),
-			),
+			.where(and(visibility, inArray(documents.id, ids))),
 	);
 	const byId = new Map(rows.map((row) => [row.id, row]));
 	let filtered = items.filter((item) => {
 		const row = byId.get(item.documentId);
 		if (!row) return false;
-		if (filters.folderId && row.folderId !== filters.folderId) return false;
+		if (
+			filters.folderId &&
+			(row.folderId !== filters.folderId || row.folderOwnerId !== ctx.userId)
+		)
+			return false;
 		if (
 			filters.categoryId &&
 			row.categoryId !== filters.categoryId &&
-			!folderCategoryMatchesOwner(
-				row,
-				filters.categoryId,
-				ctx.userId,
-			)
+			!folderCategoryMatchesOwner(row, filters.categoryId, ctx.userId)
 		)
 			return false;
 		const created = new Date(row.createdAt).getTime();

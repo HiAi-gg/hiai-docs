@@ -149,6 +149,11 @@ export function createSearchRoutes(
 					ownerId: shareScope.ownerId,
 					allowedDocumentIds: shareScope.documentIds,
 				};
+			} else {
+				graphVisibilityScope =
+					ctx.role === "admin"
+						? { kind: "admin" }
+						: { kind: "tenant", ownerId: ctx.userId, includePublic: true };
 			}
 			const parsed = searchQuerySchema.safeParse(query);
 			if (!parsed.success) {
@@ -205,12 +210,20 @@ export function createSearchRoutes(
 					q,
 					shareDocumentIds,
 					domain.queryEmbedding,
+					domain.visibleDocumentIds,
 				);
-				// The public count must describe rows that survived authorization and
-				// hydration. A domain candidate can disappear when its document was
-				// deleted, hidden, or fails the share allow-list between retrieval and
-				// hydration; exposing domain.total would leak that count.
-				return { items: rows, total: rows.length, page, limit };
+				// `visibleTotal` is calculated over the complete filtered candidate set,
+				// never from the current page. The hydrator may attach a refreshed count
+				// when a document was deleted or hidden between retrieval and hydration.
+				const hasDomainVisibilityMetadata =
+					domain.visibleTotal !== undefined ||
+					domain.visibleDocumentIds !== undefined;
+				const visibleTotal =
+					rows.visibleTotal ??
+					(hasDomainVisibilityMetadata
+						? (domain.visibleTotal ?? domain.total)
+						: rows.length);
+				return { items: rows, total: visibleTotal, page, limit };
 			} catch (err) {
 				logger.error({ err }, "Search failed");
 				set.status = 500;
@@ -274,9 +287,12 @@ async function hydrateResults(
 	query: string,
 	allowedDocumentIds?: string[],
 	queryEmbedding?: EmbeddingResult,
-): Promise<SearchResult[]> {
-	if (items.length === 0) return [];
+	candidateIds?: string[],
+): Promise<HydratedSearchResults> {
+	if (items.length === 0 && (!candidateIds || candidateIds.length === 0))
+		return [];
 	const ids = items.map((item) => item.documentId);
+	const visibleIds = [...new Set(candidateIds ?? ids)];
 	const { documents, folders } = await import("@hiai-docs/db/schema");
 	const rows = await withTenant(ctx, async (tx) =>
 		tx
@@ -303,7 +319,7 @@ async function hydrateResults(
 						eq(documents.ownerId, ctx.userId),
 						eq(documents.visibility, "public"),
 					),
-					inArray(documents.id, ids),
+					inArray(documents.id, visibleIds),
 					allowedDocumentIds
 						? inArray(documents.id, allowedDocumentIds)
 						: undefined,
@@ -377,8 +393,14 @@ async function hydrateResults(
 		}
 	}
 	const tagged = await withTags(ctx, hydrated);
-	return tagged;
+	const result = tagged as HydratedSearchResults;
+	// The query above is scoped to every authorized candidate ID, not only the
+	// current page. This preserves global pagination while avoiding hidden counts.
+	result.visibleTotal = rows.length;
+	return result;
 }
+
+export type HydratedSearchResults = SearchResult[] & { visibleTotal?: number };
 
 async function withTags<T extends { id: string }>(
 	ctx: import("../../api/middleware/tenant").TenantContext,
