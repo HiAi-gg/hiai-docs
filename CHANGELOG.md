@@ -7,6 +7,19 @@ All notable changes to hiai-docs are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- BullMQ pipeline migration and restart-recovery scaffolding. PostgreSQL is
+  the durable source of truth for nonterminal runs while Redis remains the job
+  transport.
+- One-release legacy embedding-queue bridge documentation and deterministic
+  prepare-job migration checks.
+
+### Changed
+- Release verification now includes worker restart, Redis-loss reconciliation,
+  owner isolation, and rollback safety checks.
+
 ## [0.2.7] - 2026-07-11
 
 ### Added

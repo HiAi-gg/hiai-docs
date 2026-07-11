@@ -29,6 +29,21 @@ release notes must retain the measured values rather than imply a universal SLA.
 
 ## Architecture
 
+### Pipeline migration status
+
+Document processing now targets the BullMQ five-stage pipeline
+(`prepare`, `embed`, `graph`, `summarize`, `finalize`). PostgreSQL pipeline
+tables are the recovery source of truth; Redis carries executable jobs. The
+legacy `hiai-docs:embedding-queue` list is a one-release backfill bridge: old
+string and retry-envelope entries are converted into deterministic prepare job
+IDs and deduplicated by document generation/revision.
+
+Worker restarts and Redis loss must be reconciled from nonterminal PostgreSQL
+runs. Rollback pauses BullMQ producers/workers, preserves pipeline tables, and
+re-enqueues current nonterminal documents into the legacy list. Rollback never
+deletes generation records. Graph or summary provider failures remain isolated
+from ready embeddings; finalize reports `ready_with_warnings` where applicable.
+
 The search contour contains exact/title, multilingual lexical, fuzzy, vector,
 adaptive expansion, and automatic GraphRAG channels. Reciprocal rank fusion
 (RRF) combines candidates with exact-title and channel-agreement boosts. Graph

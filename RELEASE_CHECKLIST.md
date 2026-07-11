@@ -58,7 +58,10 @@ GitHub Actions and the operator confirms the browser flow.
 - [ ] **Run migration/reindex dry-run** — `bun run db:migrate` then `cd backend && bun run src/scripts/reindex-embeddings.ts --dry-run --batch=100`
 - [ ] **Run relevance benchmark** — `cd backend && bun run benchmark:search -- --base-url=http://127.0.0.1:50700 --owner-credentials-file=/run/secrets/hiai-docs-benchmark-owners.json`; operator credential comes from `HIAI_DOCS_API_KEY`/`BENCHMARK_API_KEY` via environment/stdin/file, owner credentials come from the protected JSON map, and no credential is ever passed in argv
 - [ ] **Verify benchmark gates** — Recall@10 ≥ 0.90, MRR@10 ≥ 0.80, fast p95 ≤ 500 ms, expanded p95 ≤ 2.5 s, zero active invalid vectors, and zero tenant leakage
-- [ ] **Verify fresh and upgraded databases** — apply migrations 0000–0026, reindex fixtures, and record both DiskANN/HNSW paths plus upgrade invariants
+- [ ] **Verify fresh and upgraded databases** — apply migrations 0000–0028, reindex fixtures, and record both DiskANN/HNSW paths plus upgrade invariants
+- [ ] **Verify pipeline migration** — confirm legacy list entries become one deterministic prepare job per active document revision
+- [ ] **Verify restart recovery** — terminate workers during prepare/embed/graph/finalize, reconcile from PostgreSQL, and confirm no lost jobs, duplicate active generations, or cross-owner recovery
+- [ ] **Verify rollback safety** — pause BullMQ producers/workers, preserve pipeline tables, and re-enqueue only nonterminal documents into the legacy list; never delete generation records
 
 ## Build
 
