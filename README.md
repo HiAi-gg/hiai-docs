@@ -18,14 +18,96 @@ hiai-docs is a lightweight **self-hosted knowledge base** built for users who wa
 
 If you are looking for a **local LLM knowledge base** or a **lightweight Outline alternative** / **Docmost alternative**, hiai-docs offers an elegant, **RAG-ready knowledge vault** that automatically generates vector embeddings on every save, supports hybrid semantic search, and provides a clean REST API for AI agent integration.
 
+## Start here: fast installation
+
+The normal user does not need Bun, Node, PostgreSQL, Redis, SeaweedFS, or any
+source-code configuration. You need Docker Engine/Desktop with the Compose
+plugin. The quickstart builds the unified PostgreSQL image, generates local
+secrets, applies every migration, and starts the complete product.
+
+```bash
+git clone https://github.com/hiai-gg/hiai-docs.git
+cd hiai-docs
+cp .env.example .env
+# Choose OpenRouter (paste the key) or Ollama (set AI_PROVIDER and port).
+bash scripts/quickstart.sh
+```
+
+The script creates the ignored root `.env`. That is the only file a user ever
+needs to edit:
+
+| Provider | Change in `.env` | Models already configured |
+|---|---|---|
+| OpenRouter (default) | Set `OPENROUTER_API_KEY=sk-or-...` | `text-embedding-3-small` → `bge-m3`; Ministral → Gemma for GraphRAG/search |
+| Ollama | Set `AI_PROVIDER=ollama`; optionally change `OLLAMA_PORT` | `bge-m3` embeddings; `qwen3:8b` for extraction/search |
+
+After changing the provider value later, run the same command again:
+
+```bash
+bash scripts/quickstart.sh
+```
+
+Open the application at **http://localhost:50701**. The API health endpoint is
+**http://localhost:50700/api/health**. For Ollama, the host must already have
+the selected models (`ollama pull bge-m3` and `ollama pull qwen3:8b`).
+
+For a public domain after the local check, enable the bundled Caddy profile:
+
+```bash
+docker compose --env-file .env --profile caddy up -d
+```
+
+### Rules for a safe quickstart
+
+- Keep the root `.env` private; it is ignored by Git.
+- Never put an API key in source code, a commit, a Dockerfile, or a prompt log.
+- Do not edit migrations or application code for a normal installation.
+- Do not delete Docker volumes during troubleshooting unless data loss is
+  explicitly intended and authorized.
+- For a production domain, configure TLS/Caddy after the local health check.
+
+## Agentic installation rules
+
+Give the following instruction to your coding agent. It is intentionally
+provider-first: the agent may create and edit only the ignored root `.env`, not
+application source files, to complete a normal installation.
+
+```text
+Install and launch hiai-docs from https://github.com/hiai-gg/hiai-docs.
+
+1. Check Docker Engine/Desktop and Docker Compose v2. Do not install Node or
+   replace the Bun/Docker workflow.
+2. Clone the repository if it is not already present, then create the ignored
+   provider file without changing source code:
+      cp .env.example .env
+3. Ask for exactly one provider input: an OpenRouter API key, or Ollama host
+   port (default 11434). Never ask the user to edit source code.
+4. Write only the provider input to the ignored root `.env`:
+   - OpenRouter: OPENROUTER_API_KEY=<user-provided-key>
+   - Ollama: AI_PROVIDER=ollama and OLLAMA_PORT=<port>
+5. Run bash scripts/quickstart.sh. It generates all DB/auth/storage
+   secrets, builds the custom PostgreSQL image, runs migrations 0000 through
+   the current journal, and starts API, web, Redis, and SeaweedFS.
+6. Verify, without printing secrets:
+   - http://localhost:50701 loads;
+   - http://localhost:50700/api/health returns status=ok and storage=ok;
+   - docker compose ps reports healthy services.
+7. If a provider is unavailable, report it as a provider/configuration issue;
+   do not replace GraphRAG, disable RLS, drop volumes, or rewrite migrations.
+8. Report the UI URL, API health result, container status, and any remaining
+   provider prerequisite. Never print the contents of .env.
+```
+
 ---
 
 ## Table of Contents
 
+- [Start here: fast installation](#start-here-fast-installation)
+- [Agentic installation rules](#agentic-installation-rules)
 - [Features](#features)
 - [Screenshots](#screenshots)
 - [Automatic GraphRAG search](#automatic-graphrag-search)
-- [Quick Start](#quick-start)
+- [SDK, CLI, and MCP](#sdk-cli-and-mcp)
 - [Stack](#stack)
 - [Comparison](#comparison-with-other-self-hosted-solutions)
 - [Project Structure](#project-structure)
@@ -144,31 +226,11 @@ GRAPH_EXTRACT_MIN_CONFIDENCE=0.5
 ```
 
 The public reference profile uses Ministral as the primary extraction model and Gemma as its fallback. Exact OpenRouter hosts may reuse `OPENROUTER_API_KEY` when their provider-specific key is blank. Local no-auth endpoints may leave `GRAPH_EXTRACT_*_API_KEY` blank; custom providers may set a dedicated key. The shared OpenRouter key is never inherited by non-OpenRouter endpoints. GraphRAG is enabled in the copied `.env.example` profile so the product's central feature works immediately after a key is added. The runtime schema retains safe `false` fallbacks when no environment file is supplied; deployments that want automatic GraphRAG must copy the reference profile or set the flags explicitly. See [`.env.example`](.env.example) for the local Ollama alternative.
-## Quick Start
+## SDK, CLI, and MCP
 
-### Option 1: Docker (run the full product)
-
-```bash
-git clone https://github.com/hiai-gg/hiai-docs.git
-cd hiai-docs
-# Creates .env, generates local infrastructure secrets, and starts the
-# complete Docker stack. This is the only setup command required.
-bash scripts/quickstart.sh
-```
-
-The generated `.env` is the only file a normal user needs to edit. For the
-default OpenRouter profile, paste a key into `OPENROUTER_API_KEY`. For local
-Ollama, set `AI_PROVIDER=ollama` and, only if needed, change `OLLAMA_PORT`
-(default `11434`). Database, auth, storage, and admin secrets are generated
-automatically and remain in the ignored `.env`; no source-code edits are
-required.
-
-> **Note:** To enable the Caddy reverse proxy (TLS, production), run with `--profile caddy`:
-> `docker compose --profile caddy up -d`
-
-Open http://localhost:50701
-
-### Option 2: npm — SDK, CLI, and MCP server
+The Docker quickstart is documented at the top of this README. This section is
+for consumers who already have a running hiai-docs instance and want to use its
+agent-facing packages.
 
 Installing via npm gives you three agent-facing tools. It does **not** deploy hiai-docs —
 you still need a running instance (Docker or git clone).
@@ -242,24 +304,6 @@ const storage = createObjectStorageClient({ endpoint: "localhost", port: 9020, a
 ```
 
 > **Note:** `backend/lib/redis` and `backend/lib/storage` resolve to the pure factory files (`redis-factory.ts`, `storage-factory.ts`). Importing from `backend/lib/redis.ts` or `backend/lib/storage.ts` directly is also supported and equivalent — both re-export from the factory. The `packages/db/with-tenant` path goes through a re-export shim at `backend/src/lib/with-tenant.ts`.
-
-## Agentic Quickstart (AI-Powered Setup)
-
-Don't want to run setup commands manually? Copy-paste this unified prompt into your AI assistant (OpenCode, Claude Code, Cursor, Copilot, etc.) and let it do the work:
-
-```text
-Set up and launch the hiai-docs project on my local system:
-1. Clone the repository at https://github.com/hiai-gg/hiai-docs (if not already cloned)
-2. Ask the user for exactly one provider input: an OpenRouter API key, or an Ollama port (default `11434`). Never ask them to edit source code.
-3. Put the provider input in the generated root `.env` (`OPENROUTER_API_KEY`, or `AI_PROVIDER=ollama` and `OLLAMA_PORT`).
-4. Run `bash scripts/quickstart.sh`. It generates local infrastructure secrets, builds the unified PostgreSQL image, applies the complete migration chain, and starts API, web, Redis, and SeaweedFS.
-5. Verify health status by checking:
-   - SvelteKit Web UI: http://localhost:50701
-   - Elysia API Health: http://localhost:50700/api/health
-
-The user should not need to open the repository again after this step; future
-configuration changes are limited to the ignored root `.env`.
-```
 
 ### Local Development (Recommended for hacking)
 

@@ -5,6 +5,8 @@
 ```bash
 git clone https://github.com/hiai-gg/hiai-docs.git
 cd hiai-docs
+cp .env.example .env
+# Set OPENROUTER_API_KEY, or choose AI_PROVIDER=ollama and OLLAMA_PORT.
 bash scripts/quickstart.sh
 ```
 
