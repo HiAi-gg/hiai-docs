@@ -96,6 +96,44 @@ User → SvelteKit Frontend → REST API (Elysia) → PostgreSQL
 6. Worker atomically activates a complete finite/non-zero 1024-dimensional generation; failed candidates leave the prior generation active
 7. After activation, the worker performs GraphRAG entity extraction into AGE
 
+## Durable BullMQ document pipeline
+
+Document processing is a five-stage BullMQ pipeline backed by PostgreSQL state:
+
+```text
+prepare → embed (chunk batches) → graph → summarize → finalize
+```
+
+Each stage has its own worker, retry policy, concurrency, and dead-letter
+handling. PostgreSQL is the recovery source of truth for the document
+generation, revision fence, stage status, batch progress, attempts, errors,
+heartbeats, and idempotency. Redis/BullMQ carries executable jobs; it is not the
+canonical document store. Queue-state tables never store document bodies or
+model output.
+
+Embedding work is split into bounded batches (five chunks by default). A large
+document therefore cannot occupy the entire ready queue: only the configured
+number of unfinished batches for that document is scheduled at once. A batch
+that is already complete is idempotent on retry, and a stale revision is
+cancelled before it can activate embeddings.
+
+### Multi-user fairness
+
+Fairness controls limit active work, not submissions. Requests are not rejected
+because another owner has many queued documents. Owner-aware leases and
+per-document batch windows ensure that one owner or one large document cannot
+monopolize workers while other owners make progress. The planned defaults are:
+
+- `QUEUE_MAX_ACTIVE_PREPARE_PER_OWNER=2`
+- `QUEUE_MAX_ACTIVE_EMBED_PER_OWNER=4`
+- `QUEUE_MAX_ACTIVE_GRAPH_PER_OWNER=1`
+- `QUEUE_MAX_ACTIVE_BATCHES_PER_DOCUMENT=2`
+
+These controls are separate from provider throttling. Provider limiter modes
+are `disabled` (worker concurrency only), `local` (optional GPU-protection
+concurrency cap, no API quota), and `remote` (concurrency, requests/minute,
+backoff, and `Retry-After` handling).
+
 Search queries run exact/title, language-neutral lexical, fuzzy, and active-generation vector retrieval in parallel. A deterministic confidence gate invokes at most one structured multilingual expansion pass when direct evidence is weak. Authorized AGE graph expansion then contributes related documents. Reciprocal rank fusion combines all channels with exact-title and channel-agreement boosts, finite-score/vector thresholds, and a graph contribution cap. If embeddings, expansion, or AGE are unavailable, the remaining channels still return results.
 
 ### Search and embedding invariants

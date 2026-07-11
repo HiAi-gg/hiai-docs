@@ -48,6 +48,62 @@ cd backend && bun run dev     # → localhost:50700
 cd frontend && bun run dev    # → localhost:50701
 ```
 
+## BullMQ pipeline and local Ollama
+
+Document imports and edits are accepted by the API and queued through five
+stages: `prepare`, `embed`, `graph`, `summarize`, and `finalize`. PostgreSQL
+stores durable stage and batch state so workers can recover after a restart;
+Redis/BullMQ is the execution transport. Local API usage has no artificial
+per-user document or job quota. Authentication, payload-size limits, database
+constraints, and infrastructure backpressure still apply.
+
+The planned worker defaults are:
+
+| Knob | Default |
+|------|---------|
+| `QUEUE_PREPARE_CONCURRENCY` | `2` |
+| `QUEUE_EMBED_CONCURRENCY` | `3` |
+| `QUEUE_GRAPH_CONCURRENCY` | `2` |
+| `QUEUE_SUMMARY_CONCURRENCY` | `1` |
+| `QUEUE_FINALIZE_CONCURRENCY` | `2` |
+| `QUEUE_EMBED_BATCH_SIZE` | `5` |
+| `QUEUE_MAX_ACTIVE_BATCHES_PER_DOCUMENT` | `2` |
+| `QUEUE_MAX_ACTIVE_PREPARE_PER_OWNER` | `2` |
+| `QUEUE_MAX_ACTIVE_EMBED_PER_OWNER` | `4` |
+| `QUEUE_MAX_ACTIVE_GRAPH_PER_OWNER` | `1` |
+| `QUEUE_COMPLETED_RETENTION_COUNT` | `1000` |
+| `QUEUE_FAILED_RETENTION_COUNT` | `5000` |
+| `QUEUE_SHUTDOWN_GRACE_MS` | `30000` |
+
+### Local Ollama profile
+
+Use the host Ollama endpoint from the API container and disable remote-provider
+RPM throttling. Replace the model placeholders with models installed in your
+Ollama instance:
+
+```dotenv
+EMBEDDING_BASE_URL=http://host.docker.internal:11434/v1
+EMBEDDING_API_KEY=ollama
+EMBEDDING_MODEL=<installed-embedding-model>
+GRAPH_EXTRACT_BASE_URL=http://host.docker.internal:11434/v1
+GRAPH_EXTRACT_API_KEY=ollama
+GRAPH_EXTRACT_MODEL=<installed-chat-model>
+PROVIDER_LIMITER_MODE=local
+PROVIDER_REQUESTS_PER_MINUTE=0
+```
+
+`PROVIDER_REQUESTS_PER_MINUTE=0` means unlimited requests; it does not disable
+processing. For GPU OOM, lower `QUEUE_EMBED_CONCURRENCY` or
+`QUEUE_GRAPH_CONCURRENCY`. If the GPU is underutilized, raise one concurrency
+value at a time. With large VRAM and a parallel runner, raise
+`QUEUE_EMBED_CONCURRENCY`; when one model is shared by all stages, keep graph
+concurrency at `1`. For OpenRouter, use limiter mode `remote` and provider-
+specific limits.
+
+Do not assume a universal concurrency value for unknown GPU hardware. Observe
+queue wait, provider latency, GPU memory, and error rate before changing a
+knob.
+
 ## Environment Variables
 
 `bash scripts/quickstart.sh` fills infrastructure values automatically. Copy
