@@ -4,6 +4,7 @@ import type { EmbeddingResult } from "../embedding/result";
 import { getMetrics, METRIC_NAMES, resetMetrics } from "../lib/metrics";
 import {
 	folderCategoryMatchesOwner,
+	resolveSearchEmbedding,
 	searchDocuments,
 } from "../search/orchestrator";
 import type {
@@ -24,6 +25,16 @@ const queryEmbedding: EmbeddingResult = {
 	dimensions: 1024,
 	profile: "openai/text-embedding-3-small:1024:v1",
 };
+
+test("bounds a stalled search embedding without failing lexical retrieval", async () => {
+	const stalled = new Promise<EmbeddingResult>(() => undefined);
+	const started = performance.now();
+	expect(await resolveSearchEmbedding(stalled, 5)).toEqual({
+		ok: false,
+		code: "provider_error",
+	});
+	expect(performance.now() - started).toBeLessThan(100);
+});
 
 function candidate(
 	documentId: string,

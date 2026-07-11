@@ -101,7 +101,10 @@ export async function search(
 	if (filters?.category) params.set("category", filters.category);
 	if (filters?.dateFrom) params.set("dateFrom", filters.dateFrom);
 	if (filters?.dateTo) params.set("dateTo", filters.dateTo);
-	return apiFetch(`/api/search?${params}`);
+	// Adaptive search may spend a bounded vector budget followed by query
+	// expansion. Keep this above the backend's default combined budget while
+	// leaving the global API timeout unchanged for ordinary CRUD requests.
+	return apiFetch(`/api/search?${params}`, { timeout: 15_000 });
 }
 
 /**

@@ -498,7 +498,8 @@ deployment configuration:
 | `SEARCH_EXPANSION_ENABLED` | `true` | One-pass multilingual query expansion when confidence is low |
 | `SEARCH_EXPANSION_MODEL` | `mistralai/ministral-14b-2512` | Primary expansion model |
 | `SEARCH_EXPANSION_FALLBACK_MODEL` | `google/gemma-4-31b-it` | Expansion fallback model |
-| `SEARCH_EXPANSION_TIMEOUT_MS` | `10000` | Expansion request timeout; allows cold external or local models |
+| `SEARCH_EXPANSION_TIMEOUT_MS` | `6000` | Total expansion budget divided across primary and fallback models |
+| `SEARCH_VECTOR_PROVIDER_TIMEOUT_MS` | `2500` | Search-only vector budget; lexical results degrade gracefully when the embedding provider stalls |
 | `SEARCH_EXPANSION_CACHE_TTL_SECONDS` | `86400` | Tenant-scoped expansion cache lifetime |
 | `SEARCH_EXPANSION_MAX_VARIANTS` | `12` | Maximum variants per expansion list |
 | `SEARCH_RRF_K` | `60` | RRF rank constant |

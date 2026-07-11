@@ -50,6 +50,13 @@ export async function expandQuery(
 		config.SEARCH_EXPANSION_FALLBACK_API_KEY,
 		config.SEARCH_EXPANSION_FALLBACK_MODEL,
 	);
+	const providerCount = fallback.baseUrl ? 2 : 1;
+	const providerTimeoutMs = Math.max(
+		250,
+		Math.floor(config.SEARCH_EXPANSION_TIMEOUT_MS / providerCount),
+	);
+	primary.timeoutMs = providerTimeoutMs;
+	fallback.timeoutMs = providerTimeoutMs;
 	const key = await expansionCacheKey(
 		tenantScope,
 		plan.normalized,

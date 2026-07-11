@@ -133,7 +133,12 @@ export async function searchDocuments(
 		// provider again because no queryEmbedding could be forwarded to the route.
 		// The resolved failure sentinel keeps this request scoped and single-flight.
 		const pending = Promise.resolve()
-			.then(() => embeddingProvider(text))
+			.then(() =>
+				resolveSearchEmbedding(
+					embeddingProvider(text),
+					config.SEARCH_VECTOR_PROVIDER_TIMEOUT_MS ?? 2_500,
+				),
+			)
 			.catch(
 				(): EmbeddingResult => ({
 					ok: false,
@@ -340,6 +345,27 @@ export async function searchDocuments(
 		diagnostics,
 		...(await getCachedQueryEmbedding(embeddingCache, plan.normalized)),
 	};
+}
+
+/** Bound optional vector retrieval independently from ingestion/reindex SLAs. */
+export async function resolveSearchEmbedding(
+	pending: Promise<EmbeddingResult>,
+	timeoutMs: number,
+): Promise<EmbeddingResult> {
+	let timeout: ReturnType<typeof setTimeout> | undefined;
+	try {
+		return await Promise.race([
+			pending,
+			new Promise<EmbeddingResult>((resolve) => {
+				timeout = setTimeout(
+					() => resolve({ ok: false, code: "provider_error" }),
+					Math.max(1, timeoutMs),
+				);
+			}),
+		]);
+	} finally {
+		if (timeout) clearTimeout(timeout);
+	}
 }
 
 async function getCachedQueryEmbedding(

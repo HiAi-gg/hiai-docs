@@ -183,7 +183,13 @@ export const envSchema = z.object({
 		.int()
 		.min(1_000)
 		.max(300_000)
-		.default(10_000),
+		.default(6_000),
+	SEARCH_VECTOR_PROVIDER_TIMEOUT_MS: z.coerce
+		.number()
+		.int()
+		.min(250)
+		.max(30_000)
+		.default(2_500),
 	SEARCH_EXPANSION_CACHE_TTL_SECONDS: z.coerce
 		.number()
 		.int()

@@ -104,7 +104,8 @@ The underlying variables are:
 | `SEARCH_EXPANSION_ENABLED` | No | `true` | Run one structured multilingual expansion pass when confidence is low |
 | `SEARCH_EXPANSION_MODEL` | No | `mistralai/ministral-14b-2512` | Primary expansion model |
 | `SEARCH_EXPANSION_FALLBACK_MODEL` | No | `google/gemma-4-31b-it` | Fallback expansion model |
-| `SEARCH_EXPANSION_TIMEOUT_MS` | No | `10000` | Expansion timeout; allows cold external or local models |
+| `SEARCH_EXPANSION_TIMEOUT_MS` | No | `6000` | Total expansion budget, divided across primary and fallback providers |
+| `SEARCH_VECTOR_PROVIDER_TIMEOUT_MS` | No | `2500` | Search-only vector provider budget; ingestion keeps its longer timeout |
 | `SEARCH_EXPANSION_CACHE_TTL_SECONDS` | No | `86400` | Tenant-scoped expansion cache TTL |
 | `SEARCH_EXPANSION_MAX_VARIANTS` | No | `12` | Maximum generated variants per category |
 | `SEARCH_EXPANSION_ESTIMATED_COST_MICROUNITS` | No | `0` | Operator-supplied successful-expansion cost estimate for metrics |
