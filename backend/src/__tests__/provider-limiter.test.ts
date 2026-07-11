@@ -2,6 +2,28 @@ import { describe, expect, test } from "bun:test";
 import { createProviderLimiter } from "../queue/provider-limiter";
 
 describe("provider limiter", () => {
+	test("opens and cools down a circuit after repeated remote failures", async () => {
+		let now = 0;
+		const permit = createProviderLimiter({
+			now: () => now,
+			sleep: async () => undefined,
+		});
+		const profile = {
+			name: "remote",
+			mode: "remote" as const,
+			maxRetries: 0,
+			circuitFailureThreshold: 2,
+			circuitCooldownMs: 100,
+		};
+		const fail = () => Promise.reject({ status: 503 });
+		await expect(permit(profile, "embed", fail)).rejects.toBeTruthy();
+		await expect(permit(profile, "embed", fail)).rejects.toBeTruthy();
+		await expect(permit(profile, "embed", async () => "ok")).rejects.toThrow(
+			"provider_circuit_open",
+		);
+		now = 101;
+		expect(await permit(profile, "embed", async () => "ok")).toBe("ok");
+	});
 	test("disabled mode applies no artificial quota or concurrency bound", async () => {
 		const limiter = createProviderLimiter();
 		let active = 0;

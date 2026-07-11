@@ -7,6 +7,8 @@ export interface ProviderLimiterProfile {
 	requestsPerMinute?: number;
 	maxRetries?: number;
 	baseBackoffMs?: number;
+	circuitFailureThreshold?: number;
+	circuitCooldownMs?: number;
 }
 
 export interface ProviderLimiterRuntime {
@@ -72,6 +74,7 @@ export function createProviderLimiter(runtime: ProviderLimiterRuntime = {}) {
 	const sleep = runtime.sleep ?? ((ms: number) => Bun.sleep(ms));
 	const semaphores = new Map<string, Semaphore>();
 	const requestWindows = new Map<string, number[]>();
+	const circuits = new Map<string, { failures: number; openUntil: number }>();
 
 	async function waitForRateWindow(key: string, requestsPerMinute: number) {
 		if (requestsPerMinute <= 0) return;
@@ -96,6 +99,13 @@ export function createProviderLimiter(runtime: ProviderLimiterRuntime = {}) {
 	): Promise<T> {
 		if (profile.mode === "disabled") return fn();
 		const key = `${profile.name}:${operation}`;
+		const circuit = circuits.get(key);
+		if (circuit && circuit.openUntil > now()) {
+			throw Object.assign(new Error("provider_circuit_open"), {
+				code: "provider_circuit_open",
+				retryable: true,
+			});
+		}
 		const concurrency = profile.maxConcurrency ?? 1;
 		if (!Number.isInteger(concurrency) || concurrency < 1) {
 			throw new Error("Provider maxConcurrency must be a positive integer");
@@ -114,9 +124,21 @@ export function createProviderLimiter(runtime: ProviderLimiterRuntime = {}) {
 					await waitForRateWindow(key, profile.requestsPerMinute ?? 0);
 				}
 				try {
-					return await fn();
+					const value = await fn();
+					circuits.delete(key);
+					return value;
 				} catch (error) {
-					if (attempt >= maxRetries || !retryable(error)) throw error;
+					if (attempt >= maxRetries || !retryable(error)) {
+						if (retryable(error)) {
+							const state = circuits.get(key) ?? { failures: 0, openUntil: 0 };
+							state.failures += 1;
+							if (state.failures >= (profile.circuitFailureThreshold ?? 5)) {
+								state.openUntil = now() + (profile.circuitCooldownMs ?? 30_000);
+							}
+							circuits.set(key, state);
+						}
+						throw error;
+					}
 					const retryAfter = retryAfterMs(error);
 					const exponential = (profile.baseBackoffMs ?? 250) * 2 ** attempt;
 					await sleep(retryAfter ?? exponential);
