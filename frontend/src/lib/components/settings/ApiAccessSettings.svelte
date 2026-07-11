@@ -8,6 +8,7 @@ import {
 	categoryIdFromScopes,
 	createGlobalApiKey,
 	listApiKeys,
+	revealCategoryApiKey,
 	revokeApiKey,
 } from "$lib/api/api-keys";
 import { type Category, listCategories } from "$lib/api/categories";
@@ -86,9 +87,8 @@ async function revoke(id: string) {
 }
 
 async function copyKey(key: ApiKeySummary) {
-	await navigator.clipboard.writeText(
-		apiKeyClipboardValue(key, issuedKeys[key.id]),
-	);
+	const rawKey = issuedKeys[key.id] ?? (await revealCategoryApiKey(key.id));
+	await navigator.clipboard.writeText(apiKeyClipboardValue(key, rawKey));
 }
 </script>
 
@@ -117,10 +117,7 @@ async function copyKey(key: ApiKeySummary) {
 			{#each globalKeys as key (key.id)}
 				<div class="flex items-center justify-between rounded-md border p-3 text-sm">
 					<div><div class="font-medium">{key.name}</div><div class="text-muted-foreground">{key.prefix}…</div></div>
-					<div class="flex gap-2">
-						<Button size="sm" variant="outline" onclick={() => copyKey(key)}>{issuedKeys[key.id] ? "Copy key" : "Copy prefix"}</Button>
-						<Button size="sm" variant="destructive" onclick={() => revoke(key.id)} disabled={busy}>Revoke</Button>
-					</div>
+					<Button size="sm" variant="destructive" onclick={() => revoke(key.id)} disabled={busy}>Revoke</Button>
 				</div>
 			{:else}<p class="text-sm text-muted-foreground">No global API keys.</p>{/each}
 		</section>
@@ -139,7 +136,7 @@ async function copyKey(key: ApiKeySummary) {
 					<div class="flex items-center justify-between gap-3 rounded-md border border-dashed p-3 text-sm">
 						<div><div class="font-medium">{categoryName(categoryIdFromScopes(key.scopes))}: {key.name}</div><div class="text-muted-foreground">{key.prefix}… · {key.scopes.map((scope) => scope.split(":").at(-1)).join(" / ")}</div></div>
 						<div class="flex shrink-0 gap-2">
-							<Button size="sm" variant="outline" onclick={() => copyKey(key)}>{issuedKeys[key.id] ? "Copy key" : "Copy prefix"}</Button>
+							<Button size="sm" variant="outline" onclick={() => copyKey(key)} disabled={!key.recoverable && !issuedKeys[key.id]}>{key.recoverable || issuedKeys[key.id] ? "Copy key" : "Rotate to enable copy"}</Button>
 							<Button size="sm" variant="destructive" onclick={() => revoke(key.id)} disabled={busy}>Revoke</Button>
 						</div>
 					</div>

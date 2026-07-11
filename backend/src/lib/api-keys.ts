@@ -5,6 +5,7 @@ import {
 	ZERO_UUID,
 } from "@hiai-docs/db/with-tenant";
 import { and, desc, eq } from "drizzle-orm";
+import { decryptApiKey, encryptApiKey } from "./api-key-encryption";
 
 const API_KEY_ADMIN_TENANT = adminTenantContext(ZERO_UUID);
 
@@ -46,10 +47,14 @@ export async function createApiKey(
 	name: string,
 	scopes?: string[],
 	expiresAt?: Date,
+	options?: { encryptionSecret?: string },
 ): Promise<{ key: string; prefix: string; id: string }> {
 	const rawKey = crypto.randomUUID();
 	const keyHash = hashKey(rawKey);
 	const prefix = rawKey.slice(0, 8);
+	const encryptedKey = options?.encryptionSecret
+		? await encryptApiKey(rawKey, options.encryptionSecret)
+		: null;
 
 	const [row] = await withTenant({ userId: ownerId, role: "user" }, (tx) =>
 		tx
@@ -61,6 +66,7 @@ export async function createApiKey(
 				prefix,
 				scopes: scopes ?? [],
 				expiresAt: expiresAt ?? null,
+				encryptedKey,
 			})
 			.returning({ id: apiKeys.id }),
 	);
@@ -70,6 +76,27 @@ export async function createApiKey(
 	}
 
 	return { key: rawKey, prefix, id: row.id };
+}
+
+export async function revealCategoryApiKey(
+	id: string,
+	ownerId: string,
+	encryptionSecret: string,
+): Promise<string | null> {
+	const [row] = await withTenant({ userId: ownerId, role: "user" }, (tx) =>
+		tx
+			.select({
+				encryptedKey: apiKeys.encryptedKey,
+				scopes: apiKeys.scopes,
+			})
+			.from(apiKeys)
+			.where(and(eq(apiKeys.id, id), eq(apiKeys.ownerId, ownerId)))
+			.limit(1),
+	);
+	if (!row?.encryptedKey) return null;
+	const scopes = (row.scopes ?? []) as string[];
+	if (!categoryIdFromApiKeyScopes(scopes)) return null;
+	return decryptApiKey(row.encryptedKey, encryptionSecret);
 }
 
 /**
@@ -84,6 +111,7 @@ export async function listApiKeys(ownerId: string): Promise<
 		lastUsedAt: Date | null;
 		expiresAt: Date | null;
 		createdAt: Date;
+		recoverable: boolean;
 	}>
 > {
 	const rows = await withTenant({ userId: ownerId, role: "user" }, (tx) =>
@@ -96,6 +124,7 @@ export async function listApiKeys(ownerId: string): Promise<
 				lastUsedAt: apiKeys.lastUsedAt,
 				expiresAt: apiKeys.expiresAt,
 				createdAt: apiKeys.createdAt,
+				encryptedKey: apiKeys.encryptedKey,
 			})
 			.from(apiKeys)
 			.where(eq(apiKeys.ownerId, ownerId))
@@ -103,7 +132,13 @@ export async function listApiKeys(ownerId: string): Promise<
 	);
 
 	return rows.map((r) => ({
-		...r,
+		id: r.id,
+		name: r.name,
+		prefix: r.prefix,
+		lastUsedAt: r.lastUsedAt,
+		expiresAt: r.expiresAt,
+		createdAt: r.createdAt,
+		recoverable: r.encryptedKey !== null,
 		scopes: (r.scopes ?? []) as string[],
 	}));
 }

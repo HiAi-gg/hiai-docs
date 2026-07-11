@@ -4,6 +4,7 @@ import {
 	categoryIdFromScopes,
 	createCategoryApiKey,
 	createGlobalApiKey,
+	revealCategoryApiKey,
 	revokeApiKey,
 } from "./api-keys";
 
@@ -53,5 +54,20 @@ describe("API key client", () => {
 		const key = { prefix: "hiai_abc123" };
 		expect(apiKeyClipboardValue(key, "hiai_secret")).toBe("hiai_secret");
 		expect(apiKeyClipboardValue(key)).toBe("hiai_abc123");
+	});
+
+	test("reveals a category key through the owner-authenticated secret endpoint", async () => {
+		const requests: string[] = [];
+		globalThis.fetch = mock(async (input: RequestInfo | URL) => {
+			requests.push(String(input));
+			return new Response(JSON.stringify({ key: "category-secret" }), {
+				status: 200,
+				headers: { "content-type": "application/json" },
+			});
+		}) as unknown as typeof fetch;
+		await expect(revealCategoryApiKey("key/id")).resolves.toBe(
+			"category-secret",
+		);
+		expect(requests).toEqual(["/api/keys/key%2Fid/secret"]);
 	});
 });

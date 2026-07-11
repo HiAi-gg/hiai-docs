@@ -86,6 +86,16 @@ export const envSchema = z.object({
 		.enum(["trace", "debug", "info", "warn", "error", "fatal"])
 		.default("info"),
 	HIAI_DOCS_API_KEY: z.string().optional(),
+	API_KEY_ENCRYPTION_SECRET: z
+		.string()
+		.min(32, "API_KEY_ENCRYPTION_SECRET must be at least 32 characters")
+		.default("change-me-to-random-32-chars-long")
+		.refine(
+			(value) =>
+				process.env.NODE_ENV !== "production" ||
+				value !== "change-me-to-random-32-chars-long",
+			"API_KEY_ENCRYPTION_SECRET must be set in production",
+		),
 	OWNER_ID: z.string().uuid().default("00000000-0000-4000-8000-000000000001"),
 	// Number of auto-saved (non-snapshot) versions to retain per document.
 	// Snapshots are never pruned. Default 50.

@@ -510,6 +510,7 @@ export const apiKeys = pgTable(
     name: text("name").notNull(),
     keyHash: text("key_hash").notNull().unique(),
     prefix: text("prefix").notNull(),
+    encryptedKey: text("encrypted_key"),
     scopes: jsonb("scopes").notNull().default("[]"),
     lastUsedAt: timestamp("last_used_at"),
     expiresAt: timestamp("expires_at"),

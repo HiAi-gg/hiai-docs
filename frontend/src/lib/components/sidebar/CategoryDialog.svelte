@@ -36,6 +36,7 @@ import {
 	categoryIdFromScopes,
 	createCategoryApiKey,
 	listApiKeys,
+	revealCategoryApiKey,
 	revokeApiKey,
 } from "$lib/api/api-keys";
 import * as m from "$lib/paraglide/messages.js";
@@ -138,9 +139,8 @@ async function revokeCategoryKey(id: string) {
 }
 
 async function copyCategoryKey(key: ApiKeySummary) {
-	await navigator.clipboard.writeText(
-		apiKeyClipboardValue(key, issuedKeys[key.id]),
-	);
+	const rawKey = issuedKeys[key.id] ?? (await revealCategoryApiKey(key.id));
+	await navigator.clipboard.writeText(apiKeyClipboardValue(key, rawKey));
 }
 
 $effect(() => {
@@ -404,7 +404,7 @@ function close() {
 							<div class="flex items-center justify-between gap-3 rounded-md bg-muted/40 px-3 py-2 text-xs">
 								<span>{key.name} · {key.prefix}…</span>
 								<div class="flex shrink-0 gap-2">
-									<Button type="button" size="sm" variant="outline" onclick={() => copyCategoryKey(key)}>{issuedKeys[key.id] ? "Copy key" : "Copy prefix"}</Button>
+									<Button type="button" size="sm" variant="outline" onclick={() => copyCategoryKey(key)} disabled={!key.recoverable && !issuedKeys[key.id]}>{key.recoverable || issuedKeys[key.id] ? "Copy key" : "Rotate to enable copy"}</Button>
 									<Button type="button" size="sm" variant="destructive" onclick={() => revokeCategoryKey(key.id)} disabled={keyBusy}>Revoke</Button>
 								</div>
 							</div>

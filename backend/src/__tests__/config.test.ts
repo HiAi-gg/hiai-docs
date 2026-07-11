@@ -132,6 +132,12 @@ describe("config schema", () => {
 		}
 	});
 
+	test("rejects a non-UUID API owner before document writes reach PostgreSQL", () => {
+		expect(
+			realEnvSchema.safeParse({ OWNER_ID: "your-user-uuid-from-auth" }).success,
+		).toBe(false);
+	});
+
 	test("loads adaptive search defaults", () => {
 		const result = realEnvSchema.safeParse({});
 		expect(result.success).toBe(true);
@@ -152,6 +158,7 @@ describe("config schema", () => {
 
 	test("accepts custom search expansion provider settings", () => {
 		const result = realEnvSchema.safeParse({
+			OWNER_ID: "00000000-0000-4000-8000-000000000001",
 			SEARCH_EXPANSION_ENABLED: "false",
 			SEARCH_EXPANSION_BASE_URL: "http://ollama:11434/v1",
 			SEARCH_EXPANSION_API_KEY: "",
@@ -232,9 +239,23 @@ describe("production secret guards (real schema)", () => {
 		expect(result.success).toBe(false);
 	});
 
+	test("rejects default category API key encryption secret in production", () => {
+		process.env.NODE_ENV = "production";
+		const result = realEnvSchema.safeParse({
+			OWNER_ID: "00000000-0000-4000-8000-000000000001",
+			BETTER_AUTH_SECRET: "real-secret-32-chars-long-aaaaaa",
+			CSRF_SECRET: "real-csrf-secret-32-chars-long-bbbb",
+			WEBHOOK_SECRET: "real-webhook-secret-32-chars-long-cccc",
+			API_KEY_ENCRYPTION_SECRET: "change-me-to-random-32-chars-long",
+		});
+		expect(result.success).toBe(false);
+	});
+
 	test("accepts real non-empty secrets in production", () => {
 		process.env.NODE_ENV = "production";
 		const result = realEnvSchema.safeParse({
+			OWNER_ID: "00000000-0000-4000-8000-000000000001",
+			API_KEY_ENCRYPTION_SECRET: "real-api-key-encryption-secret-32-chars",
 			BETTER_AUTH_SECRET: "real-better-auth-secret-32-chars-long",
 			CSRF_SECRET: "real-csrf-secret-32-chars-long-bbbb",
 			WEBHOOK_SECRET: "real-webhook-secret-32-chars-long-cc",

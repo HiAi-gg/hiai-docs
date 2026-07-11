@@ -7,9 +7,11 @@ import {
 	createApiKey,
 	GLOBAL_API_SCOPE,
 	listApiKeys,
+	revealCategoryApiKey,
 	revokeApiKey,
 } from "../../lib/api-keys";
 import { recordAuditEvent } from "../../lib/audit";
+import { config } from "../../lib/config";
 import { logger } from "../../lib/logger";
 import { withTenant } from "../../lib/with-tenant";
 import { rateLimitHeaders, writeRateLimiter } from "../middleware/rate-limit";
@@ -137,6 +139,8 @@ export const keysRoutes = new Elysia({ prefix: "/api" })
 			ctx.userId,
 			parsed.data.name ?? `${category.name} API key`,
 			scopes,
+			undefined,
+			{ encryptionSecret: config.API_KEY_ENCRYPTION_SECRET },
 		);
 		auditKeyCreation(request, ctx.userId, result.id, {
 			access: "category",
@@ -145,6 +149,43 @@ export const keysRoutes = new Elysia({ prefix: "/api" })
 		});
 		set.status = 201;
 		return result;
+	})
+	.get("/keys/:id/secret", async ({ params, request, set }) => {
+		const rl = await enforceKeyWriteRateLimit(request);
+		if (!rl.allowed) {
+			set.status = 429;
+			set.headers = rateLimitHeaders(0, rl.retryAfter);
+			return { error: "Too many requests" };
+		}
+		set.headers = {
+			...rateLimitHeaders(rl.remaining),
+			"cache-control": "no-store",
+			pragma: "no-cache",
+		};
+		const ctx = await buildTenantContext(request);
+		if (ctx.role === "none") {
+			set.status = 401;
+			return { error: "Unauthorized" };
+		}
+		try {
+			const key = await revealCategoryApiKey(
+				params.id,
+				ctx.userId,
+				config.API_KEY_ENCRYPTION_SECRET,
+			);
+			if (!key) {
+				set.status = 404;
+				return { error: "Recoverable category API key not found" };
+			}
+			return { key };
+		} catch (err) {
+			logger.error(
+				{ err, keyId: params.id },
+				"Failed to reveal category API key",
+			);
+			set.status = 500;
+			return { error: "Failed to reveal category API key" };
+		}
 	})
 	// POST /api/keys — Create API key
 	.post("/keys", async ({ request, set }) => {

@@ -8,6 +8,7 @@ export interface ApiKeySummary {
 	lastUsedAt: string | null;
 	expiresAt: string | null;
 	createdAt: string;
+	recoverable: boolean;
 }
 
 export interface IssuedApiKey {
@@ -36,6 +37,13 @@ export function createCategoryApiKey(
 
 export function revokeApiKey(id: string): Promise<{ success: true }> {
 	return apiFetch(`/api/keys/${encodeURIComponent(id)}`, { method: "DELETE" });
+}
+
+export async function revealCategoryApiKey(id: string): Promise<string> {
+	const result = await apiFetch<{ key: string }>(
+		`/api/keys/${encodeURIComponent(id)}/secret`,
+	);
+	return result.key;
 }
 
 export function categoryIdFromScopes(scopes: string[]): string | null {
