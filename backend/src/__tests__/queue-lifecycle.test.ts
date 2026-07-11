@@ -1,6 +1,9 @@
 import { describe, expect, test } from "bun:test";
+import { migrateLegacyEmbeddingEntries } from "../queue/legacy-bridge";
 import {
+	createPipelineWorkerFactories,
 	type ManagedPipelineWorker,
+	type PipelineStageDependencies,
 	startPipelineWorkers,
 } from "../queue/start";
 
@@ -19,6 +22,50 @@ function worker(events: string[], stage: string): ManagedPipelineWorker {
 }
 
 describe("pipeline worker lifecycle", () => {
+	test("migrates raw and retry-envelope legacy queue entries before startup", async () => {
+		const entries = [
+			"11111111-1111-4111-8111-111111111111",
+			JSON.stringify({
+				documentId: "22222222-2222-4222-8222-222222222222",
+				attempt: 2,
+			}),
+		];
+		const enqueued: string[] = [];
+		const result = await migrateLegacyEmbeddingEntries(
+			async () => entries.shift() ?? null,
+			async (documentId) => {
+				enqueued.push(documentId);
+				return true;
+			},
+		);
+		expect(result).toEqual({ migrated: 2, failed: 0 });
+		expect(enqueued).toEqual([
+			"11111111-1111-4111-8111-111111111111",
+			"22222222-2222-4222-8222-222222222222",
+		]);
+	});
+
+	test("registers every concrete stage factory from injected adapters", () => {
+		const dependencies = {
+			prepare: {},
+			embed: {},
+			graph: {},
+			summarize: {},
+			finalize: {},
+		} as PipelineStageDependencies;
+		const factories = createPipelineWorkerFactories(
+			"redis://127.0.0.1:6379",
+			dependencies,
+		);
+		expect(Object.keys(factories)).toEqual([
+			"prepare",
+			"embed",
+			"graph",
+			"summarize",
+			"finalize",
+		]);
+	});
+
 	test("runs recovery before factories accept jobs and registers stages independently", async () => {
 		const events: string[] = [];
 		const runtime = await startPipelineWorkers({

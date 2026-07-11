@@ -1,4 +1,28 @@
-import type { PipelineStage } from "./contracts";
+import { Worker } from "bullmq";
+import { createBullMqConnection } from "./connection";
+import { JOB_IDS, type PipelineJob, type PipelineStage } from "./contracts";
+import { DEFAULT_JOB_OPTIONS, QUEUE_NAMES, SOURCE_PRIORITY } from "./names";
+import { closePipelineQueues, getPipelineQueue } from "./queues";
+import {
+	createEmbedWorker,
+	type EmbedWorkerDependencies,
+} from "./workers/embed.worker";
+import {
+	createFinalizeWorker,
+	type FinalizeWorkerDependencies,
+} from "./workers/finalize.worker";
+import {
+	createGraphWorker,
+	type GraphWorkerDependencies,
+} from "./workers/graph.worker";
+import {
+	createPrepareWorker,
+	type PrepareWorkerDependencies,
+} from "./workers/prepare.worker";
+import {
+	createSummarizeWorker,
+	type SummarizeWorkerDependencies,
+} from "./workers/summarize.worker";
 
 export interface ManagedPipelineWorker {
 	waitUntilReady?(): Promise<unknown>;
@@ -29,6 +53,14 @@ export interface StartPipelineWorkersOptions {
 	sleep?: (ms: number) => Promise<void>;
 }
 
+export interface PipelineStageDependencies {
+	prepare: PrepareWorkerDependencies;
+	embed: EmbedWorkerDependencies;
+	graph: GraphWorkerDependencies;
+	summarize: SummarizeWorkerDependencies;
+	finalize: FinalizeWorkerDependencies;
+}
+
 const STAGE_ORDER: readonly PipelineStage[] = [
 	"prepare",
 	"embed",
@@ -36,6 +68,68 @@ const STAGE_ORDER: readonly PipelineStage[] = [
 	"summarize",
 	"finalize",
 ];
+
+export function createPipelineWorkerFactories(
+	redisUrl: string,
+	deps: PipelineStageDependencies,
+): Record<PipelineStage, PipelineWorkerFactory> {
+	const connection = () => createBullMqConnection(redisUrl);
+	const graphProcessor = createGraphWorker(deps.graph);
+	const summarizeProcessor = createSummarizeWorker(deps.summarize);
+	const finalizeProcessor = createFinalizeWorker(deps.finalize);
+	return {
+		prepare: () => createPrepareWorker(redisUrl, deps.prepare),
+		embed: () => createEmbedWorker(redisUrl, deps.embed),
+		graph: () =>
+			new Worker<PipelineJob>(
+				QUEUE_NAMES.graph,
+				async (job) => {
+					await graphProcessor(job.data);
+					const data: PipelineJob = { ...job.data, stage: "summarize" };
+					await getPipelineQueue("summarize", redisUrl).add("summarize", data, {
+						...DEFAULT_JOB_OPTIONS,
+						jobId: JOB_IDS.summarize(job.data.generationId),
+						priority: SOURCE_PRIORITY[job.data.source],
+					});
+				},
+				{ connection: connection(), concurrency: 2 },
+			),
+		summarize: () =>
+			new Worker<PipelineJob>(
+				QUEUE_NAMES.summarize,
+				(job) => summarizeProcessor(job.data),
+				{ connection: connection(), concurrency: 1 },
+			),
+		finalize: () =>
+			new Worker<PipelineJob>(
+				QUEUE_NAMES.finalize,
+				(job) => finalizeProcessor(job.data),
+				{ connection: connection(), concurrency: 2 },
+			),
+	};
+}
+
+export async function startRegisteredPipelineWorkers(input: {
+	redisUrl: string;
+	dependencies: PipelineStageDependencies;
+	recover: () => Promise<void>;
+	shutdownGraceMs?: number;
+}): Promise<PipelineRuntime> {
+	const queues = {} as Record<PipelineStage, ManagedPipelineQueue>;
+	for (const stage of STAGE_ORDER) {
+		queues[stage] = getPipelineQueue(stage, input.redisUrl);
+	}
+	return startPipelineWorkers({
+		recover: input.recover,
+		workerFactories: createPipelineWorkerFactories(
+			input.redisUrl,
+			input.dependencies,
+		),
+		queues,
+		closeQueues: closePipelineQueues,
+		shutdownGraceMs: input.shutdownGraceMs,
+	});
+}
 
 /**
  * Starts registered stage workers only after PostgreSQL-to-BullMQ recovery.

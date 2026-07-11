@@ -27,16 +27,33 @@ import { visibilityRoutes } from "./api/routes/visibility";
 import { webhookRoutes } from "./api/routes/webhooks";
 import { ensureApiKeyOwner } from "./lib/api-key-owner";
 import { config } from "./lib/config";
-import { startEmbeddingWorker } from "./lib/embedding-queue";
+import { drainLegacyEmbeddingQueue } from "./lib/embedding-queue";
 import { logger } from "./lib/logger";
 import { BUCKET, ensureBucket, storage } from "./lib/storage";
+import { createPipelineStageDependencies } from "./queue/adapters";
+import {
+	createBullMqRecoveryWriter,
+	postgresRecoveryStore,
+	recoverStalledPipeline,
+} from "./queue/recovery";
+import { startRegisteredPipelineWorkers } from "./queue/start";
 
 // The API-key principal owns records created by agentic/CLI clients. Provision
 // it before accepting writes so a clean quickstart cannot fail owner FKs.
 await ensureApiKeyOwner();
 
-// Start background embedding worker
-startEmbeddingWorker();
+const pipelineRuntime = await startRegisteredPipelineWorkers({
+	redisUrl: config.REDIS_URL,
+	dependencies: createPipelineStageDependencies(config.REDIS_URL),
+	recover: async () => {
+		const legacy = await drainLegacyEmbeddingQueue();
+		const recovery = await recoverStalledPipeline(
+			postgresRecoveryStore,
+			createBullMqRecoveryWriter(config.REDIS_URL),
+		);
+		logger.info({ legacy, recovery }, "Pipeline recovery completed");
+	},
+});
 
 ensureBucket(storage, BUCKET).catch((err) => {
 	logger.error({ err }, "Failed to ensure storage bucket");
@@ -204,6 +221,7 @@ logger.info({ port: config.API_PORT }, "hiai-docs API started");
 // Graceful shutdown
 const shutdown = async () => {
 	logger.info("Shutting down...");
+	await pipelineRuntime.close();
 	await app.stop();
 	process.exit(0);
 };
