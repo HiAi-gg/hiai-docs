@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, mock, test } from "bun:test";
 import {
+	apiKeyClipboardValue,
 	categoryIdFromScopes,
 	createCategoryApiKey,
 	createGlobalApiKey,
@@ -46,5 +47,11 @@ describe("API key client", () => {
 			categoryId,
 		);
 		expect(categoryIdFromScopes(["global"])).toBeNull();
+	});
+
+	test("copies a transient raw key and safely falls back to the stored prefix", () => {
+		const key = { prefix: "hiai_abc123" };
+		expect(apiKeyClipboardValue(key, "hiai_secret")).toBe("hiai_secret");
+		expect(apiKeyClipboardValue(key)).toBe("hiai_abc123");
 	});
 });

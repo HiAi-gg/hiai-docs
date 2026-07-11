@@ -4,6 +4,7 @@ import { Input } from "@hiai-gg/hiai-ui/components/ui/input";
 import { onMount } from "svelte";
 import {
 	type ApiKeySummary,
+	apiKeyClipboardValue,
 	categoryIdFromScopes,
 	createGlobalApiKey,
 	listApiKeys,
@@ -14,10 +15,14 @@ import { type Category, listCategories } from "$lib/api/categories";
 let keys = $state<ApiKeySummary[]>([]);
 let categories = $state<Category[]>([]);
 let keyName = $state("Global API key");
-let issuedKey = $state<string | null>(null);
+let issuedKeys = $state<Record<string, string>>({});
+let latestIssuedId = $state<string | null>(null);
 let loading = $state(true);
 let busy = $state(false);
 let error = $state<string | null>(null);
+const latestIssuedKey = $derived(
+	latestIssuedId ? issuedKeys[latestIssuedId] : undefined,
+);
 
 const globalKeys = $derived(
 	keys.filter((key) => key.scopes.includes("global")),
@@ -57,7 +62,8 @@ async function issueGlobalKey() {
 	error = null;
 	try {
 		const issued = await createGlobalApiKey(keyName.trim() || undefined);
-		issuedKey = issued.key;
+		issuedKeys = { ...issuedKeys, [issued.id]: issued.key };
+		latestIssuedId = issued.id;
 		await refresh();
 	} catch (err) {
 		error = err instanceof Error ? err.message : "Failed to create API key";
@@ -70,27 +76,36 @@ async function revoke(id: string) {
 	busy = true;
 	try {
 		await revokeApiKey(id);
+		const { [id]: _revoked, ...remainingIssuedKeys } = issuedKeys;
+		issuedKeys = remainingIssuedKeys;
+		if (latestIssuedId === id) latestIssuedId = null;
 		await refresh();
 	} finally {
 		busy = false;
 	}
 }
+
+async function copyKey(key: ApiKeySummary) {
+	await navigator.clipboard.writeText(
+		apiKeyClipboardValue(key, issuedKeys[key.id]),
+	);
+}
 </script>
 
 <div class="space-y-5 rounded-lg border border-border bg-card p-6">
 	<div>
-		<h2 class="text-lg font-medium">Global API</h2>
+		<h2 class="text-lg font-medium">API</h2>
 		<p class="text-sm text-muted-foreground">Create a user-wide key or review category-scoped access. Raw keys are shown once.</p>
 	</div>
 	<div class="flex gap-2">
 		<Input aria-label="Global API key name" bind:value={keyName} />
 		<Button onclick={issueGlobalKey} disabled={busy}>Create global key</Button>
 	</div>
-	{#if issuedKey}
-		<div class="rounded-md border border-amber-500/40 bg-amber-500/10 p-3">
+	{#if latestIssuedKey}
+		<div class="rounded-lg border border-primary/30 bg-primary/10 p-4 text-primary">
 			<p class="text-sm font-medium">Copy this key now. It will not be shown again.</p>
-			<code class="mt-2 block break-all rounded bg-background p-2 text-xs">{issuedKey}</code>
-			<Button class="mt-2" size="sm" variant="outline" onclick={() => navigator.clipboard.writeText(issuedKey ?? "")}>Copy</Button>
+			<code class="mt-2 block break-all rounded bg-background/80 p-2 text-xs text-foreground">{latestIssuedKey}</code>
+			<Button class="mt-2" size="sm" variant="outline" onclick={() => navigator.clipboard.writeText(latestIssuedKey)}>Copy key</Button>
 		</div>
 	{/if}
 	{#if error}<p class="text-sm text-destructive" role="alert">{error}</p>{/if}
@@ -102,7 +117,10 @@ async function revoke(id: string) {
 			{#each globalKeys as key (key.id)}
 				<div class="flex items-center justify-between rounded-md border p-3 text-sm">
 					<div><div class="font-medium">{key.name}</div><div class="text-muted-foreground">{key.prefix}…</div></div>
-					<Button size="sm" variant="destructive" onclick={() => revoke(key.id)} disabled={busy}>Revoke</Button>
+					<div class="flex gap-2">
+						<Button size="sm" variant="outline" onclick={() => copyKey(key)}>{issuedKeys[key.id] ? "Copy key" : "Copy prefix"}</Button>
+						<Button size="sm" variant="destructive" onclick={() => revoke(key.id)} disabled={busy}>Revoke</Button>
+					</div>
 				</div>
 			{:else}<p class="text-sm text-muted-foreground">No global API keys.</p>{/each}
 		</section>
@@ -116,12 +134,17 @@ async function revoke(id: string) {
 					].filter(Boolean).join(" / ")}</div>
 				</div>
 			{/each}
-			{#each categoryKeys as key (key.id)}
-				<div class="flex items-center justify-between rounded-md border border-dashed p-3 text-sm">
-					<div><div class="font-medium">{categoryName(categoryIdFromScopes(key.scopes))}: {key.name}</div><div class="text-muted-foreground">{key.prefix}… · {key.scopes.map((scope) => scope.split(":").at(-1)).join(" / ")}</div></div>
-					<Button size="sm" variant="destructive" onclick={() => revoke(key.id)} disabled={busy}>Revoke</Button>
-				</div>
-			{/each}
+			<div class="max-h-72 space-y-2 overflow-y-auto pr-1">
+				{#each categoryKeys as key (key.id)}
+					<div class="flex items-center justify-between gap-3 rounded-md border border-dashed p-3 text-sm">
+						<div><div class="font-medium">{categoryName(categoryIdFromScopes(key.scopes))}: {key.name}</div><div class="text-muted-foreground">{key.prefix}… · {key.scopes.map((scope) => scope.split(":").at(-1)).join(" / ")}</div></div>
+						<div class="flex shrink-0 gap-2">
+							<Button size="sm" variant="outline" onclick={() => copyKey(key)}>{issuedKeys[key.id] ? "Copy key" : "Copy prefix"}</Button>
+							<Button size="sm" variant="destructive" onclick={() => revoke(key.id)} disabled={busy}>Revoke</Button>
+						</div>
+					</div>
+				{/each}
+			</div>
 		</section>
 	{/if}
 </div>

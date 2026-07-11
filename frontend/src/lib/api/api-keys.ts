@@ -45,3 +45,10 @@ export function categoryIdFromScopes(scopes: string[]): string | null {
 	}
 	return null;
 }
+
+export function apiKeyClipboardValue(
+	key: Pick<ApiKeySummary, "prefix">,
+	rawKey?: string,
+): string {
+	return rawKey ?? key.prefix;
+}

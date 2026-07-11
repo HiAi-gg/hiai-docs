@@ -32,6 +32,7 @@ import SelectValue from "@hiai-gg/hiai-ui/components/ui/select/select-value.svel
 import { Loader2 } from "lucide-svelte";
 import {
 	type ApiKeySummary,
+	apiKeyClipboardValue,
 	categoryIdFromScopes,
 	createCategoryApiKey,
 	listApiKeys,
@@ -92,8 +93,12 @@ let apiPermissionRead = $state(false);
 let apiPermissionEdit = $state(false);
 let apiPermissionWrite = $state(false);
 let categoryKeys = $state<ApiKeySummary[]>([]);
-let issuedKey = $state<string | null>(null);
+let issuedKeys = $state<Record<string, string>>({});
+let latestIssuedId = $state<string | null>(null);
 let keyBusy = $state(false);
+const latestIssuedKey = $derived(
+	latestIssuedId ? issuedKeys[latestIssuedId] : undefined,
+);
 
 async function refreshCategoryKeys(categoryId: string) {
 	const result = await listApiKeys();
@@ -107,7 +112,8 @@ async function issueCategoryKey() {
 	keyBusy = true;
 	try {
 		const issued = await createCategoryApiKey(category.id);
-		issuedKey = issued.key;
+		issuedKeys = { ...issuedKeys, [issued.id]: issued.key };
+		latestIssuedId = issued.id;
 		await refreshCategoryKeys(category.id);
 	} catch (err) {
 		error =
@@ -122,10 +128,19 @@ async function revokeCategoryKey(id: string) {
 	keyBusy = true;
 	try {
 		await revokeApiKey(id);
+		const { [id]: _revoked, ...remainingIssuedKeys } = issuedKeys;
+		issuedKeys = remainingIssuedKeys;
+		if (latestIssuedId === id) latestIssuedId = null;
 		await refreshCategoryKeys(category.id);
 	} finally {
 		keyBusy = false;
 	}
+}
+
+async function copyCategoryKey(key: ApiKeySummary) {
+	await navigator.clipboard.writeText(
+		apiKeyClipboardValue(key, issuedKeys[key.id]),
+	);
 }
 
 $effect(() => {
@@ -152,7 +167,8 @@ $effect(() => {
 		apiPermissionEdit = false;
 		apiPermissionWrite = false;
 	}
-	issuedKey = null;
+	issuedKeys = {};
+	latestIssuedId = null;
 	categoryKeys = [];
 	if (mode === "edit" && category?.id) void refreshCategoryKeys(category.id);
 	error = null;
@@ -376,19 +392,24 @@ function close() {
 					{#if category.apiMode !== "category"}
 						<p class="text-xs text-muted-foreground">Save Category API access first, then reopen settings to issue a key.</p>
 					{/if}
-					{#if issuedKey}
-						<div class="rounded-md border border-amber-500/40 bg-amber-500/10 p-2">
+					{#if latestIssuedKey}
+						<div class="rounded-lg border border-primary/30 bg-primary/10 p-3 text-primary">
 							<p class="text-xs font-medium">Copy now — this raw key is shown once.</p>
-							<code class="mt-1 block break-all text-xs">{issuedKey}</code>
-							<Button type="button" size="sm" variant="outline" class="mt-2" onclick={() => navigator.clipboard.writeText(issuedKey ?? "")}>Copy</Button>
+							<code class="mt-1 block break-all rounded bg-background/80 p-2 text-xs text-foreground">{latestIssuedKey}</code>
+							<Button type="button" size="sm" variant="outline" class="mt-2" onclick={() => navigator.clipboard.writeText(latestIssuedKey)}>Copy key</Button>
 						</div>
 					{/if}
-					{#each categoryKeys as key (key.id)}
-						<div class="flex items-center justify-between rounded-md bg-muted/40 px-3 py-2 text-xs">
-							<span>{key.name} · {key.prefix}…</span>
-							<Button type="button" size="sm" variant="destructive" onclick={() => revokeCategoryKey(key.id)} disabled={keyBusy}>Revoke</Button>
-						</div>
-					{/each}
+					<div class="max-h-48 space-y-2 overflow-y-auto pr-1">
+						{#each categoryKeys as key (key.id)}
+							<div class="flex items-center justify-between gap-3 rounded-md bg-muted/40 px-3 py-2 text-xs">
+								<span>{key.name} · {key.prefix}…</span>
+								<div class="flex shrink-0 gap-2">
+									<Button type="button" size="sm" variant="outline" onclick={() => copyCategoryKey(key)}>{issuedKeys[key.id] ? "Copy key" : "Copy prefix"}</Button>
+									<Button type="button" size="sm" variant="destructive" onclick={() => revokeCategoryKey(key.id)} disabled={keyBusy}>Revoke</Button>
+								</div>
+							</div>
+						{/each}
+					</div>
 				</div>
 			{/if}
 		</form>

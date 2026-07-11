@@ -109,7 +109,7 @@ async function handleDeleteAccount() {
   <h1 class="mb-6 text-2xl font-semibold">{m.settings_title()}</h1>
 
   <div class="mb-6 flex gap-1 rounded-lg border border-border p-1">
-    {#each [["profile", m.settings_profile()], ["api", "Global API"], ["embedding", m.settings_tab_embedding()], ["danger", m.settings_tab_danger()]] as [key, label]}
+    {#each [["profile", m.settings_profile()], ["api", "API"], ["embedding", m.settings_tab_embedding()], ["danger", m.settings_tab_danger()]] as [key, label]}
       <button
         onclick={() => { activeTab = key as typeof activeTab; }}
         class="flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition-colors
