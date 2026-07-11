@@ -26,6 +26,7 @@ import {
 } from "./generation";
 import { needsChunkRefresh } from "./incremental";
 import { type EmbeddingMetadata, embedDocument } from "./index";
+import { decodeEmbeddingJob, encodeEmbeddingJob, retryDelayMs } from "./job";
 import { EmbeddingBatchError } from "./result";
 
 const QUEUE_KEY = "hiai-docs:embedding-queue";
@@ -39,8 +40,28 @@ export function startEmbeddingWorker(): void {
 			try {
 				const result = await redis.brpop(QUEUE_KEY, 1);
 				if (!result) continue;
-				const documentId = result[1];
-				await processDocument(documentId);
+				const job = decodeEmbeddingJob(result[1]);
+				const succeeded = await processDocument(job.documentId);
+				if (!succeeded) {
+					const delay = retryDelayMs(job.attempt);
+					if (delay === null) {
+						incrementCounter(METRIC_NAMES.EMBEDDING_DEAD_LETTER_TOTAL);
+						logger.error(
+							{ documentId: job.documentId, attempts: job.attempt + 1 },
+							"Embedding job exhausted retries",
+						);
+					} else {
+						incrementCounter(METRIC_NAMES.EMBEDDING_RETRIES_TOTAL);
+						await Bun.sleep(delay);
+						await redis.lpush(
+							QUEUE_KEY,
+							encodeEmbeddingJob({
+								documentId: job.documentId,
+								attempt: job.attempt + 1,
+							}),
+						);
+					}
+				}
 			} catch (err) {
 				logger.error({ err }, "Embedding worker error");
 			}
@@ -50,7 +71,7 @@ export function startEmbeddingWorker(): void {
 	processLoop();
 }
 
-async function processDocument(documentId: string): Promise<void> {
+async function processDocument(documentId: string): Promise<boolean> {
 	logger.info({ documentId }, "Processing embedding for document");
 	// Counter sits at the very top of the worker callback so every dequeued
 	// document — including ones that early-return because the row is
@@ -78,7 +99,7 @@ async function processDocument(documentId: string): Promise<void> {
 
 		if (!doc) {
 			logger.warn({ documentId }, "Document not found, skipping embedding");
-			return;
+			return true;
 		}
 
 		const content = doc.content ?? "";
@@ -87,7 +108,7 @@ async function processDocument(documentId: string): Promise<void> {
 				{ documentId },
 				"Document has no content, skipping embedding",
 			);
-			return;
+			return true;
 		}
 
 		// Resolve metadata for the embedding preamble. We fetch folder, tag,
@@ -286,6 +307,7 @@ async function processDocument(documentId: string): Promise<void> {
 			},
 			"All chunk embeddings stored for document",
 		);
+		return true;
 	} catch (err) {
 		if (generationId && !activated) {
 			await failEmbeddingGeneration(
@@ -315,6 +337,7 @@ async function processDocument(documentId: string): Promise<void> {
 			});
 		}
 		logger.error({ err, documentId }, "Failed to process document embedding");
+		return false;
 	}
 }
 

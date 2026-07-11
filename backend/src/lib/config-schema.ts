@@ -73,7 +73,7 @@ export const envSchema = z.object({
 		.int()
 		.min(1_000)
 		.max(300_000)
-		.default(120_000),
+		.default(20_000),
 	EMBEDDING_FALLBACK_BASE_URL: z.string().optional(),
 	EMBEDDING_FALLBACK_API_KEY: z.string().optional(),
 	EMBEDDING_FALLBACK_MODEL: z.string().optional(),

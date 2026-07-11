@@ -78,6 +78,8 @@ export const METRIC_NAMES = {
 	EMBEDDING_DURATION_MS: "embedding_duration_ms",
 	EMBEDDING_CHUNKS_TOTAL: "embedding_chunks_total",
 	EMBEDDING_DOCS_TOTAL: "embedding_docs_total",
+	EMBEDDING_RETRIES_TOTAL: "embedding_retries_total",
+	EMBEDDING_DEAD_LETTER_TOTAL: "embedding_dead_letter_total",
 	EMBEDDING_PENDING: "embedding_pending",
 	EMBEDDING_PROCESSING: "embedding_processing",
 	EMBEDDING_READY: "embedding_ready",
