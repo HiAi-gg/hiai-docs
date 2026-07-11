@@ -102,7 +102,7 @@ services:
       network: host
     restart: unless-stopped
     ports:
-      - "${API_PORT:-50700}:50700"
+      - "${API_PORT:-50700}:${API_PORT:-50700}"
     extra_hosts:
       - "host.docker.internal:host-gateway"
     depends_on:
@@ -190,7 +190,7 @@ services:
       network: host
     restart: unless-stopped
     ports:
-      - "${WEB_PORT:-50701}:50701"
+      - "${WEB_PORT:-50701}:${WEB_PORT:-50701}"
     depends_on:
       api:
         condition: service_healthy
