@@ -39,6 +39,22 @@ export const embeddingStatusEnum = pgEnum("embedding_status", [
   "failed",
   "stale",
 ]);
+export const pipelineStageEnum = pgEnum("pipeline_stage", [
+  "prepare",
+  "embed",
+  "graph",
+  "summarize",
+  "finalize",
+]);
+export const pipelineStatusEnum = pgEnum("pipeline_status", [
+  "pending",
+  "processing",
+  "ready",
+  "retrying",
+  "failed",
+  "skipped",
+  "cancelled",
+]);
 
 // ============================================
 // users — managed by Better Auth
@@ -228,6 +244,94 @@ export const documentRelations = relations(documents, ({ one, many }) => ({
   attachments: many(attachments),
   versions: many(versions),
 }));
+
+// ============================================
+// document_pipeline_runs — durable multi-stage pipeline state
+// ============================================
+export const documentPipelineRuns = pgTable(
+  "document_pipeline_runs",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    documentId: uuid("document_id")
+      .notNull()
+      .references(() => documents.id, { onDelete: "cascade" }),
+    ownerId: uuid("owner_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    generationId: uuid("generation_id").notNull(),
+    revision: text("revision").notNull(),
+    source: text("source").notNull(),
+    status: pipelineStatusEnum("status").notNull().default("pending"),
+    prepareStatus: pipelineStatusEnum("prepare_status").notNull().default("pending"),
+    embedStatus: pipelineStatusEnum("embed_status").notNull().default("pending"),
+    graphStatus: pipelineStatusEnum("graph_status").notNull().default("pending"),
+    summarizeStatus: pipelineStatusEnum("summarize_status").notNull().default("pending"),
+    finalizeStatus: pipelineStatusEnum("finalize_status").notNull().default("pending"),
+    totalBatches: integer("total_batches").notNull().default(0),
+    completedBatches: integer("completed_batches").notNull().default(0),
+    failedBatches: integer("failed_batches").notNull().default(0),
+    errorCode: text("error_code"),
+    attempts: integer("attempts").notNull().default(0),
+    requestedAt: timestamp("requested_at").defaultNow().notNull(),
+    startedAt: timestamp("started_at"),
+    completedAt: timestamp("completed_at"),
+    heartbeatAt: timestamp("heartbeat_at"),
+    availableAt: timestamp("available_at"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("document_pipeline_runs_document_generation_idx").on(
+      table.documentId,
+      table.generationId,
+    ),
+    index("document_pipeline_runs_owner_status_updated_idx").on(
+      table.ownerId,
+      table.status,
+      table.updatedAt,
+    ),
+  ],
+);
+
+// ============================================
+// document_pipeline_batches — idempotent embedding work units
+// ============================================
+export const documentPipelineBatches = pgTable(
+  "document_pipeline_batches",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    documentId: uuid("document_id")
+      .notNull()
+      .references(() => documents.id, { onDelete: "cascade" }),
+    generationId: uuid("generation_id").notNull(),
+    batchIndex: integer("batch_index").notNull(),
+    stage: pipelineStageEnum("stage").notNull().default("embed"),
+    chunkStart: integer("chunk_start").notNull(),
+    chunkEnd: integer("chunk_end").notNull(),
+    status: pipelineStatusEnum("status").notNull().default("pending"),
+    attempts: integer("attempts").notNull().default(0),
+    embeddingProfile: text("embedding_profile"),
+    errorCode: text("error_code"),
+    availableAt: timestamp("available_at"),
+    startedAt: timestamp("started_at"),
+    completedAt: timestamp("completed_at"),
+    heartbeatAt: timestamp("heartbeat_at"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("document_pipeline_batches_generation_index_idx").on(
+      table.generationId,
+      table.batchIndex,
+    ),
+    index("document_pipeline_batches_stage_status_available_idx").on(
+      table.stage,
+      table.status,
+      table.availableAt,
+    ),
+    index("document_pipeline_batches_document_id_idx").on(table.documentId),
+  ],
+);
 
 // ============================================
 // tags — document tags
