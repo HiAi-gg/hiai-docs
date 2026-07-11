@@ -11,7 +11,10 @@ import { Elysia } from "elysia";
 import { nanoid } from "nanoid";
 import { config } from "../../lib/config";
 import { logger } from "../../lib/logger";
-import { shareTokenAccessForDocument } from "../../lib/share-access";
+import {
+	shareTokenAccessForDocument,
+	shareTokenReferencesAttachment,
+} from "../../lib/share-access";
 import { BUCKET, storage, storagePublic } from "../../lib/storage";
 import { withTenant } from "../../lib/with-tenant";
 import { rateLimitHeaders, writeRateLimiter } from "../middleware/rate-limit";
@@ -794,11 +797,22 @@ export const attachmentRoutes = new Elysia({ prefix: "/api" })
 					return { error: "Forbidden" };
 				}
 			} else if (shareToken) {
-				const verdict = await shareTokenAccessForDocument(
+				let verdict = await shareTokenAccessForDocument(
 					lookupCtx,
 					row.documentId,
 					shareToken,
 				);
+				if (
+					verdict === "no-access" &&
+					(await shareTokenReferencesAttachment(
+						lookupCtx,
+						shareToken,
+						row.id,
+						row.ownerId,
+					))
+				) {
+					verdict = "granted";
+				}
 				if (verdict !== "granted") {
 					// "missing", "expired", and "no-access" all collapse
 					// to 401 with the same generic message — leaking

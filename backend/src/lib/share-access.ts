@@ -100,6 +100,17 @@ export interface ShareDocumentScope {
 	expiresAt: Date | null;
 }
 
+export function documentReferencesAttachment(
+	document: { content?: string | null; contentJson?: unknown },
+	attachmentId: string,
+): boolean {
+	const path = `/api/attachments/${attachmentId}/raw`;
+	return (
+		(document.content?.includes(path) ?? false) ||
+		JSON.stringify(document.contentJson ?? null).includes(path)
+	);
+}
+
 /**
  * Resolve the complete document allow-list for an anonymous share token.
  * The token is looked up with an admin context, then the resulting document
@@ -179,4 +190,38 @@ export async function resolveShareDocumentScope(
 		passwordHash: link.passwordHash,
 		expiresAt: link.expiresAt,
 	};
+}
+
+/**
+ * Compatibility path for documents duplicated before attachment cloning was
+ * introduced. Access is allowed only when the attachment belongs to the same
+ * owner and an explicitly shared document contains its exact protected URL.
+ */
+export async function shareTokenReferencesAttachment(
+	lookupCtx: TenantContext,
+	token: string,
+	attachmentId: string,
+	attachmentOwnerId: string,
+): Promise<boolean> {
+	const scope = await resolveShareDocumentScope(lookupCtx, token);
+	if (
+		!scope ||
+		scope.ownerId !== attachmentOwnerId ||
+		scope.documentIds.length === 0
+	) {
+		return false;
+	}
+	const ownerCtx = { userId: scope.ownerId, role: "user" as const };
+	const rows = await withTenant(ownerCtx, async (tx) =>
+		tx
+			.select({
+				content: documents.content,
+				contentJson: documents.contentJson,
+			})
+			.from(documents)
+			.where(inArray(documents.id, scope.documentIds)),
+	);
+	return rows.some((document) =>
+		documentReferencesAttachment(document, attachmentId),
+	);
 }

@@ -1,4 +1,6 @@
+import { CopyObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
 import {
+	attachments,
 	documents,
 	documentTags,
 	folders,
@@ -18,9 +20,15 @@ import {
 	invalidateDocListCache,
 } from "../../lib/doc-cache";
 import { DocxParseError, docxToMarkdown } from "../../lib/docx-parser";
+import {
+	encodeS3CopySource,
+	planDuplicateAttachments,
+	rewriteDuplicateAttachmentReferences,
+} from "../../lib/duplicate-attachments";
 import { enqueueEmbedding } from "../../lib/embedding-queue";
 import { logger } from "../../lib/logger";
 import { enqueueReembed } from "../../lib/reembed";
+import { BUCKET, storage } from "../../lib/storage";
 import { maybePruneVersions } from "../../lib/version-prune";
 import { withTenant } from "../../lib/with-tenant";
 import {
@@ -673,8 +681,9 @@ export const documentRoutes = new Elysia({ prefix: "/api" })
 			return { error: "Unauthorized" };
 		}
 		const userId = ctx.userId;
+		const copiedStorageKeys: string[] = [];
 		try {
-			const copy = await withTenant(ctx, async (tx) => {
+			const sourceBundle = await withTenant(ctx, async (tx) => {
 				const sourceRows = await tx
 					.select()
 					.from(documents)
@@ -686,43 +695,93 @@ export const documentRoutes = new Elysia({ prefix: "/api" })
 				if (!source) {
 					return null;
 				}
+				const sourceAttachments = await tx
+					.select()
+					.from(attachments)
+					.where(eq(attachments.documentId, source.id));
+				return { source, sourceAttachments };
+			});
+			if (!sourceBundle) {
+				set.status = 404;
+				return { error: "Document not found" };
+			}
 
+			const copyId = crypto.randomUUID();
+			const attachmentPlans = planDuplicateAttachments(
+				sourceBundle.sourceAttachments,
+				userId,
+				copyId,
+			);
+			for (const plan of attachmentPlans) {
+				await storage.send(
+					new CopyObjectCommand({
+						Bucket: BUCKET,
+						CopySource: encodeS3CopySource(BUCKET, plan.sourceStorageKey),
+						Key: plan.storageKey,
+					}),
+				);
+				copiedStorageKeys.push(plan.storageKey);
+			}
+
+			const source = sourceBundle.source;
+			const rewrittenContent = rewriteDuplicateAttachmentReferences(
+				source.content ?? "",
+				attachmentPlans,
+			);
+			const rewrittenContentJson = rewriteDuplicateAttachmentReferences(
+				source.contentJson,
+				attachmentPlans,
+			);
+			const copy = await withTenant(ctx, async (tx) => {
 				const [row] = await tx
 					.insert(documents)
 					.values({
+						id: copyId,
 						ownerId: userId,
 						folderId: source.folderId,
 						categoryId: source.categoryId,
 						title: `${source.title} (Copy)`,
-						content: source.content ?? "",
-						contentJson: source.contentJson,
+						content: rewrittenContent,
+						contentJson: rewrittenContentJson,
 						metadata: source.metadata,
 					})
 					.returning();
 				if (!row) {
 					throw new Error("Failed to duplicate document");
 				}
+				if (attachmentPlans.length > 0) {
+					await tx.insert(attachments).values(
+						attachmentPlans.map((plan) => ({
+							id: plan.id,
+							documentId: row.id,
+							filename: plan.filename,
+							mimeType: plan.mimeType,
+							size: plan.size,
+							storageKey: plan.storageKey,
+						})),
+					);
+				}
 
 				await tx.insert(versions).values({
 					documentId: row.id,
-					content: row.content ?? "",
-					contentJson: row.contentJson,
+					content: rewrittenContent,
+					contentJson: rewrittenContentJson,
 					createdBy: userId,
 				});
 
 				return row;
 			});
 
-			if (!copy) {
-				set.status = 404;
-				return { error: "Document not found" };
-			}
-
 			enqueueEmbedding(copy.id);
 			invalidateDocListCache(userId);
 			set.status = 201;
 			return copy;
 		} catch (err) {
+			await Promise.allSettled(
+				copiedStorageKeys.map((key) =>
+					storage.send(new DeleteObjectCommand({ Bucket: BUCKET, Key: key })),
+				),
+			);
 			logger.error({ err }, "Failed to duplicate document");
 			set.status = 500;
 			return { error: "Failed to duplicate document" };
