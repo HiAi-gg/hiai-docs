@@ -42,7 +42,8 @@ import {
 	type Tag,
 } from "$lib/api/tags";
 import DocumentTitle from "$lib/components/editor/DocumentTitle.svelte";
-import { customSerializer } from "$lib/components/editor/docx-serializer";
+import { createDocxImageFetcher } from "$lib/components/editor/docx-export";
+import { customSerializerAsync } from "$lib/components/editor/docx-serializer";
 import { editorExtensions } from "$lib/components/editor/editorExtensions";
 import type { EditorOutput } from "$lib/components/editor/HiAiEditor.svelte";
 import HiAiEditor from "$lib/components/editor/HiAiEditor.svelte";
@@ -380,7 +381,7 @@ function handleExport() {
 	URL.revokeObjectURL(url);
 }
 
-function handleExportDocx() {
+async function handleExportDocx() {
 	showMenu = false;
 	try {
 		let json = contentJson;
@@ -389,25 +390,25 @@ function handleExportDocx() {
 		}
 		const schema = getSchema(editorExtensions);
 		const docNode = Node.fromJSON(schema, json);
-		const wordDoc = customSerializer.serialize(docNode, {
-			getImageBuffer(_src) {
-				return new Uint8Array(0);
-			},
+		const imageFetcher = createDocxImageFetcher();
+		const serializerOptions = {
+			getImageBuffer: imageFetcher.getImageBuffer,
+			getImageType: imageFetcher.getImageType,
 			sections: [{ properties: {} }],
-		});
-		Packer.toBlob(wordDoc)
-			.then((blob) => {
-				const url = URL.createObjectURL(blob);
-				const a = document.createElement("a");
-				a.href = url;
-				a.download = `${title || "Untitled Document"}.docx`;
-				a.click();
-				URL.revokeObjectURL(url);
-			})
-			.catch((err) => {
-				console.error("Packer failed to generate docx blob:", err);
-				fallbackHtmlDocx();
-			});
+		} as Parameters<typeof customSerializerAsync.serializeAsync>[1] & {
+			getImageType: typeof imageFetcher.getImageType;
+		};
+		const wordDoc = await customSerializerAsync.serializeAsync(
+			docNode,
+			serializerOptions,
+		);
+		const blob = await Packer.toBlob(wordDoc);
+		const url = URL.createObjectURL(blob);
+		const a = document.createElement("a");
+		a.href = url;
+		a.download = `${title || "Untitled Document"}.docx`;
+		a.click();
+		URL.revokeObjectURL(url);
 	} catch (err) {
 		console.error("Failed to export to DOCX:", err);
 		fallbackHtmlDocx();

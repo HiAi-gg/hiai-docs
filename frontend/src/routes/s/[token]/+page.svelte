@@ -13,13 +13,15 @@ import {
 	Lock,
 } from "lucide-svelte";
 import { tick, untrack } from "svelte";
-import { customSerializer } from "$lib/components/editor/docx-serializer";
+import { createDocxImageFetcher } from "$lib/components/editor/docx-export";
+import { customSerializerAsync } from "$lib/components/editor/docx-serializer";
 import { editorExtensions } from "$lib/components/editor/editorExtensions";
 import { markdownToJson } from "$lib/components/editor/markdown";
 import {
 	hydrateSharedAttachmentImages,
 	type ProseMirrorDoc,
 	renderSharedDocument,
+	sharedAttachmentHeaders,
 } from "$lib/components/editor/shared-document";
 import ScrollToTop from "$lib/components/ScrollToTop.svelte";
 import * as m from "$lib/paraglide/messages.js";
@@ -221,7 +223,7 @@ function handleExportMd() {
 	URL.revokeObjectURL(url);
 }
 
-function handleExportDocx() {
+async function handleExportDocx() {
 	const doc = getCurrentDoc();
 	if (!doc) return;
 	try {
@@ -231,25 +233,27 @@ function handleExportDocx() {
 		}
 		const schema = getSchema(editorExtensions);
 		const docNode = Node.fromJSON(schema, json);
-		const wordDoc = customSerializer.serialize(docNode, {
-			getImageBuffer(_src) {
-				return new Uint8Array(0);
-			},
-			sections: [{ properties: {} }],
+		const imageFetcher = createDocxImageFetcher({
+			headers: sharedAttachmentHeaders(data.token ?? "", verifiedPassword),
 		});
-		Packer.toBlob(wordDoc)
-			.then((blob) => {
-				const url = URL.createObjectURL(blob);
-				const a = document.createElement("a");
-				a.href = url;
-				a.download = `${doc.title}.docx`;
-				a.click();
-				URL.revokeObjectURL(url);
-			})
-			.catch((err) => {
-				console.error("Packer failed to generate docx blob:", err);
-				fallbackHtmlDocx(doc);
-			});
+		const serializerOptions = {
+			getImageBuffer: imageFetcher.getImageBuffer,
+			getImageType: imageFetcher.getImageType,
+			sections: [{ properties: {} }],
+		} as Parameters<typeof customSerializerAsync.serializeAsync>[1] & {
+			getImageType: typeof imageFetcher.getImageType;
+		};
+		const wordDoc = await customSerializerAsync.serializeAsync(
+			docNode,
+			serializerOptions,
+		);
+		const blob = await Packer.toBlob(wordDoc);
+		const url = URL.createObjectURL(blob);
+		const a = document.createElement("a");
+		a.href = url;
+		a.download = `${doc.title}.docx`;
+		a.click();
+		URL.revokeObjectURL(url);
 	} catch (err) {
 		console.error("Failed to export to DOCX:", err);
 		fallbackHtmlDocx(doc);

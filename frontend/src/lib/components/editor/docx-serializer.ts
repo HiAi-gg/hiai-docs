@@ -142,6 +142,20 @@ export const customAsyncNodes = {
 		state.current.push(new TextRun({ text: checkboxChar }));
 		await state.renderContent(node);
 	},
+	/**
+	 * The stock async image serializer infers the image type from the URL.
+	 * Attachment URLs end in `/raw`, so that inference produces an invalid
+	 * `raw` type even when the fetched bytes are a perfectly valid PNG/JPEG.
+	 * The export helper supplies the response MIME-derived type while sharing
+	 * the same cached fetch used by `getImageBuffer`.
+	 */
+	async image(state, node) {
+		const src = node?.attrs?.src;
+		if (typeof src !== "string" || !src) return;
+		const imageType = await state.options.getImageType?.(src);
+		await state.image(src, undefined, undefined, undefined, imageType);
+		state.closeBlock(node);
+	},
 	async table(state, node) {
 		const actualChildren = state.children;
 		const rows = [];
