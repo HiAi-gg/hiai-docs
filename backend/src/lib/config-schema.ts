@@ -59,6 +59,7 @@ export const envSchema = z.object({
 		),
 	BETTER_AUTH_URL: z.string().default("http://localhost:50700"),
 	CORS_ORIGINS: z.string().optional(),
+	WEB_PORT: z.coerce.number().default(50701),
 	EMBEDDING_BASE_URL: z.string().optional(),
 	EMBEDDING_API_KEY: z.string().optional(),
 	EMBEDDING_MODEL: z.string().optional(),

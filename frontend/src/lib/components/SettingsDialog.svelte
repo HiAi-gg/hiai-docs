@@ -9,6 +9,7 @@ import { onMount } from "svelte";
 import { goto } from "$app/navigation";
 import { getProfile, updateProfile } from "$lib/api/settings";
 import { authClient, signOut } from "$lib/auth-client";
+import ApiAccessSettings from "$lib/components/settings/ApiAccessSettings.svelte";
 import * as m from "$lib/paraglide/messages.js";
 import { type Theme, themeStore } from "$lib/stores/theme.svelte";
 
@@ -53,7 +54,10 @@ async function saveProfile() {
 	profileError = "";
 	try {
 		await updateProfile({ name });
-		if (email.trim() !== "" && email.trim().toLowerCase() !== currentEmail.toLowerCase()) {
+		if (
+			email.trim() !== "" &&
+			email.trim().toLowerCase() !== currentEmail.toLowerCase()
+		) {
 			const { error } = await authClient.changeEmail({
 				newEmail: email.trim(),
 				callbackURL: "/",
@@ -150,7 +154,7 @@ function close() {
 	</Dialog.DialogHeader>
 
 	<Tabs.Tabs bind:value={activeTab} class="w-full">
-		<Tabs.TabsList class="grid w-full grid-cols-3">
+		<Tabs.TabsList class="grid w-full grid-cols-4">
 			<Tabs.TabsTrigger
 				value="profile"
 				selected={activeTab === "profile"}
@@ -164,6 +168,13 @@ function close() {
 				onclick={(v) => (activeTab = v)}
 			>
 				{m.password_label()}
+			</Tabs.TabsTrigger>
+			<Tabs.TabsTrigger
+				value="api"
+				selected={activeTab === "api"}
+				onclick={(v) => (activeTab = v)}
+			>
+				Global API
 			</Tabs.TabsTrigger>
 			<Tabs.TabsTrigger
 				value="appearance"
@@ -269,6 +280,10 @@ function close() {
 					{/each}
 				</div>
 			</div>
+		</Tabs.TabsContent>
+
+		<Tabs.TabsContent value="api" currentValue={activeTab}>
+			<ApiAccessSettings />
 		</Tabs.TabsContent>
 	</Tabs.Tabs>
 

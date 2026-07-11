@@ -80,7 +80,14 @@ export const csrfMiddleware = new Elysia()
 		const host = request.headers.get("host");
 		if (origin && host) {
 			try {
-				const allowedOrigins = config.CORS_ORIGINS?.split(",") ?? [];
+				const configuredOrigins =
+					config.CORS_ORIGINS?.split(",").filter(Boolean) ?? [];
+				const allowedOrigins = configuredOrigins.length
+					? configuredOrigins
+					: [
+							`http://localhost:${config.WEB_PORT}`,
+							`http://127.0.0.1:${config.WEB_PORT}`,
+						];
 				const isAllowed = isAllowedCsrfOrigin(
 					origin,
 					host,
