@@ -1,7 +1,11 @@
+import { documents, documentTags, folders, tags } from "@hiai-docs/db/schema";
 import type { TenantContext } from "@hiai-docs/db/with-tenant";
+import { and, eq, inArray } from "drizzle-orm";
 import { getEmbedding } from "../embedding";
 import { config } from "../lib/config";
+import { withTenant } from "../lib/with-tenant";
 import { evaluateConfidence } from "./confidence";
+import type { GraphVisibilityScope } from "./graph-retriever";
 import { retrieveGraphCandidates } from "./graph-retriever";
 import { analyzeQuery } from "./query-analyzer";
 import { expandQuery } from "./query-expander";
@@ -13,6 +17,7 @@ import type {
 	RankedSearchResult,
 	SearchCandidate,
 	SearchChannel,
+	SearchFilters,
 } from "./types";
 
 export interface SearchRequest {
@@ -20,6 +25,10 @@ export interface SearchRequest {
 	page?: number;
 	limit?: number;
 	maxGraphHops?: number;
+	filters?: SearchFilters;
+	/** Restricts every lexical/vector channel to an authorized document set. */
+	documentIds?: string[];
+	visibilityScope?: GraphVisibilityScope;
 }
 
 export interface SearchDiagnostics {
@@ -47,7 +56,7 @@ export interface SearchAdapterOptions {
 	retrieveExpanded?: (
 		ctx: TenantContext,
 		plan: QueryPlan,
-		options?: { limit?: number },
+		options?: { limit?: number; documentIds?: string[] },
 	) => Promise<ChannelResult[]>;
 	expand?: typeof expandQuery;
 	retrieveGraph?: typeof retrieveGraphCandidates;
@@ -77,7 +86,10 @@ export async function searchDocuments(
 
 	let fast: ChannelResult[];
 	try {
-		fast = await retrieveFast(ctx, plan, { limit: limit * 2 });
+		fast = await retrieveFast(ctx, plan, {
+			limit: limit * 2,
+			documentIds: request.documentIds,
+		} as Parameters<typeof retrieveFastChannels>[2]);
 	} catch {
 		fast = CHANNELS.map((channel) => ({
 			channel,
@@ -111,6 +123,7 @@ export async function searchDocuments(
 				try {
 					expanded = await retrieveExpanded(ctx, expandedPlan, {
 						limit: limit * 2,
+						documentIds: request.documentIds,
 					});
 				} catch {
 					expanded = [];
@@ -143,6 +156,7 @@ export async function searchDocuments(
 			queryPlan: graphPlan,
 			limit: Math.min(limit * 2, config.SEARCH_GRAPH_RESULT_LIMIT),
 			maxHops: request.maxGraphHops ?? config.SEARCH_GRAPH_MAX_HOPS,
+			visibilityScope: request.visibilityScope,
 		});
 	} catch {
 		graphFailed = true;
@@ -162,8 +176,11 @@ export async function searchDocuments(
 			vectorMinSimilarity: config.SEARCH_VECTOR_MIN_SIMILARITY,
 		},
 	);
+	const filtered = request.filters
+		? await applySearchFilters(ctx, ranked, request.filters)
+		: ranked;
 	const offset = (page - 1) * limit;
-	const items = ranked.slice(offset, offset + limit);
+	const items = filtered.slice(offset, offset + limit);
 	const diagnostics: SearchDiagnostics = {
 		...(ranked.length === 0
 			? { reason: "no_relevant_candidates" as const }
@@ -178,7 +195,7 @@ export async function searchDocuments(
 	};
 	return {
 		items,
-		total: ranked.length,
+		total: filtered.length,
 		page,
 		limit,
 		queryPlan: plan,
@@ -189,7 +206,7 @@ export async function searchDocuments(
 async function defaultExpandedRetriever(
 	ctx: TenantContext,
 	plan: QueryPlan,
-	options: { limit?: number } = {},
+	options: { limit?: number; documentIds?: string[] } = {},
 ): Promise<ChannelResult[]> {
 	const variants = dedupe([
 		...plan.translations,
@@ -205,6 +222,7 @@ async function defaultExpandedRetriever(
 			const variantPlan: QueryPlan = { ...plan, normalized: variant };
 			const result = await retrieveFastChannels(ctx, variantPlan, {
 				limit,
+				documentIds: options.documentIds,
 				getEmbedding: async (text) => {
 					const cached = embeddingCache.get(text);
 					if (cached) return cached;
@@ -229,6 +247,87 @@ async function defaultExpandedRetriever(
 	return results.flatMap((result) =>
 		result.status === "fulfilled" ? result.value : [],
 	);
+}
+
+async function applySearchFilters(
+	ctx: TenantContext,
+	items: RankedSearchResult[],
+	filters: SearchFilters,
+): Promise<RankedSearchResult[]> {
+	if (items.length === 0) return [];
+	const ids = items.map((item) => item.documentId);
+	const rows = await withTenant(ctx, async (tx) =>
+		tx
+			.select({
+				id: documents.id,
+				folderId: documents.folderId,
+				categoryId: documents.categoryId,
+				folderCategoryId: folders.categoryId,
+				title: documents.title,
+				createdAt: documents.createdAt,
+			})
+			.from(documents)
+			.leftJoin(folders, eq(folders.id, documents.folderId))
+			.where(
+				and(eq(documents.ownerId, ctx.userId), inArray(documents.id, ids)),
+			),
+	);
+	const byId = new Map(rows.map((row) => [row.id, row]));
+	let filtered = items.filter((item) => {
+		const row = byId.get(item.documentId);
+		if (!row) return false;
+		if (filters.folderId && row.folderId !== filters.folderId) return false;
+		if (
+			filters.categoryId &&
+			row.categoryId !== filters.categoryId &&
+			row.folderCategoryId !== filters.categoryId
+		)
+			return false;
+		const created = new Date(row.createdAt).getTime();
+		if (filters.dateFrom) {
+			const from = new Date(filters.dateFrom).getTime();
+			if (Number.isFinite(from) && created < from) return false;
+		}
+		if (filters.dateTo) {
+			const toDate = new Date(filters.dateTo);
+			if (!Number.isNaN(toDate.getTime())) {
+				toDate.setHours(23, 59, 59, 999);
+				if (created > toDate.getTime()) return false;
+			}
+		}
+		return true;
+	});
+	if (filters.tagNames && filters.tagNames.length > 0) {
+		const tagRows = await withTenant(ctx, async (tx) =>
+			tx
+				.select({ documentId: documentTags.documentId })
+				.from(documentTags)
+				.innerJoin(tags, eq(tags.id, documentTags.tagId))
+				.where(
+					and(
+						eq(tags.ownerId, ctx.userId),
+						inArray(tags.name, filters.tagNames ?? []),
+						inArray(documentTags.documentId, ids),
+					),
+				),
+		);
+		const tagged = new Set(tagRows.map((row) => row.documentId));
+		filtered = filtered.filter((item) => tagged.has(item.documentId));
+	}
+	if (filters.sort && filters.sort !== "relevance") {
+		filtered.sort((left, right) => {
+			const a = byId.get(left.documentId);
+			const b = byId.get(right.documentId);
+			if (!a || !b) return 0;
+			if (filters.sort === "date_desc")
+				return +new Date(b.createdAt) - +new Date(a.createdAt);
+			if (filters.sort === "date_asc")
+				return +new Date(a.createdAt) - +new Date(b.createdAt);
+			const cmp = a.title.localeCompare(b.title);
+			return filters.sort === "name_desc" ? -cmp : cmp;
+		});
+	}
+	return filtered;
 }
 
 function dedupe(values: string[]): string[] {

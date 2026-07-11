@@ -1,5 +1,5 @@
 import { documents, folders, shareLinks } from "@hiai-docs/db/schema";
-import { eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import type { TenantContext } from "../api/middleware/tenant";
 import { withTenant } from "./with-tenant";
 
@@ -91,4 +91,92 @@ export async function shareTokenAccessForDocument(
 	}
 
 	return "no-access";
+}
+
+export interface ShareDocumentScope {
+	ownerId: string;
+	documentIds: string[];
+	passwordHash: string | null;
+	expiresAt: Date | null;
+}
+
+/**
+ * Resolve the complete document allow-list for an anonymous share token.
+ * The token is looked up with an admin context, then the resulting document
+ * set is read under the link owner's context. This keeps search channels and
+ * AGE graph expansion inside the same explicit share boundary.
+ */
+export async function resolveShareDocumentScope(
+	lookupCtx: TenantContext,
+	token: string,
+): Promise<ShareDocumentScope | null> {
+	const link = await withTenant(lookupCtx, async (tx) => {
+		const [row] = await tx
+			.select({
+				createdBy: shareLinks.createdBy,
+				documentId: shareLinks.documentId,
+				folderId: shareLinks.folderId,
+				passwordHash: shareLinks.passwordHash,
+				expiresAt: shareLinks.expiresAt,
+			})
+			.from(shareLinks)
+			.where(eq(shareLinks.token, token))
+			.limit(1);
+		return row ?? null;
+	});
+	if (!link || (link.expiresAt && link.expiresAt < new Date())) return null;
+
+	const ownerCtx = {
+		userId: link.createdBy,
+		role: "user" as const,
+	};
+	const folderIds = new Set<string>();
+	if (link.folderId) {
+		const ownerFolders = await withTenant(ownerCtx, async (tx) =>
+			tx
+				.select({ id: folders.id, parentId: folders.parentId })
+				.from(folders)
+				.where(eq(folders.ownerId, link.createdBy)),
+		);
+		const byParent = new Map<string | null, string[]>();
+		for (const folder of ownerFolders) {
+			const children = byParent.get(folder.parentId) ?? [];
+			children.push(folder.id);
+			byParent.set(folder.parentId, children);
+		}
+		const pending = [link.folderId];
+		while (pending.length > 0) {
+			const current = pending.pop();
+			if (!current || folderIds.has(current)) continue;
+			folderIds.add(current);
+			pending.push(...(byParent.get(current) ?? []));
+		}
+	}
+	if (!link.documentId && folderIds.size === 0) {
+		return {
+			ownerId: link.createdBy,
+			documentIds: [],
+			passwordHash: link.passwordHash,
+			expiresAt: link.expiresAt,
+		};
+	}
+	const rows = await withTenant(ownerCtx, async (tx) =>
+		tx
+			.select({ id: documents.id })
+			.from(documents)
+			.where(
+				and(
+					eq(documents.ownerId, link.createdBy),
+					link.documentId
+						? eq(documents.id, link.documentId)
+						: inArray(documents.folderId, [...folderIds]),
+				),
+			),
+	);
+	return {
+		ownerId: link.createdBy,
+		documentIds: rows.map((row) => row.id),
+		passwordHash: link.passwordHash,
+		expiresAt: link.expiresAt,
+	};
 }

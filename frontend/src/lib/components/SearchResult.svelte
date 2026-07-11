@@ -21,6 +21,13 @@ interface Props {
 	 */
 	titleMatch?: boolean;
 	explanations?: SearchExplanation[];
+	chunks?: Array<{
+		chunkIndex: number;
+		chunkText: string;
+		charStart: number;
+		charEnd: number;
+		score: number;
+	}>;
 }
 
 const {

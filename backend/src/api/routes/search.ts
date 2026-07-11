@@ -2,12 +2,19 @@ import { documentTags, tags as tagsTable } from "@hiai-docs/db/schema";
 import { and, eq, inArray, or, sql } from "drizzle-orm";
 import { Elysia } from "elysia";
 import { z } from "zod";
+import { getEmbedding } from "../../embedding";
 import { logger } from "../../lib/logger";
+import { resolveShareDocumentScope } from "../../lib/share-access";
 import { withTenant } from "../../lib/with-tenant";
+import type { GraphVisibilityScope } from "../../search/graph-retriever";
 import { searchDocuments } from "../../search/orchestrator";
 import type { SearchExplanation } from "../../search/types";
 import { rateLimitHeaders, searchRateLimiter } from "../middleware/rate-limit";
-import { buildTenantContext } from "../middleware/tenant";
+import {
+	adminTenantContext,
+	buildTenantContext,
+	shareGuestTenantContext,
+} from "../middleware/tenant";
 
 const searchQuerySchema = z.object({
 	q: z.string().optional(),
@@ -62,163 +69,193 @@ type SearchResult = {
 		score: number;
 	}>;
 };
-export const searchRoutes = new Elysia({ prefix: "/api/search" })
-	.get("/", async ({ query, set, request }) => {
-		const ip =
-			request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
-			request.headers.get("x-real-ip") ??
-			"unknown";
-		const rl = await searchRateLimiter(ip, request);
-		if (!rl.allowed) {
-			set.status = 429;
-			set.headers = rateLimitHeaders(0, rl.retryAfter);
-			return { error: "Too many requests" };
-		}
-		set.headers = rateLimitHeaders(rl.remaining);
 
-		const ctx = await buildTenantContext(request);
-		if (ctx.role === "none") {
-			set.status = 401;
-			return { error: "Unauthorized" };
-		}
-		const parsed = searchQuerySchema.safeParse(query);
-		if (!parsed.success) {
-			set.status = 400;
-			return { error: "Invalid query", details: parsed.error.flatten() };
-		}
-		try {
-			const {
-				q: rawQ,
-				page,
-				limit,
-				sort,
-				folder,
-				tags,
-				category,
-				dateFrom,
-				dateTo,
-				includeChunks,
-			} = parsed.data;
-			const q = rawQ ?? "";
-			if (!q.trim()) return { items: [], total: 0, page, limit };
-			const legacyGraphRequested = ["graph", "graphHops", "graphBoost"].some(
-				(key) => request.url.includes(`${key}=`),
-			);
-			if (legacyGraphRequested) {
-				set.headers.Deprecation = "true";
-			}
+export type SearchChunk = NonNullable<SearchResult["chunks"]>[number];
 
-			// The domain owns retrieval, confidence, GraphRAG, and RRF ranking. The
-			// route only hydrates authorized display fields and applies presentation
-			// filters so the public HTTP contract remains backwards compatible.
-			const domain = await searchDocuments(ctx, {
-				query: q,
-				page: 1,
-				limit: 100,
-			});
-			let rows = await hydrateResults(ctx, domain.items, includeChunks);
-			if (folder) rows = rows.filter((row) => row.folder_id === folder);
-			if (category) {
-				const allowed = await categoryFilter(ctx, category, rows);
-				rows = rows.filter((row) => allowed.has(row.id));
+/** Keep the top three finite-scored chunks per document in relevance order. */
+export function rankChunkRows(rows: Array<Record<string, unknown>>) {
+	const byDoc = new Map<string, SearchChunk[]>();
+	for (const raw of rows) {
+		const docId = String(raw.document_id ?? "");
+		const score = Number(raw.score);
+		if (!docId || !Number.isFinite(score)) continue;
+		const list = byDoc.get(docId) ?? [];
+		list.push({
+			chunkIndex: Number(raw.chunk_index ?? 0),
+			chunkText: String(raw.chunk_text ?? ""),
+			charStart: Number(raw.char_start ?? 0),
+			charEnd: Number(raw.char_end ?? 0),
+			score,
+		});
+		list.sort(
+			(left, right) =>
+				right.score - left.score || left.chunkIndex - right.chunkIndex,
+		);
+		byDoc.set(docId, list.slice(0, 3));
+	}
+	return byDoc;
+}
+export function createSearchRoutes(
+	search: typeof searchDocuments = searchDocuments,
+	hydrate: typeof hydrateResults = hydrateResults,
+) {
+	return new Elysia({ prefix: "/api/search" })
+		.get("/", async ({ query, set, request }) => {
+			const ip =
+				request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
+				request.headers.get("x-real-ip") ??
+				"unknown";
+			const rl = await searchRateLimiter(ip, request);
+			if (!rl.allowed) {
+				set.status = 429;
+				set.headers = rateLimitHeaders(0, rl.retryAfter);
+				return { error: "Too many requests" };
 			}
-			if (dateFrom) {
-				const from = new Date(dateFrom);
-				if (!Number.isNaN(from.getTime()))
-					rows = rows.filter((row) => new Date(row.created_at) >= from);
-			}
-			if (dateTo) {
-				const to = new Date(dateTo);
-				if (!Number.isNaN(to.getTime())) {
-					to.setHours(23, 59, 59, 999);
-					rows = rows.filter((row) => new Date(row.created_at) <= to);
+			set.headers = rateLimitHeaders(rl.remaining);
+
+			const ctx = await buildTenantContext(request);
+			let searchCtx = ctx;
+			let shareDocumentIds: string[] | undefined;
+			let graphVisibilityScope: GraphVisibilityScope | undefined;
+			if (ctx.role === "none") {
+				const shareToken = request.headers.get("x-share-token")?.trim();
+				if (!shareToken) {
+					set.status = 401;
+					return { error: "Unauthorized" };
 				}
-			}
-			if (tags) {
-				const tagList = tags
-					.split(",")
-					.map((tag) => tag.trim())
-					.filter(Boolean);
-				if (tagList.length > 0) {
-					const allowedIds = await tagFilter(ctx, tagList);
-					rows = rows.filter((row) => allowedIds.has(row.id));
+				const shareScope = await resolveShareDocumentScope(
+					adminTenantContext(),
+					shareToken,
+				);
+				if (!shareScope) {
+					set.status = 401;
+					return { error: "Unauthorized" };
 				}
+				if (shareScope.passwordHash) {
+					const password = request.headers.get("x-share-password");
+					if (
+						!password ||
+						!(await Bun.password.verify(password, shareScope.passwordHash))
+					) {
+						set.status = 401;
+						return { error: "Unauthorized" };
+					}
+				}
+				searchCtx = shareGuestTenantContext(shareScope.ownerId);
+				shareDocumentIds = shareScope.documentIds;
+				graphVisibilityScope = {
+					kind: "share",
+					ownerId: shareScope.ownerId,
+					allowedDocumentIds: shareScope.documentIds,
+				};
 			}
-			switch (sort) {
-				case "date_desc":
-					rows.sort(
-						(a, b) =>
-							new Date(b.created_at).getTime() -
-							new Date(a.created_at).getTime(),
-					);
-					break;
-				case "date_asc":
-					rows.sort(
-						(a, b) =>
-							new Date(a.created_at).getTime() -
-							new Date(b.created_at).getTime(),
-					);
-					break;
-				case "name_asc":
-					rows.sort((a, b) => a.title.localeCompare(b.title));
-					break;
-				case "name_desc":
-					rows.sort((a, b) => b.title.localeCompare(a.title));
-					break;
-				default:
-					break;
+			const parsed = searchQuerySchema.safeParse(query);
+			if (!parsed.success) {
+				set.status = 400;
+				return { error: "Invalid query", details: parsed.error.flatten() };
 			}
-			const total = rows.length;
-			const offset = (page - 1) * limit;
-			return { items: rows.slice(offset, offset + limit), total, page, limit };
-		} catch (err) {
-			logger.error({ err }, "Search failed");
-			set.status = 500;
-			return { error: "Search failed" };
-		}
-	})
-	.get("/suggest", async ({ query, set, request }) => {
-		const ip =
-			request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
-			request.headers.get("x-real-ip") ??
-			"unknown";
-		const rl = await searchRateLimiter(ip, request);
-		if (!rl.allowed) {
-			set.status = 429;
-			set.headers = rateLimitHeaders(0, rl.retryAfter);
-			return { error: "Too many requests" };
-		}
-		set.headers = rateLimitHeaders(rl.remaining);
+			try {
+				const {
+					q: rawQ,
+					page,
+					limit,
+					sort,
+					folder,
+					tags,
+					category,
+					dateFrom,
+					dateTo,
+					includeChunks,
+				} = parsed.data;
+				const q = rawQ ?? "";
+				if (!q.trim()) return { items: [], total: 0, page, limit };
+				const legacyGraphRequested = ["graph", "graphHops", "graphBoost"].some(
+					(key) => request.url.includes(`${key}=`),
+				);
+				if (legacyGraphRequested) {
+					set.headers.Deprecation = "true";
+				}
 
-		const ctx = await buildTenantContext(request);
-		if (ctx.role === "none") {
-			set.status = 401;
-			return { error: "Unauthorized" };
-		}
-		const userId = ctx.userId;
-		const parsed = suggestQuerySchema.safeParse(query);
-		if (!parsed.success) {
-			set.status = 400;
-			return { error: "Invalid query", details: parsed.error.flatten() };
-		}
-		try {
-			const q = parsed.data.q ?? "";
-			if (!q.trim()) return [];
-			const results = await withTenant(ctx, async (tx) => {
-				return tx.execute(sql`
+				// The domain owns retrieval, confidence, GraphRAG, and RRF ranking. The
+				// route only hydrates authorized display fields and applies presentation
+				// filters so the public HTTP contract remains backwards compatible.
+				const domain = await search(searchCtx, {
+					query: q,
+					page,
+					limit,
+					filters: {
+						folderId: folder,
+						tagNames: tags
+							?.split(",")
+							.map((tag) => tag.trim())
+							.filter(Boolean),
+						categoryId: category,
+						dateFrom,
+						dateTo,
+						sort,
+					},
+					documentIds: shareDocumentIds,
+					visibilityScope: graphVisibilityScope,
+				});
+				const rows = await hydrate(
+					searchCtx,
+					domain.items,
+					includeChunks,
+					q,
+					shareDocumentIds,
+				);
+				return { items: rows, total: domain.total, page, limit };
+			} catch (err) {
+				logger.error({ err }, "Search failed");
+				set.status = 500;
+				return { error: "Search failed" };
+			}
+		})
+		.get("/suggest", async ({ query, set, request }) => {
+			const ip =
+				request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
+				request.headers.get("x-real-ip") ??
+				"unknown";
+			const rl = await searchRateLimiter(ip, request);
+			if (!rl.allowed) {
+				set.status = 429;
+				set.headers = rateLimitHeaders(0, rl.retryAfter);
+				return { error: "Too many requests" };
+			}
+			set.headers = rateLimitHeaders(rl.remaining);
+
+			const ctx = await buildTenantContext(request);
+			if (ctx.role === "none") {
+				set.status = 401;
+				return { error: "Unauthorized" };
+			}
+			const userId = ctx.userId;
+			const parsed = suggestQuerySchema.safeParse(query);
+			if (!parsed.success) {
+				set.status = 400;
+				return { error: "Invalid query", details: parsed.error.flatten() };
+			}
+			try {
+				const q = parsed.data.q ?? "";
+				if (!q.trim()) return [];
+				const results = await withTenant(ctx, async (tx) => {
+					return tx.execute(sql`
 					SELECT id, title, similarity(title, ${q}) as score
 					FROM documents
 					WHERE owner_id = ${userId} AND title % ${q}
 					ORDER BY score DESC LIMIT 5
 				`);
-			});
-			return results;
-		} catch (err) {
-			logger.error({ err }, "Suggest failed");
-			set.status = 500;
-			return { error: "Suggest failed" };
-		}
-	});
+				});
+				return results;
+			} catch (err) {
+				logger.error({ err }, "Suggest failed");
+				set.status = 500;
+				return { error: "Suggest failed" };
+			}
+		});
+}
+
+export const searchRoutes = createSearchRoutes();
 
 async function hydrateResults(
 	ctx: import("../../api/middleware/tenant").TenantContext,
@@ -228,6 +265,8 @@ async function hydrateResults(
 		explanations: SearchExplanation[];
 	}>,
 	includeChunks: boolean,
+	query: string,
+	allowedDocumentIds?: string[],
 ): Promise<SearchResult[]> {
 	if (items.length === 0) return [];
 	const ids = items.map((item) => item.documentId);
@@ -244,7 +283,13 @@ async function hydrateResults(
 				updatedAt: documents.updatedAt,
 			})
 			.from(documents)
-			.leftJoin(folders, eq(folders.id, documents.folderId))
+			.leftJoin(
+				folders,
+				and(
+					eq(folders.id, documents.folderId),
+					eq(folders.ownerId, ctx.userId),
+				),
+			)
 			.where(
 				and(
 					or(
@@ -252,6 +297,9 @@ async function hydrateResults(
 						eq(documents.visibility, "public"),
 					),
 					inArray(documents.id, ids),
+					allowedDocumentIds
+						? inArray(documents.id, allowedDocumentIds)
+						: undefined,
 				),
 			),
 	);
@@ -280,159 +328,49 @@ async function hydrateResults(
 		];
 	});
 	if (includeChunks && hydrated.length > 0) {
-		// Chunk hydration is deliberately best-effort and tenant-scoped. The
-		// orchestrator already owns the query embedding and ranking decisions.
+		// Chunk hydration is deliberately best-effort and tenant-scoped. Reuse one
+		// query embedding and rank active, valid chunks by cosine similarity.
 		try {
-			const chunks = await withTenant(ctx, async (tx) =>
-				tx.execute(sql`
-				SELECT document_id, chunk_index, chunk_text, char_start, char_end,
-					0::double precision AS score
-				FROM document_embeddings
-				WHERE document_id IN (${sql.join(
-					ids.map((id) => sql`${id}`),
-					sql`, `,
-				)})
-				ORDER BY document_id, chunk_index
-			`),
-			);
-			const byDoc = new Map<string, SearchResult["chunks"]>();
-			for (const raw of chunks as unknown as Array<Record<string, unknown>>) {
-				const docId = String(raw.document_id ?? "");
-				const list = byDoc.get(docId) ?? [];
-				if (list.length < 3)
-					list.push({
-						chunkIndex: Number(raw.chunk_index ?? 0),
-						chunkText: String(raw.chunk_text ?? ""),
-						charStart: Number(raw.char_start ?? 0),
-						charEnd: Number(raw.char_end ?? 0),
-						score: Number(raw.score ?? 0),
-					});
-				byDoc.set(docId, list);
+			const embedding = await getEmbedding(query);
+			if (embedding.ok) {
+				const embeddingString = `[${embedding.vector.join(",")}]`;
+				const chunks = await withTenant(ctx, async (tx) =>
+					tx.execute(sql`
+					SELECT de.document_id, de.chunk_index, de.chunk_text, de.char_start, de.char_end,
+						(1 - (de.embedding <=> ${embeddingString}::vector))::double precision AS score
+					FROM document_embeddings de
+					JOIN documents d ON d.id = de.document_id
+					WHERE de.document_id IN (${sql.join(
+						ids.map((id) => sql`${id}`),
+						sql`, `,
+					)})
+						AND d.owner_id = ${ctx.userId}
+						AND d.embedding_status = 'ready'
+						AND d.active_embedding_generation IS NOT NULL
+						AND de.generation_id = d.active_embedding_generation
+						AND de.is_valid = true
+						AND de.embedding_dimensions = 1024
+						AND de.embedding_profile = d.embedding_profile
+						AND de.embedding_profile = ${embedding.profile}
+						AND de.embedding IS NOT NULL
+						AND vector_norm(de.embedding) > 0
+					ORDER BY de.document_id, score DESC, de.chunk_index ASC
+				`),
+				);
+				const byDoc = rankChunkRows(
+					chunks as unknown as Array<Record<string, unknown>>,
+				);
+				for (const result of hydrated)
+					result.chunks = byDoc.get(result.id) ?? [];
+			} else {
+				for (const result of hydrated) result.chunks = [];
 			}
-			for (const result of hydrated) result.chunks = byDoc.get(result.id) ?? [];
 		} catch (err) {
 			logger.warn({ err }, "Chunk hydration failed; continuing without chunks");
 		}
 	}
 	const tagged = await withTags(ctx, hydrated);
 	return tagged;
-}
-
-/**
- * Resolve the set of document ids that match a category scope.
- *
- * A document is in scope when either:
- *   - its own `category_id` matches `categoryId`, or
- *   - its folder's `category_id` matches `categoryId`.
- *
- * Used to narrow a merged search result list by category. We only look at
- * the `folder_id`s present in `results` to keep the lookup bounded by the
- * candidate set (no full-table scan). Folder ownership is verified via the
- * folder→owner join so users cannot see documents in someone else's folder
- * just by guessing a category UUID.
- *
- * Returns the empty set when no candidates qualify (callers fall through
- * to an empty filtered list without an extra DB call).
- */
-async function categoryFilter(
-	ctx: import("../../api/middleware/tenant").TenantContext,
-	categoryId: string,
-	results: Array<{ id: string; folder_id: string | null }>,
-): Promise<Set<string>> {
-	if (results.length === 0) return new Set();
-
-	const folderIds = Array.from(
-		new Set(
-			results
-				.map((r) => r.folder_id)
-				.filter((id): id is string => typeof id === "string" && id.length > 0),
-		),
-	);
-
-	// (1) Documents whose own category_id matches — fetched directly from
-	// the DB because the merged result rows do not carry category_id.
-	const { documents, folders } = await import("@hiai-docs/db/schema");
-	const directRows = await withTenant(ctx, async (tx) => {
-		return tx
-			.select({ id: documents.id })
-			.from(documents)
-			.where(
-				and(
-					eq(documents.ownerId, ctx.userId),
-					eq(documents.categoryId, categoryId),
-				),
-			);
-	});
-	const direct = new Set(directRows.map((r) => r.id));
-
-	// (2) Documents whose folder's category_id matches.
-	if (folderIds.length === 0) return direct;
-
-	const folderRows = await withTenant(ctx, async (tx) => {
-		return tx
-			.select({ id: folders.id })
-			.from(folders)
-			.where(
-				and(
-					eq(folders.ownerId, ctx.userId),
-					sql`${folders.id} IN (
-						WITH RECURSIVE cat_folders AS (
-							SELECT id FROM ${folders} WHERE category_id = ${categoryId} AND owner_id = ${ctx.userId}
-							UNION ALL
-							SELECT f.id FROM ${folders} f
-							JOIN cat_folders cf ON f.parent_id = cf.id
-						)
-						SELECT id FROM cat_folders
-					)`,
-					inArray(folders.id, folderIds),
-				),
-			);
-	});
-	const matchingFolderIds = new Set(folderRows.map((r) => r.id));
-	if (matchingFolderIds.size === 0) return direct;
-
-	const out = new Set<string>(direct);
-	for (const r of results) {
-		if (r.folder_id && matchingFolderIds.has(r.folder_id)) out.add(r.id);
-	}
-	return out;
-}
-
-/**
- * Return the set of document ids owned by the current user that have at
- * least one of the supplied tag names (ANY semantics — a doc qualifies
- * if it carries any of the requested tags).
- */
-async function tagFilter(
-	ctx: import("../../api/middleware/tenant").TenantContext,
-	tagNames: string[],
-): Promise<Set<string>> {
-	if (tagNames.length === 0) return new Set();
-
-	// Look up tag ids by name (parameterised — safe against injection).
-	const tagRows = await withTenant(ctx, async (tx) => {
-		return tx
-			.select({ id: tagsTable.id })
-			.from(tagsTable)
-			.where(
-				and(
-					eq(tagsTable.ownerId, ctx.userId),
-					inArray(tagsTable.name, tagNames),
-				),
-			);
-	});
-	if (tagRows.length === 0) return new Set();
-
-	const tagIds = tagRows.map((r) => r.id);
-
-	const docRows = await withTenant(ctx, async (tx) => {
-		return tx
-			.selectDistinct({ documentId: documentTags.documentId })
-			.from(documentTags)
-			.where(inArray(documentTags.tagId, tagIds));
-	});
-
-	return new Set(docRows.map((r) => r.documentId));
 }
 
 async function withTags<T extends { id: string }>(
@@ -453,7 +391,12 @@ async function withTags<T extends { id: string }>(
 			})
 			.from(documentTags)
 			.innerJoin(tagsTable, eq(tagsTable.id, documentTags.tagId))
-			.where(inArray(documentTags.documentId, ids));
+			.where(
+				and(
+					inArray(documentTags.documentId, ids),
+					eq(tagsTable.ownerId, ctx.userId),
+				),
+			);
 	});
 
 	const byDoc = new Map<

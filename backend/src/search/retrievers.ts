@@ -20,6 +20,8 @@ type SearchQueryExecutor = (
 
 export interface RetrieverOptions {
 	limit?: number;
+	/** Optional document allow-list used by share guests and scoped callers. */
+	documentIds?: string[];
 	vectorMinSimilarity?: number;
 	fuzzyMinSimilarity?: number;
 	chunkLimitPerDocument?: number;
@@ -52,12 +54,34 @@ export async function retrieveFastChannels(
 		1,
 		Math.floor(options.chunkLimitPerDocument ?? DEFAULT_CHUNK_LIMIT),
 	);
+	if (options.documentIds && options.documentIds.length === 0) {
+		return ["exact", "fts", "fuzzy", "vector"].map((channel) => ({
+			channel: channel as SearchChannel,
+			candidates: [],
+			durationMs: 0,
+		}));
+	}
+	const scopedOptions = options.documentIds
+		? sql`AND d.id IN (${sql.join(
+				options.documentIds.map((id) => sql`${id}`),
+				sql`, `,
+			)})`
+		: sql``;
 
 	const tasks: Array<Promise<ChannelResult>> = [
-		measure("exact", () => retrieveExact(ctx, plan, limit, execute)),
-		measure("fts", () => retrieveFts(ctx, plan, limit, execute)),
+		measure("exact", () =>
+			retrieveExact(ctx, plan, limit, execute, scopedOptions),
+		),
+		measure("fts", () => retrieveFts(ctx, plan, limit, execute, scopedOptions)),
 		measure("fuzzy", () =>
-			retrieveFuzzy(ctx, plan, limit, fuzzyMinSimilarity, execute),
+			retrieveFuzzy(
+				ctx,
+				plan,
+				limit,
+				fuzzyMinSimilarity,
+				execute,
+				scopedOptions,
+			),
 		),
 		measure("vector", () =>
 			retrieveVector(
@@ -69,6 +93,7 @@ export async function retrieveFastChannels(
 				execute,
 				options.queryEmbedding,
 				options.getEmbedding,
+				scopedOptions,
 			),
 		),
 	];
@@ -127,12 +152,14 @@ async function retrieveExact(
 	plan: QueryPlan,
 	limit: number,
 	execute: SearchQueryExecutor,
+	scope: ReturnType<typeof sql>,
 ): Promise<SearchCandidate[]> {
 	const query = sql`
 		SELECT d.id AS document_id, d.owner_id, d.title,
 			1.0::double precision AS score
 		FROM documents d
 		WHERE d.owner_id = ${ctx.userId}
+			${scope}
 			AND (
 				lower(trim(d.title)) = lower(trim(${plan.normalized}))
 				OR regexp_replace(lower(d.title), '[^[:alnum:]]+', '', 'g') =
@@ -163,6 +190,7 @@ async function retrieveFts(
 	plan: QueryPlan,
 	limit: number,
 	execute: SearchQueryExecutor,
+	scope: ReturnType<typeof sql>,
 ): Promise<SearchCandidate[]> {
 	const query = sql`
 		WITH lexical AS (
@@ -170,12 +198,14 @@ async function retrieveFts(
 				ts_rank(d.search_vector, websearch_to_tsquery('english', ${plan.normalized})) AS score
 			FROM documents d
 			WHERE d.owner_id = ${ctx.userId}
+				${scope}
 				AND d.search_vector @@ websearch_to_tsquery('english', ${plan.normalized})
 			UNION ALL
 			SELECT d.id AS document_id, d.owner_id,
 				ts_rank(d.search_vector_simple, websearch_to_tsquery('simple', ${plan.normalized})) AS score
 			FROM documents d
 			WHERE d.owner_id = ${ctx.userId}
+				${scope}
 				AND d.search_vector_simple @@ websearch_to_tsquery('simple', ${plan.normalized})
 		)
 		SELECT document_id, owner_id, MAX(score)::double precision AS score
@@ -199,12 +229,14 @@ async function retrieveFuzzy(
 	limit: number,
 	minimum: number,
 	execute: SearchQueryExecutor,
+	scope: ReturnType<typeof sql>,
 ): Promise<SearchCandidate[]> {
 	const query = sql`
 		SELECT d.id AS document_id, d.owner_id,
 			similarity(d.title, ${plan.normalized})::double precision AS score
 		FROM documents d
 		WHERE d.owner_id = ${ctx.userId}
+			${scope}
 			AND d.title % ${plan.normalized}
 			AND similarity(d.title, ${plan.normalized}) >= ${minimum}
 		ORDER BY score DESC, d.id ASC
@@ -223,6 +255,7 @@ async function retrieveVector(
 	execute: SearchQueryExecutor,
 	providedEmbedding?: EmbeddingResult,
 	embeddingProvider: (text: string) => Promise<EmbeddingResult> = getEmbedding,
+	scope: ReturnType<typeof sql> = sql``,
 ): Promise<SearchCandidate[] | VectorFailure> {
 	let queryEmbedding = providedEmbedding;
 	if (!queryEmbedding) {
@@ -248,6 +281,7 @@ async function retrieveVector(
 			FROM document_embeddings de
 			JOIN documents d ON d.id = de.document_id
 			WHERE d.owner_id = ${ctx.userId}
+				${scope}
 				AND d.embedding_status = 'ready'
 				AND d.active_embedding_generation IS NOT NULL
 				AND de.generation_id = d.active_embedding_generation

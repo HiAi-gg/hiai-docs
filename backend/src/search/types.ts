@@ -72,3 +72,19 @@ export interface RankedSearchResult {
 	channels: SearchChannel[];
 	explanations: SearchExplanation[];
 }
+
+export type SearchSort =
+	| "relevance"
+	| "date_desc"
+	| "date_asc"
+	| "name_asc"
+	| "name_desc";
+
+export interface SearchFilters {
+	folderId?: string;
+	tagNames?: string[];
+	categoryId?: string;
+	dateFrom?: string;
+	dateTo?: string;
+	sort?: SearchSort;
+}

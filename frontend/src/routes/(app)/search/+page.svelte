@@ -746,9 +746,10 @@ function goToPage(page: number) {
           folderName={result.folder_name ?? ""}
           tags={result.tags ?? []}
           createdAt={result.created_at}
-          query={data.query}
-          explanations={result.explanations ?? []}
-        />
+				query={data.query}
+				explanations={result.explanations}
+				chunks={result.chunks}
+			/>
       {/each}
     </div>
 

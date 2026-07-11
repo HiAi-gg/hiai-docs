@@ -25,8 +25,15 @@ export interface SearchResult {
 	folder_name?: string | null;
 	created_at: string;
 	updated_at: string;
-	explanations?: SearchExplanation[];
+	explanations: SearchExplanation[];
 	tags?: Array<{ id: string; name: string; color: string | null }>;
+	chunks?: Array<{
+		chunkIndex: number;
+		chunkText: string;
+		charStart: number;
+		charEnd: number;
+		score: number;
+	}>;
 }
 
 export interface SearchResponse {

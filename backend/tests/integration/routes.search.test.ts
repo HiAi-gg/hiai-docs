@@ -15,12 +15,15 @@ import {
   it,
 } from "bun:test";
 import {
-  API_KEY,
-  noAuthHeaders,
-  ownerHeaders,
-  request,
-  resetState,
-  setupHarness,
+	getState,
+	API_KEY,
+	noAuthHeaders,
+	ownerHeaders,
+	OTHER_USER_ID,
+	request,
+	resetState,
+	seedSearchDocument,
+	setupHarness,
 } from "./_harness";
 
 let app: any;
@@ -349,5 +352,140 @@ describe("GET /api/search — automatic GraphRAG contract", () => {
     expect(res.status).toBe(200);
     expect(res.headers.get("deprecation")).toBe("true");
     expect((res.body as any).items).toEqual([]);
-  });
+	});
+
+	it("serializes injected explanations and forwards global filters/page to the domain", async () => {
+		seedSearchDocument({
+			id: "explained-doc",
+			ownerId: "00000000-0000-0000-0000-000000000001",
+			title: "English",
+			content: "A semantic result",
+		});
+		const { Elysia } = await import("elysia");
+		const { createSearchRoutes } = await import("../../src/api/routes/search");
+		let received: any;
+		const injected = new Elysia().use(
+			createSearchRoutes(async (ctx, input) => {
+				received = { ctx, input };
+				return {
+					items: [
+						{
+							documentId: "explained-doc",
+							score: 0.88,
+							channels: ["vector", "graph"],
+							explanations: [
+								{ channel: "vector", label: "Semantic match" },
+								{ channel: "graph", label: "Related concept" },
+							],
+						},
+					],
+					total: 1,
+					page: input.page ?? 1,
+					limit: input.limit ?? 20,
+					queryPlan: {
+						original: input.query,
+						normalized: input.query,
+						detectedLanguage: "en",
+						translations: [],
+						synonyms: [],
+						concepts: [],
+						namedEntities: [],
+					},
+					diagnostics: {
+						fastChannels: ["exact", "fts", "fuzzy", "vector"],
+						channelErrors: {},
+						expansionAttempted: false,
+						graphAttempted: true,
+						graphFailed: false,
+						confidenceReasons: [],
+					},
+				};
+			},
+			async () => {
+				return [
+				{
+					id: "explained-doc",
+					title: "English",
+					snippet: "A semantic result",
+					score: 0.88,
+					folder_id: null,
+					folder_name: null,
+					created_at: "2026-01-01T00:00:00.000Z",
+					updated_at: "2026-01-01T00:00:00.000Z",
+					explanations: [
+						{ channel: "vector", label: "Semantic match" },
+						{ channel: "graph", label: "Related concept" },
+					],
+				},
+				];
+			},
+			),
+		);
+		const res = await request(injected, "/api/search?q=English&page=2&limit=1&sort=name_asc&folder=folder-1&tags=alpha,beta", {
+			method: "GET",
+			headers: ownerHeaders(),
+		});
+		expect(res.status).toBe(200);
+		expect((res.body as any).items[0].explanations).toEqual([
+			{ channel: "vector", label: "Semantic match" },
+			{ channel: "graph", label: "Related concept" },
+		]);
+		expect(received.input.page).toBe(2);
+		expect(received.input.limit).toBe(1);
+		expect(received.input.filters).toMatchObject({
+			folderId: "folder-1",
+			tagNames: ["alpha", "beta"],
+			sort: "name_asc",
+		});
+	});
+
+	it("allows share guests to search only the token document and passes a share graph scope", async () => {
+		const sharedId = "shared-search-doc";
+		const hiddenId = "hidden-search-doc";
+		seedSearchDocument({ id: sharedId, ownerId: OTHER_USER_ID, title: "Shared English" });
+		seedSearchDocument({ id: hiddenId, ownerId: OTHER_USER_ID, title: "Hidden English" });
+		getState().shareLinks.set("share-search-link", {
+			id: "share-search-link",
+			documentId: sharedId,
+			folderId: null,
+			token: "share-search-token",
+			passwordHash: null,
+			expiresAt: null,
+			createdBy: OTHER_USER_ID,
+			role: "viewer",
+			createdAt: new Date("2026-01-01T00:00:00.000Z"),
+		});
+		const { Elysia } = await import("elysia");
+		const { createSearchRoutes } = await import("../../src/api/routes/search");
+		let received: any;
+		const injected = new Elysia().use(
+			createSearchRoutes(async (ctx, input) => {
+				received = { ctx, input };
+				return {
+					items: [
+						{ documentId: sharedId, score: 0.9, channels: ["vector"], explanations: [{ channel: "vector", label: "Semantic match" }] },
+						{ documentId: hiddenId, score: 0.8, channels: ["vector"], explanations: [{ channel: "vector", label: "Semantic match" }] },
+					],
+					total: 2,
+					page: 1,
+					limit: 20,
+					queryPlan: { original: input.query, normalized: input.query, detectedLanguage: "en", translations: [], synonyms: [], concepts: [], namedEntities: [] },
+					diagnostics: { fastChannels: [], channelErrors: {}, expansionAttempted: false, graphAttempted: true, graphFailed: false, confidenceReasons: [] },
+				};
+			}),
+		);
+		const res = await request(injected, "/api/search?q=English", {
+			method: "GET",
+			headers: { ...noAuthHeaders(), "x-share-token": "share-search-token" },
+		});
+		expect(res.status).toBe(200);
+		expect((res.body as any).items.map((item: any) => item.id)).toEqual([sharedId]);
+		expect(received.ctx.userId).toBe(OTHER_USER_ID);
+		expect(received.input.documentIds).toEqual([sharedId]);
+		expect(received.input.visibilityScope).toEqual({
+		kind: "share",
+		ownerId: OTHER_USER_ID,
+		allowedDocumentIds: [sharedId],
+	});
+	});
 });
