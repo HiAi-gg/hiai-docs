@@ -437,6 +437,11 @@ describe("GET /api/search — automatic GraphRAG contract", () => {
 			{ channel: "vector", label: "Semantic match" },
 			{ channel: "graph", label: "Related concept" },
 		]);
+		expect((res.body as any).diagnostics).toMatchObject({
+			fastChannels: ["exact", "fts", "fuzzy", "vector"],
+			graphAttempted: true,
+			graphFailed: false,
+		});
 		expect(received.input.page).toBe(2);
 		expect(received.input.limit).toBe(1);
 		expect(received.input.filters).toMatchObject({

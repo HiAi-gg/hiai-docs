@@ -312,6 +312,7 @@ interface AdminMetricsSnapshot {
 interface CliArgs {
 	baseUrl: string;
 	k: number;
+	concurrency: number;
 	apiKeyFile?: string;
 	apiKeyStdin: boolean;
 	ownerCredentialsFile?: string;
@@ -324,6 +325,7 @@ export function parseArgs(
 	const output: CliArgs = {
 		baseUrl: "http://127.0.0.1:50700",
 		k: 10,
+		concurrency: 2,
 		apiKeyStdin: false,
 	};
 	for (let index = 0; index < argv.length; index++) {
@@ -360,9 +362,39 @@ export function parseArgs(
 		} else if (name === "--k" && value) {
 			output.k = Math.max(1, Number.parseInt(value, 10) || 10);
 			if (inlineValue === undefined) index += 1;
+		} else if (name === "--concurrency" && value) {
+			output.concurrency = Math.min(
+				10,
+				Math.max(1, Number.parseInt(value, 10) || 2),
+			);
+			if (inlineValue === undefined) index += 1;
 		}
 	}
 	return output;
+}
+
+/** Run probes with a bounded number of provider requests in flight. */
+async function mapWithConcurrency<T, R>(
+	items: readonly T[],
+	concurrency: number,
+	mapper: (item: T) => Promise<R>,
+): Promise<R[]> {
+	const results = new Array<R>(items.length);
+	let nextIndex = 0;
+	const worker = async () => {
+		while (true) {
+			const index = nextIndex++;
+			if (index >= items.length) return;
+			results[index] = await mapper(items[index] as T);
+		}
+	};
+	await Promise.all(
+		Array.from(
+			{ length: Math.min(concurrency, Math.max(items.length, 1)) },
+			() => worker(),
+		),
+	);
+	return results;
 }
 
 interface FixtureMap {
@@ -710,15 +742,16 @@ async function main(): Promise<void> {
 	);
 	const ownerCredentials = await loadOwnerCredentials(args, fixture);
 	const metricsBefore = await readMetrics(args.baseUrl, apiKey);
-	const probes = await Promise.all(
-		fixture.cases.map((item) =>
+	const probes = await mapWithConcurrency(
+		fixture.cases,
+		args.concurrency,
+		(item) =>
 			querySearch(
 				args.baseUrl,
 				ownerCredentials.get(item.ownerId) as OwnerCredentialHeaders,
 				item,
 				args.k,
 			),
-		),
 	);
 	const metricsAfter = await readMetrics(args.baseUrl, apiKey);
 	const invalidVectors = await readInvalidVectorCount(args.baseUrl, apiKey);

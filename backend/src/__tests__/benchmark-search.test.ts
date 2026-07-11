@@ -222,6 +222,12 @@ describe("search benchmark evaluation math", () => {
 		).toBe("file-secret");
 	});
 
+	test("bounds live provider probe concurrency", () => {
+		expect(parseArgs([]).concurrency).toBe(2);
+		expect(parseArgs(["--concurrency=1"]).concurrency).toBe(1);
+		expect(parseArgs(["--concurrency", "99"]).concurrency).toBe(10);
+	});
+
 	test("requires distinct scoped credentials for every fixture owner", () => {
 		const fixture: RelevanceFixture = {
 			version: "test",

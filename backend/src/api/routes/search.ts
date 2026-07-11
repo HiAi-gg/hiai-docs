@@ -223,7 +223,13 @@ export function createSearchRoutes(
 					(hasDomainVisibilityMetadata
 						? (domain.visibleTotal ?? domain.total)
 						: rows.length);
-				return { items: rows, total: visibleTotal, page, limit };
+				return {
+					items: rows,
+					total: visibleTotal,
+					page,
+					limit,
+					diagnostics: domain.diagnostics,
+				};
 			} catch (err) {
 				logger.error({ err }, "Search failed");
 				set.status = 500;
