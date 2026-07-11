@@ -401,16 +401,17 @@ End every response with a structured `<CLOSURE>` block:
 
 > **Note:** This file (`AGENTS.md`) and `todo.md` are added to `.gitignore` and not committed. They contain operational instructions for agents and may change without review.
 
-## Secret management (`.env` is user-managed, never automation-edited)
+## Secret management (`.env` is provider-input automation only)
 
 - `.env` is **gitignored** (see `.gitignore` line `.env` / `.env.*.local` / `!.env.example`).
-- The file at `hiai-docs/.env` is **user-managed only**. Agents and automation **must NOT create, edit, rotate, or extend** `.env` in any way — even to add new variables. This includes but is not limited to:
+- The file at `hiai-docs/.env` is **gitignored** and must never be printed, committed, or uploaded. The quickstart script and an installation agent MAY create it from `.env.example` and write only the provider input explicitly supplied by the user: `OPENROUTER_API_KEY`, or `AI_PROVIDER=ollama` and `OLLAMA_PORT`. They MUST NOT rotate or overwrite existing secrets, change unrelated variables, or copy a key into source code. `quickstart.sh` generates database, auth, storage, and admin secrets when they are placeholders.
+- Agents and automation **must NOT create, edit, rotate, or extend** any other `.env` value. This includes but is not limited to:
   - `OPENROUTER_API_KEY` / `EMBEDDING_API_KEY` (real production keys)
   - `BETTER_AUTH_SECRET`, `CSRF_SECRET`, `WEBHOOK_SECRET` (auth signing keys)
   - `HIAI_DOCS_API_KEY` (admin API key)
   - any database or storage credential
-- **Where to add new variables**: extend `.env.example` (committed, placeholders only) and, if needed, document the variable in `docs/`. The user copies `.env.example` → `.env` and fills in real values themselves.
-- **If a task appears to require editing `.env`** (e.g. "add OPENROUTER_FALLBACK_KEY"): STOP and surface the requirement to the user instead of editing the file. Provide the exact line to add; let the user paste it.
+- **Where to add new variables**: extend `.env.example` (committed, placeholders only) and, if needed, document the variable in `docs/`. Provider input is the only quickstart exception.
+- **If a task appears to require editing a non-provider `.env` value** (e.g. `BETTER_AUTH_SECRET` or `OPENROUTER_FALLBACK_KEY`): STOP and surface the requirement to the user instead of editing it. Provide the exact line to add; let the user paste it.
 - **If `.env` already contains a real secret** (e.g. the live OpenRouter key): DO NOT include the secret in any report, checkpoint, memory file, or commit. Reference the variable name only; redact the value.
-- The `bun --env-file=.env run` flag in `package.json` scripts reads the file at process start. Changing the run command is fine; mutating the file is not.
-- This rule applies to **all** sibling env files: `.env.local`, `.env.production`, `.env.test`, `.env.development`, etc. None are automation-edited.
+- The `bun --env-file=.env run` flag in `package.json` scripts reads the file at process start. Changing the run command is fine; mutating the file is not, except for the provider-input quickstart exception above.
+- This rule applies to **all** sibling env files: `.env.local`, `.env.production`, `.env.test`, `.env.development`, etc. Only the ignored root `.env` may receive provider input during quickstart; never edit tracked or production env files automatically.

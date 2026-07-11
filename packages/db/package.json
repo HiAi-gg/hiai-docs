@@ -17,6 +17,7 @@
     "db:migrate": "bun run scripts/migrate.ts",
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
+    "test": "bun test ./scripts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

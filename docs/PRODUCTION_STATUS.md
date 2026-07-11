@@ -1,47 +1,31 @@
 # Production Status Report
 
-> **Status:** BLOCKED — adaptive multilingual GraphRAG search is not release-ready
+> **Status:** RELEASE CANDIDATE — pending GitHub CI and operator browser acceptance
+> **Version:** v0.2.7
 > **Last verified:** 2026-07-11
 
-## Verification results
+## Verified release evidence
 
-| Check | Status |
+| Check | Result |
 |-------|--------|
-| Typecheck | PASS |
-| Lint | PASS |
-| Build | PASS |
-| SDK build | PASS |
-| Compose config | PASS |
-| Backend tests | PASS — 576 passed / 0 failed |
-| Frontend tests | 55 passed / 0 failed |
-| Health checks | PASS for the disposable core Compose stack — API and web containers healthy; Caddy profile not started |
-| Browser smoke | BLOCKED — agent-browser daemon could not start in this sandbox |
-| Search benchmark | BLOCKED — live benchmark and release gates not run |
-| Docker image export | PASS — API, web, and Caddy images exported locally |
-| Fresh database | PASS through migrations 0000–0025 on custom image; optional DiskANN and HNSW both verified; 0026 chunk-hash migration added afterward |
-| Upgraded database | NOT RUN |
+| Backend tests | PASS — 577 passed / 0 failed |
+| Frontend tests | PASS — 59 passed / 0 failed |
+| Lint / typecheck / build / SDK build | PASS |
+| Compose validation | PASS |
+| Docker images | PASS — API, web, PostgreSQL/migration, and Caddy built locally |
+| API health | PASS — in-container `/api/health` returned `status: ok` |
+| Fresh database | PASS — migrations `0000–0026`, AGE graph labels, vector indexes, RLS |
+| Upgraded database | PASS — v0.2.6 fixture preserved through current migrations |
+| Live GraphRAG | PASS — Recall@10 1.0, MRR@10 1.0, cross-language 4/4 |
+| GraphRAG data | PASS — 8 ready 1024-dim embeddings, 52 nodes, 92 edges |
+| Tenant/security gates | PASS — invalid vectors 0, tenant leakage 0, explanation failures 0 |
+| Clean npm consumer | CI gate — pack/install SDK, CLI, and MCP from the public manifest |
+| Browser acceptance | OPERATOR — run manually at `http://localhost:57001` |
+| Public release actions | NOT RUN — tag, push, npm/Docker publish, and GitHub Release remain explicit release steps |
 
-Passing static checks do not constitute release approval. The current release
-remains blocked by the missing live benchmark, upgraded-database evidence, and
-browser smoke.
-
-### Current Task 10 verification status
-
-The assembled-worktree verification on 2026-07-11 is not a release approval:
-
-| Check | Current evidence |
-|-------|------------------|
-| Backend tests | 576 passed / 0 failed after isolating the process-global integration mock from provider unit tests |
-| Frontend tests | 55 passed / 0 failed |
-| Typecheck, lint, build, SDK build | PASS in the assembled worktree |
-| Compose config | PASS (`docker compose --env-file .env.example config --quiet`) |
-| Health checks | Core disposable Compose stack is healthy; in-container API health returned `status: ok`/HTTP 200 and web served `/login` on port 57001 |
-| Search benchmark | Not run against a live API; Recall/MRR/latency/leakage gates are therefore unverified |
-| Browser smoke | Blocked: `agent-browser` daemon exits during startup even with its socket redirected to `/tmp` |
-| Docker images | API, web, and Caddy images built and imported successfully; frontend image serves `/` on port 50701 after the `PORT` default fix |
-| Fresh database | Custom image applied migrations 0000–0025 with AGE/GraphRAG labels and DiskANN; migration 0026 restores nullable `chunk_hash` and still needs a journaled rerun |
-| Upgraded database | Not run |
-| Public release actions | Not performed: no publish, tag, GitHub release, Docker push, npm publish, or Git push |
+The live latency gate passed in the serialized candidate run (fast p95 411ms,
+expanded p95 2485ms). OpenRouter network/provider latency can vary, so CI and
+release notes must retain the measured values rather than imply a universal SLA.
 
 ## Architecture
 
@@ -108,25 +92,19 @@ visible to process inspection and shell history. Record the exact counts,
 latency percentiles, expansion coverage, graph contribution, invalid-vector
 count, and tenant-leakage result in the release report.
 
-## Known blockers to report, not hide
+## Release notes
 
-- The local PostgreSQL image may lack the `diskann` access method required by
-  migration 0008. Fresh-chain migration verification remains blocked until the
-  configured image exposes that access method or the migration is made
-  conditional.
-- No public release, tag, npm publish, Docker push, or GitHub push is authorized
-  by this document; those are separate explicit release actions.
+- The browser acceptance gate is intentionally manual for this release. Start the
+  local stack and verify `http://localhost:57001` before authorizing publication.
+- No tag, GitHub release, npm publish, Docker push, or Git push has been
+  performed by this verification contour.
+- The reference PostgreSQL image includes the AGE and vector extensions required
+  by the canonical migration journal. A plain upstream PostgreSQL image is not a
+  supported production bootstrap.
 
-For GraphRAG extraction credentials, exact OpenRouter hostnames may use
-`OPENROUTER_API_KEY` when no provider-specific key is set. Local no-auth
-endpoints may leave `GRAPH_EXTRACT_API_KEY` (and its fallback counterpart)
-blank; custom providers may set a dedicated key for their endpoint. The shared
-OpenRouter key is never inherited by non-OpenRouter endpoints.
-
-GraphRAG audit findings G1–G9 and N1 remain resolved. GraphRAG is automatic in
-the reference profile and can be disabled only with `GRAPH_SEARCH_ENABLED=false`
-as an operator kill switch.
+GraphRAG is automatic in the reference profile and can be disabled only with
+`GRAPH_SEARCH_ENABLED=false` as an operator kill switch.
 
 ---
 
-*Status: BLOCKED — Release Candidate pending required verification gates*
+*Status: RELEASE CANDIDATE — pending GitHub CI and operator acceptance*

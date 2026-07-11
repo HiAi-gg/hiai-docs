@@ -2,7 +2,7 @@
 
 All notable changes to hiai-docs are documented in this file.
 
-<!-- Verified accurate for v0.1.1 by doc audit 2026-07-02 -->
+<!-- v0.2.7 candidate evidence verified 2026-07-11; publication remains a separate release action. -->
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
@@ -33,12 +33,11 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
   integration mocks, keeping the full suite deterministic.
 
 ### Migration Notes
-- Apply the complete Drizzle journal before enabling search generations or
-  reindexing embeddings. Fresh-install verification remains blocked on local
-  PostgreSQL images that do not provide the `diskann` access method required by
-  migration `0008_streaming_diskann_index.sql`.
-- No public tag, GitHub release, npm publish, Docker push, or Git push is part
-  of this candidate verification.
+- Apply the complete Drizzle journal (`0000–0026`) before enabling search
+  generations or reindexing embeddings. The reference PostgreSQL image includes
+  AGE and vector extensions required by the migrations.
+- This candidate has passed fresh-database, upgraded-database, and live GraphRAG
+  verification. Tagging and publication remain explicit release actions.
 
 ## [0.2.6] - 2026-07-10
 

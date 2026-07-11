@@ -2,29 +2,30 @@
 
 > Use this checklist for every release. Tick items as they are completed.
 
-## Current Task 10 Verification Status — v0.2.7 candidate (2026-07-11)
+## Current v0.2.7 release candidate evidence (2026-07-11)
 
-This section records the current evidence before any public release action:
+This is the verified local candidate. No tag, push, npm publish, Docker push,
+or GitHub Release has been performed. Browser acceptance is intentionally
+left to the operator on the running local build.
 
-| Check | Status |
-|-------|--------|
-| Backend tests | 576 passed / 0 failed |
-| Frontend tests | 55 passed / 0 failed |
-| Lint, typecheck, build, SDK build | Passed in the assembled worktree |
-| Compose config | Passed with `.env.example` |
-| Docker image export | Passed; API, web, and Caddy images exported locally |
-| API image smoke | Passed in-container: `/api/health` returned HTTP 200 with `status: ok` |
-| Fresh database migration | PASS for migrations 0000–0025 on custom image; AGE/GraphRAG labels and DiskANN verified; 0026 `chunk_hash` migration added and journaled rerun pending |
-| Upgraded database migration | Not run |
-| Live relevance benchmark | Not run; Recall/MRR/latency/tenant-leakage gates remain unverified |
-| Full Compose health | Not run |
-| Browser smoke | Blocked; `agent-browser` daemon could not start in this sandbox |
-| Public release actions | Not performed: no publish, tag, GitHub release, Docker push, npm publish, or Git push |
+| Check | Evidence |
+|-------|----------|
+| Backend tests | **577 passed / 0 failed** |
+| Frontend tests | **59 passed / 0 failed** |
+| Lint, typecheck, build, SDK build | Passed |
+| Compose config | Passed with the documented quickstart profile |
+| Docker images | API, web, PostgreSQL/migration, and Caddy built locally |
+| API image smoke | In-container `/api/health` returned HTTP 200 and `status: ok` |
+| Fresh database | Full Drizzle journal `0000–0026` applied; AGE labels, graph indexes, and vector indexes verified |
+| Upgraded database | v0.2.6 fixture upgraded to current schema; legacy document and 1024-dim embedding preserved |
+| Live GraphRAG benchmark | **Passed**: Recall@10 1.0, MRR@10 1.0, cross-language 4/4, leakage 0, invalid vectors 0, explanation failures 0 |
+| Live GraphRAG latency | Fast p95 411ms; expanded p95 2485ms in the passing serialized run; provider latency remains environment-dependent |
+| Embeddings | 8/8 fixture documents ready via `openai/text-embedding-3-small`, dimension 1024 |
+| AGE graph | 52 nodes / 92 edges populated by real extraction |
+| Browser smoke | **Operator gate** — verify manually at `http://localhost:57001` |
 
-These remaining blockers must stay visible in the release evidence; they are
-not release approvals or reasons to mark the corresponding checklist items
-done.
-This file describes a v0.2.7 release candidate, not a completed public release.
+The candidate is release-ready only after the P0 package/CI gates below pass in
+GitHub Actions and the operator confirms the browser flow.
 
 ## Pre-Release
 
@@ -50,8 +51,9 @@ This file describes a v0.2.7 release candidate, not a completed public release.
 - [ ] **Verify PostgreSQL bootstrap** — `postgres/init.sql` contains infrastructure setup only; application schema and graph/labels/indexes are created by Drizzle migrations
 - [ ] **Build SDK** — `cd packages/sdk && bun run build` (ensures `dist/` is current before publishing)
 - [ ] **Run full typecheck** — `bun run typecheck` (0 errors)
-- [ ] **Run full test suite** — `bun run test` (backend 576/0 and frontend 55/0 in the current candidate)
+- [ ] **Run full test suite** — `bun run test` (backend 577/0 and frontend 59/0 in the current candidate)
 - [ ] **Run lint** — `bun run lint` (0 errors)
+- [ ] **Run clean npm consumer smoke** — pack `package.public.json`, install in an empty npm project, import the SDK, run `hiai-docs --help`, and start `hiai-docs-mcp` without missing runtime dependencies
 - [ ] **Run secret scans** — no real OpenRouter token values or real `OPENROUTER_API_KEY` outside ignored local `.env`; no unfinished markers in release files
 - [ ] **Run migration/reindex dry-run** — `bun run db:migrate` then `cd backend && bun run src/scripts/reindex-embeddings.ts --dry-run --batch=100`
 - [ ] **Run relevance benchmark** — `cd backend && bun run benchmark:search -- --base-url=http://127.0.0.1:50700 --owner-credentials-file=/run/secrets/hiai-docs-benchmark-owners.json`; operator credential comes from `HIAI_DOCS_API_KEY`/`BENCHMARK_API_KEY` via environment/stdin/file, owner credentials come from the protected JSON map, and no credential is ever passed in argv
@@ -62,7 +64,7 @@ This file describes a v0.2.7 release candidate, not a completed public release.
 
 - [ ] **Build Docker images** — `docker compose build` (API, migration target, web, and Caddy; local candidate export passed)
 - [ ] **Verify Docker health** — `docker compose up -d && docker exec hiai-docs-api wget -qO- http://127.0.0.1:50700/api/health`
-- [ ] **Run agent-browser smoke** — verify `http://localhost:50701/search`, a cross-language query, explanations, and no console errors
+- [ ] **Operator browser acceptance** — manually verify `http://localhost:57001` (login, import, search, share, images, align/list, and export); this is intentionally not automated in CI
 - [ ] **Run DB migrations** — `bun run db:migrate` (loads the root `.env` and applies the canonical Drizzle migration journal)
 
 ## Release

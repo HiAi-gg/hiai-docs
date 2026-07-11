@@ -31,7 +31,8 @@
     "setup": "bun install && bun run docker:dev && bun run db:push",
     "export:openapi": "bun run scripts/export-openapi.ts",
     "mcp:dev": "bun run --filter '@hiai-docs/mcp-server' dev",
-    "cli": "bun run --filter '@hiai-docs/cli' dev"
+    "cli": "bun run --filter '@hiai-docs/cli' dev",
+    "test:public-package": "bash scripts/test-public-package-consumer.sh"
   },
   "devDependencies": {
     "@sinclair/typebox": "^0.34.49",

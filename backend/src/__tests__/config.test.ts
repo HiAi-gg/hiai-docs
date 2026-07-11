@@ -143,7 +143,7 @@ describe("config schema", () => {
 			expect(result.data.SEARCH_EXPANSION_FALLBACK_MODEL).toBe(
 				"google/gemma-4-31b-it",
 			);
-			expect(result.data.SEARCH_EXPANSION_TIMEOUT_MS).toBe(2_000);
+			expect(result.data.SEARCH_EXPANSION_TIMEOUT_MS).toBe(10_000);
 			expect(result.data.SEARCH_EXPANSION_MAX_VARIANTS).toBe(12);
 			expect(result.data.SEARCH_RRF_K).toBe(60);
 		}

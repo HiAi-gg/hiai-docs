@@ -33,8 +33,10 @@ cp .env.example .env
 bash scripts/quickstart.sh
 ```
 
-The script creates the ignored root `.env`. That is the only file a user ever
-needs to edit:
+The script creates the ignored root `.env`. During an agentic installation the
+agent may create this file and write only the provider input supplied by the
+user; it must never print or overwrite generated infrastructure secrets. That
+is the only file a user ever needs to edit:
 
 | Provider | Change in `.env` | Models already configured |
 |---|---|---|
@@ -496,7 +498,7 @@ deployment configuration:
 | `SEARCH_EXPANSION_ENABLED` | `true` | One-pass multilingual query expansion when confidence is low |
 | `SEARCH_EXPANSION_MODEL` | `mistralai/ministral-14b-2512` | Primary expansion model |
 | `SEARCH_EXPANSION_FALLBACK_MODEL` | `google/gemma-4-31b-it` | Expansion fallback model |
-| `SEARCH_EXPANSION_TIMEOUT_MS` | `2000` | Expansion request timeout |
+| `SEARCH_EXPANSION_TIMEOUT_MS` | `10000` | Expansion request timeout; allows cold external or local models |
 | `SEARCH_EXPANSION_CACHE_TTL_SECONDS` | `86400` | Tenant-scoped expansion cache lifetime |
 | `SEARCH_EXPANSION_MAX_VARIANTS` | `12` | Maximum variants per expansion list |
 | `SEARCH_RRF_K` | `60` | RRF rank constant |
