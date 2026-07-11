@@ -18,7 +18,9 @@ export interface GraphPipelineState {
 }
 
 export interface GraphWorkerDependencies {
-	getRun(job: ReturnType<typeof graphJobSchema.parse>): Promise<GraphPipelineState | null>;
+	getRun(
+		job: ReturnType<typeof graphJobSchema.parse>,
+	): Promise<GraphPipelineState | null>;
 	extract(job: ReturnType<typeof graphJobSchema.parse>): Promise<void>;
 	setGraphStatus(
 		generationId: string,
@@ -39,12 +41,23 @@ export function createGraphWorker(deps: GraphWorkerDependencies) {
 		if (run.ownerId !== job.ownerId || run.documentId !== job.documentId) {
 			throw new Error("Pipeline owner mismatch");
 		}
-		if (run.generationId !== job.generationId || run.revision !== job.revision) {
-			await deps.setGraphStatus(job.generationId, "cancelled", "stale_revision");
+		if (
+			run.generationId !== job.generationId ||
+			run.revision !== job.revision
+		) {
+			await deps.setGraphStatus(
+				job.generationId,
+				"cancelled",
+				"stale_revision",
+			);
 			return;
 		}
 		if (run.embedStatus !== "ready") {
-			await deps.setGraphStatus(job.generationId, "skipped", "embedding_not_ready");
+			await deps.setGraphStatus(
+				job.generationId,
+				"skipped",
+				"embedding_not_ready",
+			);
 			return;
 		}
 

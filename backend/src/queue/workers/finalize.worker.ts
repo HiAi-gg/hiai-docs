@@ -9,19 +9,27 @@ export type FinalRunStatus =
 
 export interface FinalizeWorkerDependencies {
 	getRun(job: ReturnType<typeof finalizeJobSchema.parse>): Promise<
-		(GraphPipelineState & {
-			status: PipelineStageStatus;
-			graphStatus: PipelineStageStatus;
-			summarizeStatus: PipelineStageStatus;
-		}) | null
+		| (GraphPipelineState & {
+				status: PipelineStageStatus;
+				graphStatus: PipelineStageStatus;
+				summarizeStatus: PipelineStageStatus;
+		  })
+		| null
 	>;
-	setRunStatus(generationId: string, status: FinalRunStatus, errorCode?: string): Promise<void>;
+	setRunStatus(
+		generationId: string,
+		status: FinalRunStatus,
+		errorCode?: string,
+	): Promise<void>;
 }
 
-function deriveFinalStatus(run: Awaited<ReturnType<FinalizeWorkerDependencies["getRun"]>>): FinalRunStatus {
+function deriveFinalStatus(
+	run: Awaited<ReturnType<FinalizeWorkerDependencies["getRun"]>>,
+): FinalRunStatus {
 	if (!run) throw new Error("Pipeline run not found");
 	if (run.status === "cancelled") return "cancelled";
-	if (run.embedStatus === "failed" || run.embedStatus === "cancelled") return "failed";
+	if (run.embedStatus === "failed" || run.embedStatus === "cancelled")
+		return "failed";
 	if (run.embedStatus !== "ready") return "failed";
 	if (run.graphStatus === "failed" || run.summarizeStatus === "failed") {
 		return "ready_with_warnings";
@@ -43,7 +51,10 @@ export function createFinalizeWorker(deps: FinalizeWorkerDependencies) {
 		if (run.ownerId !== job.ownerId || run.documentId !== job.documentId) {
 			throw new Error("Pipeline owner mismatch");
 		}
-		if (run.generationId !== job.generationId || run.revision !== job.revision) {
+		if (
+			run.generationId !== job.generationId ||
+			run.revision !== job.revision
+		) {
 			await deps.setRunStatus(job.generationId, "cancelled", "stale_revision");
 			return;
 		}

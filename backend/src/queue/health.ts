@@ -48,16 +48,25 @@ export interface PipelineHealthReport {
 }
 
 /** Queue health is unhealthy only for execution/recovery failures or SLO breach. */
-export function evaluatePipelineHealth(input: PipelineHealthInput): PipelineHealthReport {
+export function evaluatePipelineHealth(
+	input: PipelineHealthInput,
+): PipelineHealthReport {
 	const reasons: string[] = [];
 	if (!input.redisAvailable) reasons.push("redis_unavailable");
 	if (!input.recoveryAvailable) reasons.push("recovery_unavailable");
 	if (input.oldestInteractiveWaitMs > input.interactiveSloMs) {
 		reasons.push("interactive_slo_breached");
 	}
-	const degraded = input.graphAvailable ? {} : { graph: "provider_unavailable" };
+	const degraded = input.graphAvailable
+		? {}
+		: { graph: "provider_unavailable" };
 	return {
-		status: reasons.length > 0 ? "unhealthy" : Object.keys(degraded).length ? "degraded" : "healthy",
+		status:
+			reasons.length > 0
+				? "unhealthy"
+				: Object.keys(degraded).length
+					? "degraded"
+					: "healthy",
 		degraded,
 		reasons,
 	};

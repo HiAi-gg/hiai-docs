@@ -1,8 +1,10 @@
-import { summarizeJobSchema, type PipelineJob } from "../contracts";
+import { type PipelineJob, summarizeJobSchema } from "../contracts";
 import type { GraphPipelineState, PipelineStageStatus } from "./graph.worker";
 
 export interface SummarizeWorkerDependencies {
-	getRun(job: ReturnType<typeof summarizeJobSchema.parse>): Promise<GraphPipelineState | null>;
+	getRun(
+		job: ReturnType<typeof summarizeJobSchema.parse>,
+	): Promise<GraphPipelineState | null>;
 	enabled(): boolean;
 	summarize(job: ReturnType<typeof summarizeJobSchema.parse>): Promise<void>;
 	setSummaryStatus(
@@ -10,7 +12,9 @@ export interface SummarizeWorkerDependencies {
 		status: PipelineStageStatus,
 		errorCode?: string,
 	): Promise<void>;
-	enqueueFinalize(job: ReturnType<typeof summarizeJobSchema.parse>): Promise<void>;
+	enqueueFinalize(
+		job: ReturnType<typeof summarizeJobSchema.parse>,
+	): Promise<void>;
 }
 
 /** Summary is optional and never controls embedding or GraphRAG readiness. */
@@ -22,8 +26,15 @@ export function createSummarizeWorker(deps: SummarizeWorkerDependencies) {
 		if (run.ownerId !== job.ownerId || run.documentId !== job.documentId) {
 			throw new Error("Pipeline owner mismatch");
 		}
-		if (run.generationId !== job.generationId || run.revision !== job.revision) {
-			await deps.setSummaryStatus(job.generationId, "cancelled", "stale_revision");
+		if (
+			run.generationId !== job.generationId ||
+			run.revision !== job.revision
+		) {
+			await deps.setSummaryStatus(
+				job.generationId,
+				"cancelled",
+				"stale_revision",
+			);
 			return;
 		}
 		if (!deps.enabled()) {

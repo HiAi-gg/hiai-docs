@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { createFinalizeWorker, deriveFinalStatus } from "../queue/workers/finalize.worker";
+import { deriveFinalStatus } from "../queue/workers/finalize.worker";
 import { createSummarizeWorker } from "../queue/workers/summarize.worker";
 
 const job = {
@@ -27,11 +27,15 @@ describe("finalize worker semantics", () => {
 	});
 
 	it("returns ready_with_warnings for graph failure without losing embeddings", () => {
-		expect(deriveFinalStatus({ ...baseRun, graphStatus: "failed" })).toBe("ready_with_warnings");
+		expect(deriveFinalStatus({ ...baseRun, graphStatus: "failed" })).toBe(
+			"ready_with_warnings",
+		);
 	});
 
 	it("fails the run when embedding failed", () => {
-		expect(deriveFinalStatus({ ...baseRun, embedStatus: "failed" })).toBe("failed");
+		expect(deriveFinalStatus({ ...baseRun, embedStatus: "failed" })).toBe(
+			"failed",
+		);
 	});
 
 	it("skips optional summary and enqueues finalize", async () => {
@@ -41,8 +45,12 @@ describe("finalize worker semantics", () => {
 			getRun: async () => ({ ...baseRun }),
 			enabled: () => false,
 			summarize: async () => {},
-			setSummaryStatus: async (_id, status) => { statuses.push(status); },
-			enqueueFinalize: async () => { enqueued = true; },
+			setSummaryStatus: async (_id, status) => {
+				statuses.push(status);
+			},
+			enqueueFinalize: async () => {
+				enqueued = true;
+			},
 		});
 		await worker({ ...job, stage: "summarize" });
 		expect(statuses).toEqual(["skipped"]);
