@@ -25,10 +25,15 @@ import { tagRoutes } from "./api/routes/tags";
 import { versionRoutes } from "./api/routes/versions";
 import { visibilityRoutes } from "./api/routes/visibility";
 import { webhookRoutes } from "./api/routes/webhooks";
+import { ensureApiKeyOwner } from "./lib/api-key-owner";
 import { config } from "./lib/config";
 import { startEmbeddingWorker } from "./lib/embedding-queue";
 import { logger } from "./lib/logger";
 import { BUCKET, ensureBucket, storage } from "./lib/storage";
+
+// The API-key principal owns records created by agentic/CLI clients. Provision
+// it before accepting writes so a clean quickstart cannot fail owner FKs.
+await ensureApiKeyOwner();
 
 // Start background embedding worker
 startEmbeddingWorker();

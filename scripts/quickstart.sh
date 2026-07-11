@@ -42,6 +42,12 @@ for secret in DB_PASSWORD HIAI_APP_PASSWORD BETTER_AUTH_SECRET CSRF_SECRET \
 	generate_secret_if_placeholder "$secret"
 done
 
+owner_id="$(read_value OWNER_ID)"
+if [[ -z "$owner_id" || "$owner_id" == "00000000-0000-4000-8000-000000000001" || "$owner_id" == your-user-* ]]; then
+	hex="$(openssl rand -hex 16)"
+	set_value OWNER_ID "${hex:0:8}-${hex:8:4}-4${hex:13:3}-8${hex:17:3}-${hex:20:12}"
+fi
+
 db_name="$(read_value DB_NAME)"
 db_name="${db_name:-hiai_docs}"
 db_port="$(read_value DB_PORT)"

@@ -86,7 +86,7 @@ export const envSchema = z.object({
 		.enum(["trace", "debug", "info", "warn", "error", "fatal"])
 		.default("info"),
 	HIAI_DOCS_API_KEY: z.string().optional(),
-	OWNER_ID: z.string().default("api-key-user"),
+	OWNER_ID: z.string().uuid().default("00000000-0000-4000-8000-000000000001"),
 	// Number of auto-saved (non-snapshot) versions to retain per document.
 	// Snapshots are never pruned. Default 50.
 	VERSION_RETENTION_COUNT: z.coerce.number().default(50),
