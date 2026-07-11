@@ -25,6 +25,7 @@
     "db:migrate": "bun run --filter '@hiai-docs/db' db:migrate",
     "docker:up": "docker compose up -d",
     "docker:down": "docker compose down",
+    "quickstart": "bash scripts/quickstart.sh",
     "docker:dev": "docker compose -f docker-compose.dev.yml up -d",
     "stop": "docker compose -f docker-compose.dev.yml down",
     "setup": "bun install && bun run docker:dev && bun run db:push",
