@@ -1,17 +1,29 @@
 # Production Status Report
 
-> **Status:** Release Candidate — adaptive multilingual GraphRAG search
+> **Status:** BLOCKED — adaptive multilingual GraphRAG search is not release-ready
 > **Last verified:** 2026-07-11
 
 ## Verification results
 
 | Check | Status |
 |-------|--------|
-| Typecheck | Pending final assembled-worktree run |
-| Tests | Focused task suites pass; release run must record the complete matrix |
-| Build | Pending final assembled-worktree run |
-| Health checks | Pending stack and browser smoke |
-| Search benchmark | Must meet Recall@10 >= 0.90, MRR@10 >= 0.80, fast p95 <= 500 ms, expanded p95 <= 2.5 s, zero active invalid vectors, and zero tenant leakage |
+| Typecheck | PASS |
+| Lint | PASS |
+| Build | PASS |
+| SDK build | PASS |
+| Compose config | PASS |
+| Backend tests | 569 passed / 7 known embedding-provider mock failures |
+| Frontend tests | 55 passed / 0 failed |
+| Health checks | BLOCKED — live stack and in-container health probe not run |
+| Browser smoke | BLOCKED — agent-browser visual verification not run |
+| Search benchmark | BLOCKED — live benchmark and release gates not run |
+| Docker image export | BLOCKED — export did not complete |
+| Fresh database | BLOCKED — migration `0008_streaming_diskann_index.sql` requires unavailable `diskann` access method |
+| Upgraded database | NOT RUN |
+
+Passing static checks do not constitute release approval. The current release
+remains blocked by the known backend test failures and the missing benchmark,
+health, browser, Docker-export, and fresh-database evidence.
 
 ### Current Task 10 verification status
 
@@ -21,8 +33,14 @@ The assembled-worktree verification on 2026-07-11 is not a release approval:
 |-------|------------------|
 | Backend tests | 569 passed / 7 known embedding-provider mock failures; failures are recorded and are not documentation regressions |
 | Frontend tests | 55 passed / 0 failed |
+| Typecheck, lint, build, SDK build | PASS in the assembled worktree |
+| Compose config | PASS (`docker compose config --quiet`) |
+| Health checks | Not run against the assembled stack |
+| Search benchmark | Not run against a live API; Recall/MRR/latency/leakage gates are therefore unverified |
+| Browser smoke | Not run with agent-browser |
 | Docker images | Export incomplete; backend and web compilation reached the final runtime `chown` layers, but image export was interrupted |
 | Fresh database | Blocked by migration `0008_streaming_diskann_index.sql`; the configured local PostgreSQL image does not expose the required `diskann` access method |
+| Upgraded database | Not run |
 | Public release actions | Not performed: no publish, tag, GitHub release, Docker push, npm publish, or Git push |
 
 ## Architecture
@@ -100,11 +118,11 @@ count, and tenant-leakage result in the release report.
 - No public release, tag, npm publish, Docker push, or GitHub push is authorized
   by this document; those are separate explicit release actions.
 
-For GraphRAG extraction credentials, an exact OpenRouter base URL may inherit
-`OPENROUTER_API_KEY`. Custom or non-OpenRouter extraction endpoints require a
-dedicated `GRAPH_EXTRACT_API_KEY` (and a dedicated fallback key when the
-fallback endpoint is custom); the shared OpenRouter key is never forwarded to
-those endpoints.
+For GraphRAG extraction credentials, exact OpenRouter hostnames may use
+`OPENROUTER_API_KEY` when no provider-specific key is set. Local no-auth
+endpoints may leave `GRAPH_EXTRACT_API_KEY` (and its fallback counterpart)
+blank; custom providers may set a dedicated key for their endpoint. The shared
+OpenRouter key is never inherited by non-OpenRouter endpoints.
 
 GraphRAG audit findings G1–G9 and N1 remain resolved. GraphRAG is automatic in
 the reference profile and can be disabled only with `GRAPH_SEARCH_ENABLED=false`

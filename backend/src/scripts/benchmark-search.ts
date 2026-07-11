@@ -2,9 +2,16 @@
 /**
  * Release-gate benchmark for the real adaptive search HTTP endpoint.
  *
- * Usage (the credential is read from the environment, never argv):
+ * Usage (operator credential from env/stdin/file; scoped owner credentials from a protected file):
  *   export HIAI_DOCS_API_KEY
- *   bun run benchmark:search -- --base-url=http://127.0.0.1:50700
+ *   bun run benchmark:search -- --base-url=http://127.0.0.1:50700 \
+ *     --owner-credentials-file=/run/secrets/hiai-docs-benchmark-owners.json
+ *
+ * The operator credential is resolved from HIAI_DOCS_API_KEY or
+ * BENCHMARK_API_KEY, or explicitly from --api-key-stdin / --api-key-file.
+ * Never pass an API-key value in argv: --api-key is rejected. Every fixture
+ * owner must have a separate token or session in the protected owner map;
+ * the benchmark never falls back to the operator or OWNER_ID scope.
  *
  * The fixture contains document IDs that a deployment may seed separately.
  * This script never writes documents, never prints query credentials, and

@@ -198,6 +198,12 @@ GraphRAG layers a knowledge graph over the retrieval channels to surface related
 | `GRAPH_EXTRACT_API_KEY` | — | API key for extraction LLM |
 | `GRAPH_EXTRACT_MODEL` | `EMBEDDING_MODEL` | Extraction model name |
 
+Graph provider credentials are URL-scoped: exact OpenRouter hostnames may use
+the shared `OPENROUTER_API_KEY` when no dedicated key is set; local no-auth
+endpoints may leave the dedicated key blank; custom providers may set their
+own dedicated key. The shared OpenRouter key is never inherited by a
+non-OpenRouter endpoint.
+
 **Important:** `GRAPH_EXTRACT_BASE_URL` must be set explicitly in production. Falling back to `EMBEDDING_BASE_URL` is incorrect because extraction uses chat-completion endpoints while embeddings use embedding endpoints.
 
 #### Entity Extraction
