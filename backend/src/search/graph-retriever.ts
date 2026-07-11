@@ -1,6 +1,6 @@
 import { documents } from "@hiai-docs/db/schema";
 import type { TenantContext } from "@hiai-docs/db/with-tenant";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, or } from "drizzle-orm";
 import { config } from "../lib/config";
 import {
 	expandFromQueryPlan,
@@ -15,6 +15,19 @@ export interface GraphRetrieverRequest {
 	queryPlan: QueryPlan;
 	limit?: number;
 	maxHops?: number;
+	visibilityScope?: GraphVisibilityScope;
+}
+
+export type GraphVisibilityScope =
+	| { kind: "admin" }
+	| { kind: "public" }
+	| { kind: "tenant"; ownerId: string; includePublic: true }
+	| { kind: "share"; ownerId: string; allowedDocumentIds: string[] };
+
+interface GraphDocumentVisibilityRow {
+	id: string;
+	ownerId: string;
+	visibility: "private" | "shared" | "public";
 }
 
 export interface GraphRetrieverAdapters {
@@ -30,6 +43,7 @@ export interface GraphRetrieverAdapters {
 	visibleDocumentIds?: (
 		ctx: TenantContext,
 		documentIds: string[],
+		scope: GraphVisibilityScope,
 	) => Promise<Set<string>>;
 }
 
@@ -61,17 +75,13 @@ export async function retrieveGraphCandidates(
 	const expandQuery = adapters.expandFromQueryPlan ?? expandFromQueryPlan;
 
 	let related: RelatedDoc[] = [];
-	try {
-		if (seeds.length > 0) {
-			const bySeed = await expand(seeds, maxHops);
-			for (const values of bySeed.values()) related.push(...values);
-		} else {
-			// No direct seed is available: concepts/entities from the expanded
-			// plan are resolved directly to visible documents in AGE.
-			related = await expandQuery(request.queryPlan, limit);
-		}
-	} catch {
-		return [];
+	if (seeds.length > 0) {
+		const bySeed = await expand(seeds, maxHops);
+		for (const values of bySeed.values()) related.push(...values);
+	} else {
+		// No direct seed is available: concepts/entities from the expanded
+		// plan are resolved directly to visible documents in AGE.
+		related = await expandQuery(request.queryPlan, limit);
 	}
 
 	const unique = new Map<string, RelatedDoc>();
@@ -88,6 +98,7 @@ export async function retrieveGraphCandidates(
 		ctx,
 		ids,
 		adapters.visibleDocumentIds,
+		request.visibilityScope ?? _buildGraphVisibilityScope(ctx),
 	);
 
 	return ids
@@ -107,18 +118,70 @@ async function resolveVisibleIds(
 	ctx: TenantContext,
 	ids: string[],
 	adapter?: GraphRetrieverAdapters["visibleDocumentIds"],
+	scope: GraphVisibilityScope = _buildGraphVisibilityScope(ctx),
 ): Promise<Set<string>> {
-	if (adapter) return adapter(ctx, ids);
+	if (adapter) return adapter(ctx, ids, scope);
 	if (ids.length === 0) return new Set();
 	const rows = await withTenant(ctx, async (tx) =>
 		tx
-			.select({ id: documents.id })
+			.select({
+				id: documents.id,
+				ownerId: documents.ownerId,
+				visibility: documents.visibility,
+			})
 			.from(documents)
 			.where(
-				and(eq(documents.ownerId, ctx.userId), inArray(documents.id, ids)),
+				and(
+					inArray(documents.id, ids),
+					scope.kind === "admin"
+						? undefined
+						: scope.kind === "public"
+							? eq(documents.visibility, "public")
+							: scope.kind === "share"
+								? inArray(documents.id, scope.allowedDocumentIds)
+								: or(
+										eq(documents.ownerId, scope.ownerId),
+										eq(documents.visibility, "public"),
+									),
+				),
 			),
 	);
-	return new Set(rows.map((row) => row.id));
+	return new Set(
+		rows
+			.filter((row) =>
+				_isGraphDocumentVisible(scope, {
+					id: row.id,
+					ownerId: row.ownerId,
+					visibility: row.visibility,
+				}),
+			)
+			.map((row) => row.id),
+	);
+}
+
+export function _buildGraphVisibilityScope(
+	ctx: TenantContext,
+	override?: GraphVisibilityScope,
+): GraphVisibilityScope {
+	if (override) return override;
+	if (ctx.role === "admin") return { kind: "admin" };
+	if (ctx.role === "none") return { kind: "public" };
+	return { kind: "tenant", ownerId: ctx.userId, includePublic: true };
+}
+
+export function _isGraphDocumentVisible(
+	scope: GraphVisibilityScope,
+	document: GraphDocumentVisibilityRow,
+): boolean {
+	if (scope.kind === "admin") return true;
+	if (scope.kind === "public") return document.visibility === "public";
+	if (scope.kind === "share") {
+		return scope.allowedDocumentIds.includes(document.id);
+	}
+	return (
+		document.ownerId === scope.ownerId ||
+		(scope.includePublic && document.visibility === "public")
+	);
 }
 
 function dedupe(values: string[]): string[] {

@@ -41,7 +41,28 @@ PASS
 
 The focused test process logs the expected Redis connection warning when the local Redis service is not running; this does not fail the tests and expansion failures remain non-fatal by design.
 
+## Review Fixes
+
+The follow-up review identified five correctness and security gaps. They are now
+closed without changing the HTTP route or frontend:
+
+- AGE Cypher wrappers use a generated dollar-quote tag that cannot occur in the
+  generated body, including hostile `$$` and `$hiai$` terms from query expansion.
+- Graph hydration now derives an explicit visibility scope (`admin`, `tenant`,
+  `public`, or `share`) and applies owner/public/share filtering before graph
+  candidates become results. The adapter receives that scope so share-aware
+  callers cannot silently fall back to owner-only behavior.
+- AGE client/query failures propagate through the graph retriever; the search
+  orchestrator catches them, preserves direct results, and sets
+  `diagnostics.graphFailed=true`.
+- Traversal Cypher uses `[:MENTIONS*1..N]` and returns `length(path)`, honoring
+  configured `maxHops` values from 1 through 3.
+- Confidence evaluation now receives `SEARCH_MIN_CHANNEL_AGREEMENT` from the
+  validated configuration rather than assuming two agreeing channels.
+
+Additional regression coverage lives in `graph-expand.test.ts`,
+`graph-retriever.test.ts`, and `search-confidence.test.ts`.
+
 ## Handoff
 
 Task 8 can now replace the HTTP route's legacy merge with `searchDocuments()` and hydrate the returned owner-scoped IDs. The orchestrator intentionally does not change HTTP request validation or frontend behavior.
-

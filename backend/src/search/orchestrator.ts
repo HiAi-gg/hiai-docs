@@ -92,6 +92,7 @@ export async function searchDocuments(
 
 	const confidence = evaluateConfidence(fast, plan, {
 		vectorMinSimilarity: config.SEARCH_VECTOR_MIN_SIMILARITY,
+		minChannelAgreement: config.SEARCH_MIN_CHANNEL_AGREEMENT,
 	});
 	let expandedPlan: QueryPlan | null = null;
 	let expansionModel: string | undefined;

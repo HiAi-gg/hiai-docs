@@ -85,6 +85,23 @@ describe("search confidence", () => {
 		).toEqual({ confident: true, reasons: [] });
 	});
 
+	test("uses the configured minimum channel agreement", () => {
+		const result = evaluateConfidence(
+			channels(
+				candidate("doc-1", "exact"),
+				candidate("doc-1", "fts"),
+				candidate("doc-1", "vector", 0.88),
+			),
+			plan,
+			{
+				vectorMinSimilarity: 0.35,
+				minChannelAgreement: 4,
+			},
+		);
+		expect(result.confident).toBe(false);
+		expect(result.reasons).toContain("low_channel_agreement");
+	});
+
 	test("is deterministic and provider-free", () => {
 		const first = evaluateConfidence(
 			channels(candidate("doc-1", "fts", 0.8)),

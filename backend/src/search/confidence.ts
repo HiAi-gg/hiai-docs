@@ -27,6 +27,10 @@ export function evaluateConfidence(
 	_plan?: QueryPlan,
 	thresholds: ConfidenceThresholds = { vectorMinSimilarity: 0.35 },
 ): ConfidenceResult {
+	const minChannelAgreement = Math.max(
+		1,
+		Math.floor(thresholds.minChannelAgreement ?? 2),
+	);
 	const candidates = flatten(results);
 	if (candidates.length === 0)
 		return { confident: false, reasons: ["empty_candidates"] };
@@ -46,7 +50,7 @@ export function evaluateConfidence(
 		channelByDocument.set(candidate.documentId, channels);
 	}
 	const hasAgreement = [...channelByDocument.values()].some(
-		(channels) => channels.size >= 2,
+		(channels) => channels.size >= minChannelAgreement,
 	);
 	if (!hasAgreement) reasons.push("low_channel_agreement");
 

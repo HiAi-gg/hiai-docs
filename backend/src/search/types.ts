@@ -49,6 +49,7 @@ export interface ChannelResult {
 
 export interface ConfidenceThresholds {
 	vectorMinSimilarity: number;
+	minChannelAgreement?: number;
 	languageMismatch?: boolean;
 }
 
