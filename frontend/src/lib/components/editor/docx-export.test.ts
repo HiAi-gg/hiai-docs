@@ -1,9 +1,14 @@
 import { describe, expect, test } from "bun:test";
+import { Packer } from "docx";
+import { getSchema } from "@tiptap/core";
+import { Node } from "@tiptap/pm/model";
 import {
 	createDocxImageFetcher,
 	createPlainTextDocxBlob,
 	normalizeDocxDocumentJson,
 } from "./docx-export";
+import { customSerializerAsync } from "./docx-serializer";
+import { editorExtensions } from "./editorExtensions";
 
 const ONE_PIXEL_PNG =
 	"iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=";
@@ -132,5 +137,50 @@ describe("DOCX document compatibility", () => {
 		const bytes = new Uint8Array(await blob.arrayBuffer());
 		expect(String.fromCharCode(...bytes.slice(0, 2))).toBe("PK");
 		expect(blob.type).toContain("wordprocessingml.document");
+	});
+
+	test("serializes normalized task lists and embeds inline images", async () => {
+		const schema = getSchema(editorExtensions);
+		const json = normalizeDocxDocumentJson({
+			type: "doc",
+			content: [
+				{
+					type: "taskList",
+					content: [
+						{
+							type: "taskItem",
+							attrs: { checked: true },
+							content: [
+								{
+									type: "paragraph",
+									content: [{ type: "text", text: "with image" }],
+								},
+							],
+						},
+					],
+				},
+				{
+					type: "paragraph",
+					content: [
+						{
+							type: "image",
+							attrs: { src: `data:image/png;base64,${ONE_PIXEL_PNG}` },
+						},
+					],
+				},
+			],
+		});
+		const docNode = Node.fromJSON(schema, json);
+		const fetcher = createDocxImageFetcher();
+		const wordDoc = await customSerializerAsync.serializeAsync(docNode, {
+			getImageBuffer: fetcher.getImageBuffer,
+			getImageType: fetcher.getImageType,
+			sections: [{ properties: {} }],
+		} as Parameters<typeof customSerializerAsync.serializeAsync>[1]);
+		const blob = await Packer.toBlob(wordDoc);
+		const bytes = new Uint8Array(await blob.arrayBuffer());
+		const zipText = new TextDecoder().decode(bytes);
+		expect(String.fromCharCode(...bytes.slice(0, 2))).toBe("PK");
+		expect(zipText).toMatch(/word\/media\/[^/]+\.png/);
 	});
 });
