@@ -2,20 +2,28 @@
 
 > Use this checklist for every release. Tick items as they are completed.
 
-## Current Task 10 Verification Status (2026-07-11)
+## Current Task 10 Verification Status — v0.2.7 candidate (2026-07-11)
 
 This section records the current evidence before any public release action:
 
 | Check | Status |
 |-------|--------|
-| Backend tests | 569 passed / 7 known embedding-provider mock failures |
+| Backend tests | 576 passed / 0 failed |
 | Frontend tests | 55 passed / 0 failed |
-| Docker image export | Incomplete; backend/web builds reached the final runtime `chown` layers, but export was interrupted |
+| Lint, typecheck, build, SDK build | Passed in the assembled worktree |
+| Compose config | Passed with `.env.example` |
+| Docker image export | Passed; API, web, and Caddy images exported locally |
+| API image smoke | Passed in-container: `/api/health` returned HTTP 200 with `status: ok` |
 | Fresh database migration | Blocked by migration `0008_streaming_diskann_index.sql`; the local PostgreSQL image lacks the required `diskann` access method |
+| Upgraded database migration | Not run |
+| Live relevance benchmark | Not run; Recall/MRR/latency/tenant-leakage gates remain unverified |
+| Full Compose health | Not run |
+| Browser smoke | Blocked; `agent-browser` daemon could not start in this sandbox |
 | Public release actions | Not performed: no publish, tag, GitHub release, Docker push, npm publish, or Git push |
 
 These blockers must remain visible in the release evidence; they are not
 release approvals or reasons to mark the corresponding checklist items done.
+This file describes a v0.2.7 release candidate, not a completed public release.
 
 ## Pre-Release
 
@@ -41,7 +49,7 @@ release approvals or reasons to mark the corresponding checklist items done.
 - [ ] **Verify PostgreSQL bootstrap** — `postgres/init.sql` contains infrastructure setup only; application schema and graph/labels/indexes are created by Drizzle migrations
 - [ ] **Build SDK** — `cd packages/sdk && bun run build` (ensures `dist/` is current before publishing)
 - [ ] **Run full typecheck** — `bun run typecheck` (0 errors)
-- [ ] **Run full test suite** — `bun test` (all passing)
+- [ ] **Run full test suite** — `bun run test` (backend 576/0 and frontend 55/0 in the current candidate)
 - [ ] **Run lint** — `bun run lint` (0 errors)
 - [ ] **Run secret scans** — no real OpenRouter token values or real `OPENROUTER_API_KEY` outside ignored local `.env`; no unfinished markers in release files
 - [ ] **Run migration/reindex dry-run** — `bun run db:migrate` then `cd backend && bun run src/scripts/reindex-embeddings.ts --dry-run --batch=100`
@@ -51,7 +59,7 @@ release approvals or reasons to mark the corresponding checklist items done.
 
 ## Build
 
-- [ ] **Build Docker images** — `docker compose build` (api, migration target, and web; build Caddy separately when releasing the proxy image)
+- [ ] **Build Docker images** — `docker compose build` (API, migration target, web, and Caddy; local candidate export passed)
 - [ ] **Verify Docker health** — `docker compose up -d && docker exec hiai-docs-api wget -qO- http://127.0.0.1:50700/api/health`
 - [ ] **Run agent-browser smoke** — verify `http://localhost:50701/search`, a cross-language query, explanations, and no console errors
 - [ ] **Run DB migrations** — `bun run db:migrate` (loads the root `.env` and applies the canonical Drizzle migration journal)

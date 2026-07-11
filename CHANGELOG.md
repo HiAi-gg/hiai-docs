@@ -7,6 +7,39 @@ All notable changes to hiai-docs are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.7] - 2026-07-11
+
+### Added
+- **Adaptive multilingual search**: exact/title, multilingual lexical, fuzzy,
+  vector, one-pass query expansion, and automatic GraphRAG retrieval are
+  combined with reciprocal rank fusion (RRF).
+- **Search explanations and chunks**: results expose bounded channel and graph
+  contribution metadata, with request-scoped chunk hydration for authorized
+  documents.
+- **Generation-aware embeddings**: embedding generations use explicit
+  pending/processing/ready/failed/stale states and atomic activation, while
+  enforcing finite, non-zero 1024-dimensional vectors.
+- **Relevance benchmark and observability**: the release contour includes
+  tenant-scoped benchmark credentials, latency/relevance gates, and bounded
+  search metrics without credentials in process arguments.
+
+### Fixed
+- **GraphRAG safety**: graph seeds are visibility-authorized before traversal,
+  Cypher inputs use safe dollar-quoted values, and graph failures degrade to
+  direct search results without leaking tenant data.
+- **Share and pagination scope**: public/share search preserves document
+  visibility while hydrating global authorized totals and page slices correctly.
+- **Embedding test isolation**: provider tests no longer inherit process-global
+  integration mocks, keeping the full suite deterministic.
+
+### Migration Notes
+- Apply the complete Drizzle journal before enabling search generations or
+  reindexing embeddings. Fresh-install verification remains blocked on local
+  PostgreSQL images that do not provide the `diskann` access method required by
+  migration `0008_streaming_diskann_index.sql`.
+- No public tag, GitHub release, npm publish, Docker push, or Git push is part
+  of this candidate verification.
+
 ## [0.2.6] - 2026-07-10
 
 ### Fixed
