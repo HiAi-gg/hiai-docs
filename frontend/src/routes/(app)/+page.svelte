@@ -50,7 +50,7 @@ import { page } from "$app/state";
 import type { Category } from "$lib/api/categories";
 import { apiFetch } from "$lib/api/client";
 import { createDocument, listDocuments } from "$lib/api/documents";
-import { createFolder, listFolders } from "$lib/api/folders";
+import { createFolder, duplicateDocument, listFolders } from "$lib/api/folders";
 import DatePicker from "$lib/components/DatePicker.svelte";
 import DocumentCard from "$lib/components/DocumentCard.svelte";
 import FolderCard from "$lib/components/FolderCard.svelte";
@@ -99,6 +99,8 @@ let showShareDialog = $state(false);
 let importOpen = $state(false);
 let importItems = $state<ImportItem[]>([]);
 let importInput = $state<HTMLInputElement | undefined>(undefined);
+let duplicatingDocumentId = $state<string | null>(null);
+let optimisticDocuments = $state<Document[]>([]);
 
 // --- Mutating actions ---
 function handleNewDocument() {
@@ -183,12 +185,24 @@ async function handleDeleteDocument(id: string) {
 }
 
 async function handleDuplicateDocument(id: string) {
+	if (duplicatingDocumentId) return;
+	duplicatingDocumentId = id;
 	try {
-		await apiFetch(`/api/documents/${id}/duplicate`, { method: "POST" });
+		const duplicate = await duplicateDocument(id);
+		optimisticDocuments = [
+			...optimisticDocuments.filter((doc) => doc.id !== duplicate.id),
+			duplicate,
+		];
 		await invalidateAll();
+		const currentDocuments = data.activeFolder?.documents ?? data.recentDocs;
+		optimisticDocuments = optimisticDocuments.filter(
+			(doc) => !currentDocuments.some((current) => current.id === doc.id),
+		);
 		refreshDocs();
 	} catch (e) {
 		console.error("Failed to duplicate document", e);
+	} finally {
+		duplicatingDocumentId = null;
 	}
 }
 
@@ -333,6 +347,10 @@ const filteredDocuments = $derived.by(() => {
 	let list = activeFolderId
 		? (data.activeFolder?.documents ?? [])
 		: data.recentDocs;
+	const extras = optimisticDocuments.filter(
+		(doc) => !list.some((current) => current.id === doc.id),
+	);
+	list = extras.length > 0 ? [...list, ...extras] : list;
 
 	// Filter by search query locally
 	if (searchQuery.trim()) {
@@ -718,6 +736,7 @@ const isFolderEmpty = $derived(
                 document={doc}
                 onDelete={handleDeleteDocument}
                 onDuplicate={handleDuplicateDocument}
+                duplicateBusy={duplicatingDocumentId === doc.id}
               />
             {/each}
           </div>
@@ -774,6 +793,7 @@ const isFolderEmpty = $derived(
                 document={doc}
                 onDelete={handleDeleteDocument}
                 onDuplicate={handleDuplicateDocument}
+                duplicateBusy={duplicatingDocumentId === doc.id}
               />
             {/each}
           </div>

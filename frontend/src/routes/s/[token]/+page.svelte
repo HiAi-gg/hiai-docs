@@ -545,9 +545,9 @@ $effect(() => {
             <button
               onclick={handleExportMd}
               class="flex items-center gap-1 rounded-md border border-border px-3 py-1.5 text-xs hover:bg-accent"
-              title="Export MD"
+              title="Export .md"
             >
-              <Download class="h-3 w-3" /> MD
+              <Download class="h-3 w-3" /> Export .md
             </button>
             <button
               onclick={handleExportDocx}
