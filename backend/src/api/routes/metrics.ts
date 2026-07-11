@@ -19,7 +19,11 @@
 
 import { Elysia } from "elysia";
 import { logger } from "../../lib/logger";
-import { getEmbeddingStateInventory, getMetrics } from "../../lib/metrics";
+import {
+	getEmbeddingStateInventory,
+	getMetrics,
+	getPipelineMetrics,
+} from "../../lib/metrics";
 import { rateLimitHeaders, searchRateLimiter } from "../middleware/rate-limit";
 
 /**
@@ -67,6 +71,7 @@ export const metricsRoutes = new Elysia({ prefix: "/api/admin" }).get(
 		try {
 			return {
 				metrics: getMetrics({ includeReserved: true }),
+				pipelineMetrics: getPipelineMetrics(),
 				embeddingStateInventory: getEmbeddingStateInventory(),
 				uptime: process.uptime(),
 			};

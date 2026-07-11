@@ -18,6 +18,35 @@ interface CounterState {
 	count: number;
 }
 
+import {
+	emptyPipelineMetricSnapshot,
+	type PipelineMetricName,
+	type PipelineMetricSnapshot,
+} from "../queue/health";
+
+const PIPELINE_METRICS = emptyPipelineMetricSnapshot();
+
+/** Fixed-cardinality queue metric update; arbitrary/user-derived keys are impossible. */
+export function setPipelineMetric(
+	name: PipelineMetricName,
+	value: number,
+): void {
+	if (!Number.isFinite(value) || value < 0) return;
+	PIPELINE_METRICS[name] = value;
+}
+
+export function incrementPipelineMetric(
+	name: PipelineMetricName,
+	amount = 1,
+): void {
+	if (!Number.isFinite(amount) || amount < 0) return;
+	PIPELINE_METRICS[name] = (PIPELINE_METRICS[name] ?? 0) + amount;
+}
+
+export function getPipelineMetrics(): PipelineMetricSnapshot {
+	return { ...PIPELINE_METRICS };
+}
+
 /** Search channels are deliberately finite. Never turn user input into a
  * metric label: each channel owns a fixed set of metric names below. */
 export const SEARCH_CHANNELS = [
@@ -254,6 +283,7 @@ export function getMetrics(
  */
 export function resetMetrics(): void {
 	REGISTRY.clear();
+	Object.assign(PIPELINE_METRICS, emptyPipelineMetricSnapshot());
 }
 
 const SEARCH_METRIC_MAP: Record<
