@@ -8,6 +8,7 @@ import {
 	JOB_IDS,
 	type PipelineJob,
 } from "../contracts";
+import { withOwnerSlot } from "../fair-scheduler";
 import { DEFAULT_JOB_OPTIONS, QUEUE_NAMES, SOURCE_PRIORITY } from "../names";
 
 export interface EmbedWorkerDependencies {
@@ -135,7 +136,10 @@ export function createEmbedWorker(
 ): Worker<EmbedBatchJob> {
 	return new Worker<EmbedBatchJob>(
 		QUEUE_NAMES.embed,
-		(job) => processEmbedJob(job, deps),
+		(job) =>
+			withOwnerSlot(job.data.ownerId, "embed", () =>
+				processEmbedJob(job, deps),
+			),
 		{ connection: createBullMqConnection(redisUrl), concurrency: 4 },
 	);
 }

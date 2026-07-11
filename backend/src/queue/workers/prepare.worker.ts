@@ -9,6 +9,7 @@ import {
 	type PrepareJob,
 	prepareJobSchema,
 } from "../contracts";
+import { withOwnerSlot } from "../fair-scheduler";
 import { DEFAULT_JOB_OPTIONS, QUEUE_NAMES, SOURCE_PRIORITY } from "../names";
 
 export interface PrepareWorkerDependencies {
@@ -87,7 +88,10 @@ export function createPrepareWorker(
 ): Worker<PrepareJob> {
 	return new Worker<PrepareJob>(
 		QUEUE_NAMES.prepare,
-		(job) => processPrepareJob(job, deps),
+		(job) =>
+			withOwnerSlot(job.data.ownerId, "prepare", () =>
+				processPrepareJob(job, deps),
+			),
 		{ connection: createBullMqConnection(redisUrl), concurrency: 2 },
 	);
 }

@@ -1,6 +1,7 @@
 import { Worker } from "bullmq";
 import { createBullMqConnection } from "./connection";
 import { JOB_IDS, type PipelineJob, type PipelineStage } from "./contracts";
+import { withOwnerSlot } from "./fair-scheduler";
 import { DEFAULT_JOB_OPTIONS, QUEUE_NAMES, SOURCE_PRIORITY } from "./names";
 import { closePipelineQueues, getPipelineQueue } from "./queues";
 import {
@@ -83,27 +84,38 @@ export function createPipelineWorkerFactories(
 		graph: () =>
 			new Worker<PipelineJob>(
 				QUEUE_NAMES.graph,
-				async (job) => {
-					await graphProcessor(job.data);
-					const data: PipelineJob = { ...job.data, stage: "summarize" };
-					await getPipelineQueue("summarize", redisUrl).add("summarize", data, {
-						...DEFAULT_JOB_OPTIONS,
-						jobId: JOB_IDS.summarize(job.data.generationId),
-						priority: SOURCE_PRIORITY[job.data.source],
-					});
-				},
+				(job) =>
+					withOwnerSlot(job.data.ownerId, "graph", async () => {
+						await graphProcessor(job.data);
+						const data: PipelineJob = { ...job.data, stage: "summarize" };
+						await getPipelineQueue("summarize", redisUrl).add(
+							"summarize",
+							data,
+							{
+								...DEFAULT_JOB_OPTIONS,
+								jobId: JOB_IDS.summarize(job.data.generationId),
+								priority: SOURCE_PRIORITY[job.data.source],
+							},
+						);
+					}),
 				{ connection: connection(), concurrency: 2 },
 			),
 		summarize: () =>
 			new Worker<PipelineJob>(
 				QUEUE_NAMES.summarize,
-				(job) => summarizeProcessor(job.data),
+				(job) =>
+					withOwnerSlot(job.data.ownerId, "summarize", () =>
+						summarizeProcessor(job.data),
+					),
 				{ connection: connection(), concurrency: 1 },
 			),
 		finalize: () =>
 			new Worker<PipelineJob>(
 				QUEUE_NAMES.finalize,
-				(job) => finalizeProcessor(job.data),
+				(job) =>
+					withOwnerSlot(job.data.ownerId, "finalize", () =>
+						finalizeProcessor(job.data),
+					),
 				{ connection: connection(), concurrency: 2 },
 			),
 	};

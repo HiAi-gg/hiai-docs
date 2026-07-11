@@ -13,15 +13,36 @@ import { and, eq, sql } from "drizzle-orm";
 import { activateEmbeddingGeneration } from "../embedding/generation";
 import { getEmbedding } from "../embedding/index";
 import { chunkHash } from "../lib/chunk-hash";
+import { config } from "../lib/config";
 import { extractEntities } from "../lib/graph/extract-entities";
 import type { PipelineJob, PipelineStage } from "./contracts";
 import { JOB_IDS } from "./contracts";
 import { DEFAULT_JOB_OPTIONS, SOURCE_PRIORITY } from "./names";
+import {
+	type ProviderLimiterProfile,
+	withProviderPermit,
+} from "./provider-limiter";
 import { getPipelineQueue } from "./queues";
 import type { PipelineStageDependencies } from "./start";
 import type { PipelineStageStatus } from "./workers/graph.worker";
 
 const admin = adminTenantContext(ZERO_UUID);
+
+function providerProfile(name: string): ProviderLimiterProfile {
+	return {
+		name,
+		mode: config.PROVIDER_LIMITER_MODE,
+		maxConcurrency: config.PROVIDER_MAX_CONCURRENCY,
+		requestsPerMinute:
+			config.PROVIDER_LIMITER_MODE === "remote"
+				? config.PROVIDER_REQUESTS_PER_MINUTE
+				: 0,
+		maxRetries: config.PROVIDER_MAX_RETRIES,
+		baseBackoffMs: config.PROVIDER_RETRY_BASE_DELAY_MS,
+		circuitFailureThreshold: config.PROVIDER_CIRCUIT_FAILURE_THRESHOLD,
+		circuitCooldownMs: config.PROVIDER_CIRCUIT_COOLDOWN_MS,
+	};
+}
 
 function stagePatch(stage: PipelineStage, status: PipelineStageStatus) {
 	if (stage === "prepare") return { prepareStatus: status };
@@ -183,7 +204,12 @@ export function createPipelineStageDependencies(
 					};
 				});
 			},
-			getEmbedding,
+			getEmbedding: (text) =>
+				withProviderPermit(
+					providerProfile(`embedding:${config.EMBEDDING_MODEL ?? "default"}`),
+					"embed",
+					() => getEmbedding(text),
+				),
 			async storeBatch({ job, rows }) {
 				return withTenant(admin, async (tx) => {
 					const [batch] = await tx
@@ -306,7 +332,11 @@ export function createPipelineStageDependencies(
 					return row;
 				});
 				if (!doc) throw new Error("Pipeline document not found");
-				await extractEntities(doc.content ?? "", job.documentId);
+				await withProviderPermit(
+					providerProfile(`graph:${config.GRAPH_EXTRACT_MODEL ?? "default"}`),
+					"graph",
+					() => extractEntities(doc.content ?? "", job.documentId),
+				);
 			},
 			setGraphStatus: (generationId, status, errorCode) =>
 				setStageStatus(generationId, "graph", status, errorCode),

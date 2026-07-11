@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import {
 	createOwnerFairScheduler,
 	type RedisLeaseClient,
+	withOwnerSlot,
 } from "../queue/fair-scheduler";
 
 class FakeLeaseRedis implements RedisLeaseClient {
@@ -22,6 +23,26 @@ class FakeLeaseRedis implements RedisLeaseClient {
 }
 
 describe("owner fair scheduler", () => {
+	test("production wrapper always acquires and releases around stage work", async () => {
+		const events: string[] = [];
+		const result = await withOwnerSlot(
+			"owner-a",
+			"embed",
+			async () => {
+				events.push("work");
+				return "done";
+			},
+			async (ownerId, stage) => {
+				events.push(`acquire:${ownerId}:${stage}`);
+				return async () => {
+					events.push("release");
+				};
+			},
+		);
+		expect(result).toBe("done");
+		expect(events).toEqual(["acquire:owner-a:embed", "work", "release"]);
+	});
+
 	test("one saturated owner cannot block another owner", async () => {
 		const acquire = createOwnerFairScheduler(new FakeLeaseRedis(), {
 			limits: { embed: 2 },

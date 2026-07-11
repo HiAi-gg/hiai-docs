@@ -119,3 +119,17 @@ export async function acquireOwnerSlot(
 	}
 	return defaultAcquire(ownerId, stage, signal);
 }
+
+export async function withOwnerSlot<T>(
+	ownerId: string,
+	stage: PipelineStage,
+	work: () => Promise<T>,
+	acquire: typeof acquireOwnerSlot = acquireOwnerSlot,
+): Promise<T> {
+	const release = await acquire(ownerId, stage);
+	try {
+		return await work();
+	} finally {
+		await release();
+	}
+}
