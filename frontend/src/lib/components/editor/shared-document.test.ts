@@ -12,7 +12,7 @@ describe("PDF task-list HTML normalization", () => {
 		const html = '<ul><li><input checked type="checkbox"> done</li></ul>';
 		const normalized = markMarkdownTaskItems(html);
 		expect(normalized).toContain('<li class="task-list-item"><input');
-		expect(normalized).not.toContain('<li><input');
+		expect(normalized).not.toContain("<li><input");
 	});
 });
 

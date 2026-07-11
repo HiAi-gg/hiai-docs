@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
-import { Packer } from "docx";
 import { getSchema } from "@tiptap/core";
 import { Node } from "@tiptap/pm/model";
+import { Packer } from "docx";
 import {
 	createDocxImageFetcher,
 	createPlainTextDocxBlob,
