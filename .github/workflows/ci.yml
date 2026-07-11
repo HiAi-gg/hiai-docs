@@ -148,6 +148,8 @@ jobs:
           exit 1
 
       - run: cd packages/db && bun run db:migrate
+        env:
+          MIGRATION_DATABASE_URL: postgresql://aiuser:testpassword@localhost:5432/hiai_docs_test
       - run: bun run test
 
       - name: Stop Postgres
