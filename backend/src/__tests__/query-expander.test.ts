@@ -137,14 +137,14 @@ describe("structured query expansion", () => {
 		}
 	});
 
-	test("returns null for malformed JSON", async () => {
+	test("uses local fallback for malformed provider JSON", async () => {
 		globalThis.fetch = mock(async () =>
 			completion("not-json"),
 		) as unknown as typeof fetch;
 		const { expandQuery } = await import("../search/query-expander");
-		expect(
-			await expandQuery(queryPlan(), { tenantScope: "tenant-a" }),
-		).toBeNull();
+		const result = await expandQuery(queryPlan(), { tenantScope: "tenant-a" });
+		expect(result?.model).toBe("local-lexicon-v1");
+		expect(result?.plan.translations).toEqual(["english"]);
 	});
 
 	test("falls back after a primary timeout", async () => {
@@ -167,14 +167,29 @@ describe("structured query expansion", () => {
 		expect(calls).toBe(2);
 	});
 
-	test("returns null when both providers fail", async () => {
+	test("uses deterministic cross-language fallback when both providers fail", async () => {
 		globalThis.fetch = mock(async () => {
 			throw new Error("provider unavailable");
 		}) as unknown as typeof fetch;
 		const { expandQuery } = await import("../search/query-expander");
-		expect(
-			await expandQuery(queryPlan(), { tenantScope: "tenant-a" }),
-		).toBeNull();
+		const result = await expandQuery(queryPlan(), { tenantScope: "tenant-a" });
+		expect(result?.model).toBe("local-lexicon-v1");
+		expect(result?.plan.translations).toContain("english");
+	});
+
+	test("expands a broad language concept without provider availability", async () => {
+		globalThis.fetch = mock(async () => {
+			throw new Error("provider unavailable");
+		}) as unknown as typeof fetch;
+		const { expandQuery } = await import("../search/query-expander");
+		const result = await expandQuery(
+			queryPlan({ original: "разные языки", normalized: "разные языки" }),
+			{ tenantScope: "tenant-a" },
+		);
+		expect(result?.plan.translations).toEqual(["language", "languages"]);
+		expect(result?.plan.concepts).toEqual(
+			expect.arrayContaining(["english", "french", "portuguese"]),
+		);
 	});
 
 	test("uses tenant-scoped hashed cache keys without raw queries", async () => {

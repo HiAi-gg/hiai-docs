@@ -126,34 +126,49 @@ export async function expandQuery(
 		maxTokens: 512,
 		temperature: 0,
 	});
-	if (!result) return null;
+	const local = localQueryVariants(plan);
+	if (!result && local.every((values) => values.length === 0)) return null;
+	const providerData = result?.data ?? {
+		translations: [],
+		synonyms: [],
+		concepts: [],
+		namedEntities: [],
+	};
+	const localFallback = result ? ([[], [], [], []] as typeof local) : local;
 
 	const expandedPlan: QueryPlan = {
 		original: plan.original,
 		normalized: plan.normalized,
 		detectedLanguage: plan.detectedLanguage,
 		translations: cleanVariants(
-			[...plan.translations, ...result.data.translations],
+			[...plan.translations, ...providerData.translations, ...localFallback[0]],
 			[plan.original, plan.normalized],
 			config.SEARCH_EXPANSION_MAX_VARIANTS,
 		),
 		synonyms: cleanVariants(
-			[...plan.synonyms, ...result.data.synonyms],
+			[...plan.synonyms, ...providerData.synonyms, ...localFallback[1]],
 			[plan.original, plan.normalized],
 			config.SEARCH_EXPANSION_MAX_VARIANTS,
 		),
 		concepts: cleanVariants(
-			[...plan.concepts, ...result.data.concepts],
+			[...plan.concepts, ...providerData.concepts, ...localFallback[2]],
 			[plan.original, plan.normalized],
 			config.SEARCH_EXPANSION_MAX_VARIANTS,
 		),
 		namedEntities: cleanVariants(
-			[...plan.namedEntities, ...result.data.namedEntities],
+			[
+				...plan.namedEntities,
+				...providerData.namedEntities,
+				...localFallback[3],
+			],
 			[plan.original, plan.normalized],
 			config.SEARCH_EXPANSION_MAX_VARIANTS,
 		),
 	};
-	const output = { plan: expandedPlan, model: result.model };
+	const output = {
+		plan: expandedPlan,
+		model: result?.model ?? "local-lexicon-v1",
+	};
 
 	if (ttl > 0) {
 		try {
@@ -163,6 +178,30 @@ export async function expandQuery(
 		}
 	}
 	return output;
+}
+
+/** Deterministic multilingual safety net for high-value language concepts. */
+function localQueryVariants(
+	plan: QueryPlan,
+): [string[], string[], string[], string[]] {
+	const query = plan.normalized.toLocaleLowerCase();
+	const translations: string[] = [];
+	const concepts: string[] = [];
+	if (/английск/u.test(query)) translations.push("english");
+	if (/француз/u.test(query)) translations.push("french");
+	if (/португал/u.test(query)) translations.push("portuguese");
+	if (/язык/u.test(query)) {
+		translations.push("language", "languages");
+		concepts.push(
+			"english",
+			"french",
+			"portuguese",
+			"английский",
+			"французский",
+			"португальский",
+		);
+	}
+	return [translations, [], concepts, []];
 }
 
 const cachedResultSchema = z.object({

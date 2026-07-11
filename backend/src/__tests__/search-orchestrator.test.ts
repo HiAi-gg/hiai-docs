@@ -198,6 +198,31 @@ describe("automatic GraphRAG search orchestration", () => {
 		expect(response.items[0]?.documentId).toBe("doc-2");
 	});
 
+	test("retrieves a language-list document when query embeddings are unavailable", async () => {
+		const languageDoc = candidate("language-list", "expanded_fts");
+		const response = await searchDocuments(
+			ctx,
+			{ query: "разные языки", limit: 10 },
+			{
+				getEmbedding: async () => ({ ok: false, code: "provider_error" }),
+				retrieveFast: async () => channels({ vector: [] }),
+				expand: async (plan) => ({
+					model: "local-lexicon-v1",
+					plan: { ...plan, concepts: ["english", "french", "portuguese"] },
+				}),
+				retrieveExpanded: async (_tenant, plan) => {
+					expect(plan.concepts).toContain("french");
+					return channels({ expanded_fts: [languageDoc] });
+				},
+				retrieveGraph: async () => [],
+			},
+		);
+		expect(response.items.map((item) => item.documentId)).toContain(
+			"language-list",
+		);
+		expect(response.diagnostics.crossLanguageSuccess).toBe(true);
+	});
+
 	test("GraphRAG is called without a request flag", async () => {
 		const graph = mock(async () => [candidate("graph-doc", "graph")]);
 		const response = await searchDocuments(
