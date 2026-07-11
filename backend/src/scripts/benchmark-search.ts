@@ -443,12 +443,16 @@ export function resolveApiKey(
 	env: Record<string, string | undefined> = process.env,
 	fileValue?: string,
 ): string {
-	return (
-		env.HIAI_DOCS_API_KEY ??
-		env.BENCHMARK_API_KEY ??
-		fileValue ??
-		""
-	).trim();
+	const firstNonBlank = (...values: Array<string | undefined>) => {
+		for (const value of values) {
+			if (typeof value !== "string") continue;
+			const trimmed = value.trim();
+			if (trimmed.length > 0) return trimmed;
+		}
+		return "";
+	};
+
+	return firstNonBlank(env.HIAI_DOCS_API_KEY, env.BENCHMARK_API_KEY, fileValue);
 }
 
 async function loadApiKey(args: CliArgs): Promise<string> {

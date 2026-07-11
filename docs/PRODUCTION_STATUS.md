@@ -130,4 +130,4 @@ as an operator kill switch.
 
 ---
 
-*Status: Release Candidate — adaptive multilingual GraphRAG search*
+*Status: BLOCKED — Release Candidate pending required verification gates*

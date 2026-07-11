@@ -208,6 +208,18 @@ describe("search benchmark evaluation math", () => {
 		expect(resolveApiKey({ BENCHMARK_API_KEY: "fallback-secret" })).toBe(
 			"fallback-secret",
 		);
+		expect(
+			resolveApiKey({
+				HIAI_DOCS_API_KEY: " \t\n",
+				BENCHMARK_API_KEY: " fallback-secret ",
+			}),
+		).toBe("fallback-secret");
+		expect(
+			resolveApiKey(
+				{ HIAI_DOCS_API_KEY: "\t", BENCHMARK_API_KEY: " " },
+				" file-secret ",
+			),
+		).toBe("file-secret");
 	});
 
 	test("requires distinct scoped credentials for every fixture owner", () => {
