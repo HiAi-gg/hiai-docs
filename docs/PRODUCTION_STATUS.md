@@ -22,8 +22,8 @@
 | Upgraded database | NOT RUN |
 
 Passing static checks do not constitute release approval. The current release
-remains blocked by the known backend test failures and the missing benchmark,
-health, browser, Docker-export, and fresh-database evidence.
+remains blocked by the missing benchmark, health, browser, Docker-export, and
+fresh-database evidence.
 
 ### Current Task 10 verification status
 
