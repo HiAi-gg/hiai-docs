@@ -2,7 +2,7 @@
 
 > Use this checklist for every release. Tick items as they are completed.
 
-## Current v0.2.7 release candidate evidence (2026-07-11)
+## Current v0.2.8 release candidate evidence (2026-07-12)
 
 This is the verified local candidate. No tag, push, npm publish, Docker push,
 or GitHub Release has been performed. Browser acceptance is intentionally
@@ -22,7 +22,7 @@ left to the operator on the running local build.
 | Live GraphRAG latency | Fast p95 411ms; expanded p95 2485ms in the passing serialized run; provider latency remains environment-dependent |
 | Embeddings | 8/8 fixture documents ready via `openai/text-embedding-3-small`, dimension 1024 |
 | AGE graph | 52 nodes / 92 edges populated by real extraction |
-| Browser smoke | **Operator gate** — verify manually at `http://localhost:57001` |
+| Browser smoke | **Operator gate** — verify manually at `http://localhost:50701` |
 
 The candidate is release-ready only after the P0 package/CI gates below pass in
 GitHub Actions and the operator confirms the browser flow.
@@ -67,7 +67,7 @@ GitHub Actions and the operator confirms the browser flow.
 
 - [ ] **Build Docker images** — `docker compose build` (API, migration target, web, and Caddy; local candidate export passed)
 - [ ] **Verify Docker health** — `docker compose up -d && docker exec hiai-docs-api wget -qO- http://127.0.0.1:50700/api/health`
-- [ ] **Operator browser acceptance** — manually verify `http://localhost:57001` (login, import, search, share, images, align/list, and export); this is intentionally not automated in CI
+- [ ] **Operator browser acceptance** — manually verify `http://localhost:50701` (login, import, search, share, images, align/list, and export); this is intentionally not automated in CI
 - [ ] **Run DB migrations** — `bun run db:migrate` (loads the root `.env` and applies the canonical Drizzle migration journal)
 
 ## Release

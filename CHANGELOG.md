@@ -2,15 +2,18 @@
 
 All notable changes to hiai-docs are documented in this file.
 
-<!-- v0.2.7 candidate evidence verified 2026-07-11; publication remains a separate release action. -->
+<!-- v0.2.8 candidate evidence verified 2026-07-12; publication remains a separate release action. -->
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.2.8] - 2026-07-12
+
 ### Added
-- BullMQ pipeline migration and restart-recovery scaffolding. PostgreSQL is
+- BullMQ document-processing pipeline with independent prepare, embed, graph,
+  summarize, and finalize workers. PostgreSQL is
   the durable source of truth for nonterminal runs while Redis remains the job
   transport.
 - One-release legacy embedding-queue bridge documentation and deterministic
@@ -19,6 +22,30 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 ### Changed
 - Release verification now includes worker restart, Redis-loss reconciliation,
   owner isolation, and rollback safety checks.
+- Worker scheduling now applies per-owner fairness, bounded per-document fan-out,
+  provider concurrency controls, deterministic retry-safe job identifiers, and
+  automatic reconciliation after restart.
+- The canonical local runtime uses API port `50700` and web port `50701` across
+  quickstart, release verification, and browser acceptance instructions.
+
+### Fixed
+- SvelteKit's production request-body limit now matches the documented import
+  contour, allowing requests up to 100 MB to reach the backend while retaining
+  the backend's 10 MB per-file limit.
+- Pipeline migrations place state tables and enum types in `public`, repair
+  objects created under the AGE search path during an earlier candidate run,
+  and grant the runtime role only the required access.
+- Empty documents and optional graph/summarization failures reach deterministic
+  terminal states without blocking usable embeddings.
+
+### Migration Notes
+- Apply the complete Drizzle journal (`0000–0030`) before starting the API.
+  Migration `0030` safely repairs pipeline objects created under the AGE schema
+  by an earlier unreleased candidate.
+- The verified candidate passed fresh-database and upgraded-database migration
+  checks while preserving legacy documents and 1024-dimensional embeddings.
+- Tagging, pushing, npm/Docker publication, and the GitHub Release remain
+  explicit release actions after CI and operator browser acceptance.
 
 ## [0.2.7] - 2026-07-11
 

@@ -1,7 +1,7 @@
 # Production Status Report
 
 > **Status:** RELEASE CANDIDATE — pending GitHub CI and operator browser acceptance
-> **Version:** v0.2.7
+> **Version:** v0.2.8
 > **Last verified:** 2026-07-12
 
 ## Verified release evidence
@@ -20,7 +20,7 @@
 | GraphRAG data | PASS — 8 ready 1024-dim embeddings, 52 nodes, 92 edges |
 | Tenant/security gates | PASS — invalid vectors 0, tenant leakage 0, explanation failures 0 |
 | Clean npm consumer | CI gate — pack/install SDK, CLI, and MCP from the public manifest |
-| Browser acceptance | OPERATOR — run manually at `http://localhost:57001` |
+| Browser acceptance | OPERATOR — run manually at `http://localhost:50701` |
 | Public release actions | NOT RUN — tag, push, npm/Docker publish, and GitHub Release remain explicit release steps |
 
 The live latency gate passed in the serialized candidate run (fast p95 411ms,
@@ -122,7 +122,9 @@ notes, logs, screenshots, or package artifacts.
 ## Release notes
 
 - The browser acceptance gate is intentionally manual for this release. Start the
-  local stack and verify `http://localhost:57001` before authorizing publication.
+  canonical local stack and verify `http://localhost:50701` before authorizing
+  publication. Its API is available at `http://localhost:50700`; alternate
+  candidate-stack ports are not part of the public release contract.
 - No tag, GitHub release, npm publish, Docker push, or Git push has been
   performed by this verification contour.
 - The reference PostgreSQL image includes the AGE and vector extensions required
