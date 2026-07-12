@@ -274,11 +274,11 @@ Reject missing `ownerId`, invalid UUIDs, unknown `source`, unknown schema versio
 
 ```ts
 export const QUEUE_NAMES = {
-  prepare: "hiai-docs:prepare:v1",
-  embed: "hiai-docs:embed:v1",
-  graph: "hiai-docs:graph:v1",
-  summarize: "hiai-docs:summarize:v1",
-  finalize: "hiai-docs:finalize:v1",
+  prepare: "hiai-docs-prepare-v1",
+  embed: "hiai-docs-embed-v1",
+  graph: "hiai-docs-graph-v1",
+  summarize: "hiai-docs-summarize-v1",
+  finalize: "hiai-docs-finalize-v1",
 } as const;
 
 export const SOURCE_PRIORITY = {
@@ -889,4 +889,3 @@ The implementation is complete only when all of the following are demonstrated w
 10. Local Ollama works with provider RPM limiting disabled and only worker concurrency protecting hardware.
 11. Remote-provider rate limits remain configurable without changing code.
 12. Fresh and upgraded PostgreSQL installations, Docker images, lint, typecheck, tests, and builds pass.
-

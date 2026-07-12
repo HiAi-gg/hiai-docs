@@ -5,12 +5,25 @@ import {
 	JOB_IDS,
 	prepareJobSchema,
 } from "../queue/contracts";
+import { QUEUE_NAMES } from "../queue/names";
 
 const documentId = "11111111-1111-4111-8111-111111111111";
 const ownerId = "22222222-2222-4222-8222-222222222222";
 const generationId = "33333333-3333-4333-8333-333333333333";
 
 describe("versioned queue contracts", () => {
+	test("uses BullMQ-valid queue names without Redis key separators", () => {
+		expect(Object.values(QUEUE_NAMES)).toEqual([
+			"hiai-docs-prepare-v1",
+			"hiai-docs-embed-v1",
+			"hiai-docs-graph-v1",
+			"hiai-docs-summarize-v1",
+			"hiai-docs-finalize-v1",
+		]);
+		expect(
+			Object.values(QUEUE_NAMES).every((name) => !name.includes(":")),
+		).toBe(true);
+	});
 	test("rejects missing owners, invalid UUIDs, sources, and schema versions", () => {
 		expect(
 			enqueueDocumentPipelineSchema.safeParse({

@@ -2,11 +2,11 @@ import type { JobsOptions } from "bullmq";
 import type { PipelineSource, PipelineStage } from "./contracts";
 
 export const QUEUE_NAMES = {
-	prepare: "hiai-docs:prepare:v1",
-	embed: "hiai-docs:embed:v1",
-	graph: "hiai-docs:graph:v1",
-	summarize: "hiai-docs:summarize:v1",
-	finalize: "hiai-docs:finalize:v1",
+	prepare: "hiai-docs-prepare-v1",
+	embed: "hiai-docs-embed-v1",
+	graph: "hiai-docs-graph-v1",
+	summarize: "hiai-docs-summarize-v1",
+	finalize: "hiai-docs-finalize-v1",
 } as const satisfies Record<PipelineStage, string>;
 
 export const SOURCE_PRIORITY = {
