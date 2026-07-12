@@ -200,6 +200,13 @@ let draggedDocId = $state<string | null>(null);
 // future call site (or a rapid successive drop) racing a still-running
 // persist and clobbering the optimistic zone state with stale data.
 let persistingFolders = $state(false);
+// Category reorders are optimistic and serialized. While a drag or a PATCH
+// batch is active, server refreshes must not replace the dndzone's working
+// array with an older order.
+let categoryDragActive = $state(false);
+let categoryOrderPending = $state(false);
+let categoryOrderGeneration = 0;
+let categoryOrderQueue: Promise<void> = Promise.resolve();
 let droppedOnHeader = false;
 
 let rootItems = $state<DndDoc[]>([]);
@@ -456,6 +463,7 @@ $effect(() => {
 	// Touch `folders`/`categories` so the effect re-runs when they change.
 	void folders;
 	void categories;
+	if (categoryDragActive || categoryOrderPending) return;
 	orderedBuckets = buckets.map((b) => ({
 		id: b.id,
 		category: b.category,
@@ -496,7 +504,17 @@ async function loadFolders() {
 
 async function loadCategories() {
 	try {
-		categories = (await listCategories()) as CategoryWithApiAccess[];
+		const loaded = (await listCategories()) as CategoryWithApiAccess[];
+		const ids = new Set<string>();
+		for (const category of loaded) {
+			if (ids.has(category.id)) {
+				throw new Error(
+					`Categories response contains duplicate id: ${category.id}`,
+				);
+			}
+			ids.add(category.id);
+		}
+		categories = loaded;
 	} catch (e) {
 		// Don't surface category-load failures as a hard error — the
 		// folder tree must still render even if the categories endpoint
@@ -1204,6 +1222,7 @@ type CategoryBucket = {
 function handleCategoryConsider(e: CustomEvent<DndEvent<CategoryBucket>>) {
 	e.stopPropagation();
 	isDraggingGlobal = true;
+	categoryDragActive = true;
 	orderedBuckets = sanitizeBuckets(e.detail.items);
 }
 
@@ -1212,19 +1231,70 @@ function handleCategoryFinalize(e: CustomEvent<DndEvent<CategoryBucket>>) {
 	const next = sanitizeBuckets(e.detail.items);
 	orderedBuckets = next;
 	isDraggingGlobal = false;
-	void persistCategoryOrder(next);
+	categoryDragActive = false;
+	queueCategoryOrder(next);
 }
 
 function sanitizeBuckets(raw: unknown): CategoryBucket[] {
 	if (!Array.isArray(raw)) return [];
-	return raw
-		.filter(
-			(item): item is CategoryBucket =>
-				item !== null &&
-				typeof item === "object" &&
-				typeof (item as { id?: unknown }).id === "string",
-		)
-		.map((b) => ({ id: b.id, category: b.category, folders: b.folders }));
+	const result: CategoryBucket[] = [];
+	const seen = new Set<string>();
+	for (const item of raw) {
+		if (
+			item === null ||
+			typeof item !== "object" ||
+			typeof (item as { id?: unknown }).id !== "string"
+		) {
+			continue;
+		}
+		const bucket = item as CategoryBucket;
+		// svelte-dnd-action can emit overlapping consider events while its
+		// shadow item is being reconciled with an external reactive update.
+		// Never hand a duplicate key to Svelte. This is deliberately limited
+		// to transient DnD input; duplicate ids from the API are rejected in
+		// loadCategories instead of being silently hidden.
+		if (seen.has(bucket.id)) {
+			console.warn(
+				"FolderTree: ignored duplicate category DnD item",
+				bucket.id,
+			);
+			continue;
+		}
+		seen.add(bucket.id);
+		result.push({
+			id: bucket.id,
+			category: bucket.category,
+			folders: bucket.folders,
+		});
+	}
+	return result;
+}
+
+function queueCategoryOrder(next: CategoryBucket[]) {
+	const generation = ++categoryOrderGeneration;
+	categoryOrderPending = true;
+	const snapshot = next.map((bucket) => ({ ...bucket }));
+	categoryOrderQueue = categoryOrderQueue
+		.catch(() => undefined)
+		.then(async () => {
+			try {
+				await persistCategoryOrder(snapshot);
+			} catch (err) {
+				console.error("FolderTree: category DnD persist failed", err);
+				setDndError(
+					err instanceof Error
+						? `Reorder failed: ${err.message}`
+						: "Reorder failed: unknown error",
+				);
+			} finally {
+				// A newer drag is already queued: do not let this older request's
+				// refresh overwrite its optimistic order.
+				if (generation === categoryOrderGeneration) {
+					await refresh();
+					categoryOrderPending = false;
+				}
+			}
+		});
 }
 
 async function persistCategoryOrder(next: CategoryBucket[]) {
@@ -1235,19 +1305,9 @@ async function persistCategoryOrder(next: CategoryBucket[]) {
 		updates.push({ id: bucket.category.id, order: index });
 	});
 	if (updates.length === 0) return;
-	try {
-		await Promise.all(
-			updates.map((u) => updateCategory(u.id, { order: u.order })),
-		);
-	} catch (err) {
-		console.error("FolderTree: category DnD persist failed", err);
-	} finally {
-		await refresh();
-		// Keep the per-category folder buckets in sync with the freshly
-		// reordered category list (same reasoning as in
-		// `persistFolderChanges`).
-		resyncBucketFolders();
-	}
+	await Promise.all(
+		updates.map((u) => updateCategory(u.id, { order: u.order })),
+	);
 }
 
 // --- Rename / delete (folders and documents) ---
