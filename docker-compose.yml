@@ -256,6 +256,10 @@ services:
       API_URL: http://api:${API_PORT:-50700}
       PORT: ${WEB_PORT:-50701}
       WEB_PORT: ${WEB_PORT:-50701}
+      # adapter-node defaults to 512 KiB. Keep the proxy envelope aligned
+      # with the API's 100 MiB global body cap; the API still enforces the
+      # 10 MiB per-file import limit.
+      BODY_SIZE_LIMIT: "104857600"
     networks:
       - hiai-docs-net
     deploy:

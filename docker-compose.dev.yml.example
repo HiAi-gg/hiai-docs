@@ -181,6 +181,9 @@ services:
       API_URL: http://api:${API_PORT:-50700}
       PORT: ${WEB_PORT:-50701}
       WEB_PORT: ${WEB_PORT:-50701}
+      # SvelteKit adapter-node rejects bodies over 512 KiB by default. Match
+      # the production proxy envelope so large valid imports reach the API.
+      BODY_SIZE_LIMIT: "104857600"
       NODE_ENV: development
 
 volumes:

@@ -321,6 +321,17 @@ describe("POST /api/documents/import — multipart path", () => {
     expect((res.body as any).error).toContain("Invalid file type");
   });
 
+  it("keeps the 10 MB per-file guard after the proxy envelope is raised", async () => {
+    const res = await multipartImport([
+      {
+        name: "too-large.md",
+        content: Buffer.alloc(10 * 1024 * 1024 + 1, 0x61),
+      },
+    ]);
+    expect(res.status).toBe(413);
+    expect((res.body as any).error).toContain("Maximum size: 10MB");
+  });
+
   it("accepts .txt, .md, .markdown, .json extensions", async () => {
     const res = await multipartImport([
       { name: "readme.txt", content: "plain text" },

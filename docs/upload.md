@@ -19,6 +19,13 @@ return the same response envelope so client code can stay uniform.
 
 Maximum file size: **10 MB** per file.
 
+The same-origin SvelteKit proxy accepts up to **100 MB per request** so a
+multipart batch can contain multiple files. The backend remains the source
+of truth: it rejects any individual file over 10 MB and rejects request bodies
+over 100 MB. This avoids the adapter-node default 512 KiB limit causing a
+generic `413 Payload Too Large` before the API can return the actionable
+per-file error.
+
 ## Single file (JSON path)
 
 ```http
