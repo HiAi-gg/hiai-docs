@@ -48,7 +48,7 @@ describe("pipeline recovery", () => {
 			{ now: new Date(1_000_000) },
 		);
 		expect(result).toEqual({ recovered: 1, exhausted: 0 });
-		expect(queued[0]?.jobId).toBe(`graph:${candidate.job.generationId}`);
+		expect(queued[0]?.jobId).toBe(`graph-${candidate.job.generationId}`);
 	});
 
 	test("marks exhausted runs without requeueing", async () => {

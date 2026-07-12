@@ -54,7 +54,7 @@ describe("document pipeline enqueue", () => {
 			deduplicated: true,
 		});
 		expect(jobs).toHaveLength(1);
-		expect(jobs[0]?.jobId).toBe(`prepare:${documentId}:${first.generationId}`);
+		expect(jobs[0]?.jobId).toBe(`prepare-${documentId}-${first.generationId}`);
 	});
 
 	test("never shares runs or jobs across owners", async () => {

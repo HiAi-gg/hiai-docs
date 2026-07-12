@@ -84,10 +84,10 @@ export type EnqueueDocumentPipelineInput = z.infer<
 
 export const JOB_IDS = {
 	prepare: (documentId: string, generationId: string) =>
-		`prepare:${documentId}:${generationId}`,
+		`prepare-${documentId}-${generationId}`,
 	embed: (generationId: string, batchIndex: number) =>
-		`embed:${generationId}:${batchIndex}`,
-	graph: (generationId: string) => `graph:${generationId}`,
-	summarize: (generationId: string) => `summary:${generationId}`,
-	finalize: (generationId: string) => `finalize:${generationId}`,
+		`embed-${generationId}-${batchIndex}`,
+	graph: (generationId: string) => `graph-${generationId}`,
+	summarize: (generationId: string) => `summary-${generationId}`,
+	finalize: (generationId: string) => `finalize-${generationId}`,
 } as const;

@@ -30,7 +30,7 @@ describe("legacy embedding queue migration", () => {
 
 	it("uses deterministic prepare IDs for restart-safe deduplication", () => {
 		expect(JOB_IDS.prepare(DOCUMENT_ID, GENERATION_ID)).toBe(
-			`prepare:${DOCUMENT_ID}:${GENERATION_ID}`,
+			`prepare-${DOCUMENT_ID}-${GENERATION_ID}`,
 		);
 	});
 });

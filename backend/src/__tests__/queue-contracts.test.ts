@@ -107,11 +107,20 @@ describe("versioned queue contracts", () => {
 
 	test("builds deterministic stage job identifiers", () => {
 		expect(JOB_IDS.prepare(documentId, generationId)).toBe(
-			`prepare:${documentId}:${generationId}`,
+			`prepare-${documentId}-${generationId}`,
 		);
-		expect(JOB_IDS.embed(generationId, 3)).toBe(`embed:${generationId}:3`);
-		expect(JOB_IDS.graph(generationId)).toBe(`graph:${generationId}`);
-		expect(JOB_IDS.summarize(generationId)).toBe(`summary:${generationId}`);
-		expect(JOB_IDS.finalize(generationId)).toBe(`finalize:${generationId}`);
+		expect(JOB_IDS.embed(generationId, 3)).toBe(`embed-${generationId}-3`);
+		expect(JOB_IDS.graph(generationId)).toBe(`graph-${generationId}`);
+		expect(JOB_IDS.summarize(generationId)).toBe(`summary-${generationId}`);
+		expect(JOB_IDS.finalize(generationId)).toBe(`finalize-${generationId}`);
+		expect(
+			[
+				JOB_IDS.prepare(documentId, generationId),
+				JOB_IDS.embed(generationId, 3),
+				JOB_IDS.graph(generationId),
+				JOB_IDS.summarize(generationId),
+				JOB_IDS.finalize(generationId),
+			].every((id) => !id.includes(":")),
+		).toBe(true);
 	});
 });

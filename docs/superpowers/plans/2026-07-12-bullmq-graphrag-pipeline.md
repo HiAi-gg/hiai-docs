@@ -263,7 +263,7 @@ git commit -m "feat(db): track document pipeline stages"
 
 **Interfaces:**
 - Produces: `enqueueDocumentPipeline(input): Promise<{ generationId: string; deduplicated: boolean }>`.
-- Produces deterministic job IDs: `prepare:{documentId}:{generationId}`, `embed:{generationId}:{batchIndex}`, `graph:{generationId}`, `summary:{generationId}`, `finalize:{generationId}`.
+- Produces deterministic BullMQ-safe job IDs: `prepare-{documentId}-{generationId}`, `embed-{generationId}-{batchIndex}`, `graph-{generationId}`, `summary-{generationId}`, `finalize-{generationId}`.
 - Preserves `enqueueEmbedding(documentId): Promise<boolean>` as a one-release compatibility wrapper.
 
 - [ ] **Step 1: Write Zod contract tests**
