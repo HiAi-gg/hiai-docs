@@ -192,7 +192,7 @@ function toggleCollapse() {
           <SettingsIcon class="size-4" />
         </button>
         <a
-          href="https://hiai.gg/docs"
+          href="https://github.com/HiAi-gg/hiai-docs/"
           target="_blank"
           rel="noopener noreferrer"
           class="text-xs text-muted-foreground hover:text-foreground transition-colors"
@@ -204,7 +204,7 @@ function toggleCollapse() {
     {:else}
       <div class="flex items-center justify-between">
         <a
-          href="https://hiai.gg/docs"
+          href="https://github.com/HiAi-gg/hiai-docs/"
           target="_blank"
           rel="noopener noreferrer"
           class="text-xs text-muted-foreground hover:text-foreground transition-colors"
