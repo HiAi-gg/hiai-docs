@@ -232,6 +232,13 @@
 			"when": 1785000000018,
 			"tag": "0032_unique_sibling_folder_names",
 			"breakpoints": true
+		},
+		{
+			"idx": 33,
+			"version": "7",
+			"when": 1785000000019,
+			"tag": "0033_bound_document_search_vectors",
+			"breakpoints": true
     }
   ]
 }

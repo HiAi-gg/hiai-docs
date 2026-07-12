@@ -18,11 +18,14 @@ return the same response envelope so client code can stay uniform.
 | `.docx`                  | mammoth → Markdown    | DOCX is converted to Markdown; title is the filename minus `.docx`. |
 
 Maximum file size: **10 MB** per file.
+Maximum batch size: **10 files** and **50 MB** of file data. Converted content
+(notably DOCX, which can expand while parsing) is capped at **25 MB** per file.
 
 The same-origin SvelteKit proxy accepts up to **100 MB per request** so a
-multipart batch can contain multiple files. The backend remains the source
-of truth: it rejects any individual file over 10 MB and rejects request bodies
-over 100 MB. This avoids the adapter-node default 512 KiB limit causing a
+multipart batch can reach the backend. The backend remains the source of truth:
+it applies the stricter 10-file / 50 MB batch envelope before processing, as
+well as the per-file and converted-content limits above. This avoids the
+adapter-node default 512 KiB limit causing a
 generic `413 Payload Too Large` before the API can return the actionable
 per-file error.
 
@@ -128,13 +131,18 @@ immediately. Re-embedding is idempotent — running
 [Re-embedding Backfill](#re-embedding-backfill)) refreshes the vectors
 without producing duplicates.
 
+Full document content remains available to chunking and embeddings. PostgreSQL
+lexical search strips inline `data:` image payloads and indexes a bounded text
+prefix so large supported documents cannot exceed PostgreSQL's 1 MiB `tsvector`
+limit.
+
 ## Errors
 
 | Status | When |
 | ------ | ---- |
 | `400` | Invalid JSON body (Zod validation), or empty multipart body. |
 | `403` | CSRF middleware blocks the request (missing/invalid token). |
-| `413` | A single file exceeds 10 MB. |
+| `413` | A file exceeds 10 MB, converted content exceeds 25 MB, or a batch exceeds 10 files / 50 MB. |
 | `415` | An unsupported file extension or content type. |
 | `422` | DOCX parsing failed (corrupt file, encrypted document). |
 | `429` | Per-IP rate limit exceeded. |

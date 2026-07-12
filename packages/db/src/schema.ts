@@ -202,10 +202,10 @@ export const documents = pgTable(
       .notNull(),
     metadataChangedAt: timestamp("metadata_changed_at"),
     searchVector: tsvector("search_vector").generatedAlwaysAs(
-      sql`to_tsvector('english', COALESCE(title, '') || ' ' || COALESCE(content, ''))`
+      sql`to_tsvector('english', left(COALESCE(title, '') || ' ' || regexp_replace(COALESCE(content, ''), 'data:[^[:space:])>]+', ' ', 'g'), 200000))`
     ),
     searchVectorSimple: tsvector("search_vector_simple").generatedAlwaysAs(
-      sql`to_tsvector('simple', COALESCE(title, '') || ' ' || COALESCE(content, ''))`
+      sql`to_tsvector('simple', left(COALESCE(title, '') || ' ' || regexp_replace(COALESCE(content, ''), 'data:[^[:space:])>]+', ' ', 'g'), 200000))`
     ),
     embeddingStatus: embeddingStatusEnum("embedding_status").notNull().default("pending"),
     activeEmbeddingGeneration: uuid("active_embedding_generation"),

@@ -72,6 +72,51 @@ const ALLOWED_IMPORT_EXTENSIONS = [
 	".docx",
 ];
 const MAX_IMPORT_SIZE = 10 * 1024 * 1024;
+const MAX_IMPORT_FILES = 10;
+const MAX_IMPORT_REQUEST_SIZE = 50 * 1024 * 1024;
+const MAX_EXTRACTED_CONTENT_SIZE = 25 * 1024 * 1024;
+
+class ImportInputError extends Error {
+	constructor(
+		message: string,
+		readonly status: 413 | 422,
+	) {
+		super(message);
+		this.name = "ImportInputError";
+	}
+}
+
+function assertImportContentSize(content: string, filename: string): void {
+	const size = Buffer.byteLength(content, "utf8");
+	if (size > MAX_EXTRACTED_CONTENT_SIZE) {
+		throw new ImportInputError(
+			`Extracted content from "${filename}" is too large. Maximum size: ${MAX_EXTRACTED_CONTENT_SIZE / 1024 / 1024}MB`,
+			413,
+		);
+	}
+}
+
+function importErrorDetails(err: unknown): {
+	name: string;
+	message: string;
+	code?: string;
+} {
+	if (!(err instanceof Error)) {
+		return { name: "UnknownError", message: "Non-error import failure" };
+	}
+	const cause = err.cause;
+	if (cause instanceof Error) {
+		return {
+			name: cause.name,
+			message: cause.message,
+			code:
+				"code" in cause && typeof cause.code === "string"
+					? cause.code
+					: undefined,
+		};
+	}
+	return { name: err.name, message: err.message };
+}
 
 const importJsonSchema = z.object({
 	title: z.string().min(1).max(500).optional(),
@@ -104,6 +149,7 @@ async function importFileToItem(file: File): Promise<{
 		const arrayBuffer = await file.arrayBuffer();
 		const buffer = Buffer.from(arrayBuffer);
 		const content = await docxToMarkdown(buffer, name);
+		assertImportContentSize(content, name);
 		return {
 			title: name.replace(/\.docx$/i, ""),
 			content,
@@ -118,12 +164,14 @@ async function importFileToItem(file: File): Promise<{
 				`Invalid JSON format in "${name}": ${JSON.stringify(jsonParsed.error.flatten())}`,
 			);
 		}
+		assertImportContentSize(jsonParsed.data.content, name);
 		return {
 			title: jsonParsed.data.title ?? name.replace(/\.json$/i, ""),
 			content: jsonParsed.data.content,
 		};
 	}
 	const text = await file.text();
+	assertImportContentSize(text, name);
 	return {
 		title: name.replace(/\.(md|txt|markdown)$/i, ""),
 		content: text,
@@ -1003,6 +1051,16 @@ export const documentRoutes = new Elysia({ prefix: "/api" })
 		const userId = ctx.userId;
 		try {
 			const contentType = request.headers.get("content-type") ?? "";
+			const contentLength = Number(request.headers.get("content-length"));
+			if (
+				Number.isFinite(contentLength) &&
+				contentLength > MAX_IMPORT_REQUEST_SIZE
+			) {
+				set.status = 413;
+				return {
+					error: `Import request too large. Maximum total size: ${MAX_IMPORT_REQUEST_SIZE / 1024 / 1024}MB`,
+				};
+			}
 
 			// Per-item import result. `filename` is captured from the
 			// uploaded `File.name` for multipart uploads, and synthesized
@@ -1028,6 +1086,7 @@ export const documentRoutes = new Elysia({ prefix: "/api" })
 					};
 				}
 				const jsonTitle = parsed.data.title ?? "Imported Document";
+				assertImportContentSize(parsed.data.content, `${jsonTitle}.md`);
 				items = [
 					{
 						filename: `${jsonTitle}.md`,
@@ -1045,6 +1104,19 @@ export const documentRoutes = new Elysia({ prefix: "/api" })
 				if (files.length === 0) {
 					set.status = 400;
 					return { error: "At least one file is required" };
+				}
+				if (files.length > MAX_IMPORT_FILES) {
+					set.status = 413;
+					return {
+						error: `Too many files. Maximum per import: ${MAX_IMPORT_FILES}`,
+					};
+				}
+				const totalFileSize = files.reduce((sum, file) => sum + file.size, 0);
+				if (totalFileSize > MAX_IMPORT_REQUEST_SIZE) {
+					set.status = 413;
+					return {
+						error: `Import request too large. Maximum total size: ${MAX_IMPORT_REQUEST_SIZE / 1024 / 1024}MB`,
+					};
 				}
 				const rawFolderId = formData.get("folderId");
 				if (rawFolderId !== null && rawFolderId !== undefined) {
@@ -1181,6 +1253,10 @@ export const documentRoutes = new Elysia({ prefix: "/api" })
 				failed: 0,
 			};
 		} catch (err: unknown) {
+			if (err instanceof ImportInputError) {
+				set.status = err.status;
+				return { error: err.message };
+			}
 			// DOCX parsing failures are user-actionable (bad file, encrypted
 			// doc) so we surface them as 422 with a descriptive message
 			// rather than collapsing them into a generic 500.
@@ -1192,7 +1268,18 @@ export const documentRoutes = new Elysia({ prefix: "/api" })
 				set.status = 422;
 				return { error: err.message };
 			}
-			logger.error({ err }, "Failed to import document");
+			const details = importErrorDetails(err);
+			logger.error({ importError: details }, "Failed to import document");
+			if (
+				details.code === "54000" ||
+				details.message.includes("string is too long for tsvector")
+			) {
+				set.status = 422;
+				return {
+					error:
+						"Document text is too large for the search index. Remove embedded data images or split the document.",
+				};
+			}
 			set.status = 500;
 			return { error: "Failed to import document" };
 		}

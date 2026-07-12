@@ -332,6 +332,28 @@ describe("POST /api/documents/import — multipart path", () => {
     expect((res.body as any).error).toContain("Maximum size: 10MB");
   });
 
+  it("rejects batches above the 10-file processing cap", async () => {
+    const files = Array.from({ length: 11 }, (_, index) => ({
+      name: `batch-${index}.md`,
+      content: `# Item ${index}`,
+    }));
+    const res = await multipartImport(files);
+    expect(res.status).toBe(413);
+    expect((res.body as any).error).toBe(
+      "Too many files. Maximum per import: 10",
+    );
+  });
+
+  it("accepts documents larger than PostgreSQL's raw tsvector input limit", async () => {
+    const largeMarkdown = `${"searchable paragraph\n\n".repeat(60_000)}\n`;
+    expect(Buffer.byteLength(largeMarkdown)).toBeGreaterThan(1_048_575);
+    const res = await multipartImport([
+      { name: "large-supported.md", content: largeMarkdown },
+    ]);
+    expect(res.status).toBe(201);
+    expect((res.body as any).imported).toBe(1);
+  });
+
   it("accepts .txt, .md, .markdown, .json extensions", async () => {
     const res = await multipartImport([
       { name: "readme.txt", content: "plain text" },
