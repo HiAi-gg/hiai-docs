@@ -57,6 +57,11 @@ Open the application at **http://localhost:50701**. The API health endpoint is
 **http://localhost:50700/api/health**. For Ollama, the host must already have
 the selected models (`ollama pull bge-m3` and `ollama pull qwen3:8b`).
 
+These are the canonical public localhost ports. In Docker, `WEB_PORT` and
+`API_PORT` remap only the published host side; containers always listen on
+`50701` and `50700`, and web reaches API at `http://api:50700`. A custom web
+host port also requires matching `CORS_ORIGINS` and public auth URL values.
+
 For a public domain after the local check, enable the bundled Caddy profile:
 
 ```bash

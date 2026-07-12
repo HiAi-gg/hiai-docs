@@ -203,6 +203,9 @@ jobs:
       - name: Validate docker compose
         run: docker compose config --quiet
 
+      - name: Validate canonical container ports
+        run: sh scripts/check-compose-port-contract.sh
+
       # B) Set up buildx with GitHub Actions cache
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
