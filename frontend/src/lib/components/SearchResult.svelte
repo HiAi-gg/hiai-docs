@@ -128,9 +128,6 @@ function highlightText(text: string, q: string): string {
   {#if explanations.length > 0}
     <div class="mt-3 flex flex-wrap gap-1.5" aria-label="Search match explanations">
       {#each explanations.slice(0, 3) as explanation, index (index)}
-=======
-      {#each explanations.slice(0, 3) as explanation (explanation.channel)}
->>>>>>> theirs
         <span class="inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
           {explanation.label}
         </span>

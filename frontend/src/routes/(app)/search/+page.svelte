@@ -804,11 +804,6 @@ function goToPage(page: number) {
 				explanations={result.explanations}
 				chunks={result.chunks}
 			/>
-=======
-          query={data.query}
-          explanations={result.explanations ?? []}
-        />
->>>>>>> theirs
       {/each}
     </div>
 
