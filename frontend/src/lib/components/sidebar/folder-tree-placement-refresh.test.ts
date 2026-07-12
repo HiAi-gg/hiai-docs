@@ -41,9 +41,7 @@ describe("FolderTree placement refresh", () => {
 	});
 
 	test("sidebar moves supersede an acknowledged editor placement", () => {
-		expect(folderTree).toContain("supersedePendingDocumentPlacement(item.id)");
-		expect(folderTree).toContain(
-			"supersedePendingDocumentPlacement(draggedDocId)",
-		);
+		expect(folderTree).toContain("publishDocumentPlacement(");
+		expect(folderTree).toContain("acknowledgeDocumentPlacement(");
 	});
 });
