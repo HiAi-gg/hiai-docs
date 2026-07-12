@@ -95,7 +95,7 @@ async function copyKey(key: ApiKeySummary) {
 <div class="space-y-5 rounded-lg border border-border bg-card p-6">
 	<div>
 		<h2 class="text-lg font-medium">API</h2>
-		<p class="text-sm text-muted-foreground">Create a user-wide key or review category-scoped access. Raw keys are shown once.</p>
+		<p class="text-sm text-muted-foreground">Create a user-wide key or review category-scoped access. Global keys are shown once.</p>
 	</div>
 	<div class="flex gap-2">
 		<Input aria-label="Global API key name" bind:value={keyName} />
@@ -112,26 +112,21 @@ async function copyKey(key: ApiKeySummary) {
 	{#if loading}
 		<p class="text-sm text-muted-foreground">Loading API access…</p>
 	{:else}
-		<section class="space-y-2">
-			<h3 class="text-sm font-semibold">Global keys</h3>
-			{#each globalKeys as key (key.id)}
-				<div class="flex items-center justify-between rounded-md border p-3 text-sm">
-					<div><div class="font-medium">{key.name}</div><div class="text-muted-foreground">{key.prefix}…</div></div>
-					<Button size="sm" variant="destructive" onclick={() => revoke(key.id)} disabled={busy}>Revoke</Button>
-				</div>
-			{:else}<p class="text-sm text-muted-foreground">No global API keys.</p>{/each}
-		</section>
-		<section class="space-y-2">
-			<h3 class="text-sm font-semibold">Category API access</h3>
-			{#each categories.filter((category) => category.apiMode !== "unavailable") as category (category.id)}
-				<div class="rounded-md border p-3 text-sm">
-					<div class="font-medium">{category.name}</div>
-					<div class="text-muted-foreground">{category.apiMode === "category" ? "Category key" : "Global key"} · {[
-						category.apiPermissionRead && "read", category.apiPermissionEdit && "edit", category.apiPermissionWrite && "write"
-					].filter(Boolean).join(" / ")}</div>
-				</div>
-			{/each}
-			<div class="max-h-72 space-y-2 overflow-y-auto pr-1">
+		<div
+			class="max-h-72 space-y-5 overflow-y-auto pr-1"
+			aria-label="API key management list"
+		>
+			<section class="space-y-2">
+				<h3 class="text-sm font-semibold">Global keys</h3>
+				{#each globalKeys as key (key.id)}
+					<div class="flex items-center justify-between rounded-md border p-3 text-sm">
+						<div><div class="font-medium">{key.name}</div><div class="text-muted-foreground">{key.prefix}…</div></div>
+						<Button size="sm" variant="destructive" onclick={() => revoke(key.id)} disabled={busy}>Revoke</Button>
+					</div>
+				{:else}<p class="text-sm text-muted-foreground">No global API keys.</p>{/each}
+			</section>
+			<section class="space-y-2">
+				<h3 class="text-sm font-semibold">Category keys</h3>
 				{#each categoryKeys as key (key.id)}
 					<div class="flex items-center justify-between gap-3 rounded-md border border-dashed p-3 text-sm">
 						<div><div class="font-medium">{categoryName(categoryIdFromScopes(key.scopes))}: {key.name}</div><div class="text-muted-foreground">{key.prefix}… · {key.scopes.map((scope) => scope.split(":").at(-1)).join(" / ")}</div></div>
@@ -140,8 +135,8 @@ async function copyKey(key: ApiKeySummary) {
 							<Button size="sm" variant="destructive" onclick={() => revoke(key.id)} disabled={busy}>Revoke</Button>
 						</div>
 					</div>
-				{/each}
-			</div>
-		</section>
+				{:else}<p class="text-sm text-muted-foreground">No category API keys.</p>{/each}
+			</section>
+		</div>
 	{/if}
 </div>
