@@ -82,12 +82,28 @@ describe("pipeline worker lifecycle", () => {
 					return worker(events, "embed");
 				},
 			},
+			queues: {
+				prepare: {
+					async pause() {},
+					async resume() {
+						events.push("prepare:resume");
+					},
+				},
+				embed: {
+					async pause() {},
+					async resume() {
+						events.push("embed:resume");
+					},
+				},
+			},
 			async closeQueues() {
 				events.push("queues:close");
 			},
 		});
 		expect(events).toEqual([
 			"recover",
+			"prepare:resume",
+			"embed:resume",
 			"prepare:factory",
 			"prepare:ready",
 			"embed:factory",
@@ -104,6 +120,9 @@ describe("pipeline worker lifecycle", () => {
 			workerFactories: { embed: () => worker(events, "embed") },
 			queues: {
 				embed: {
+					async resume() {
+						events.push("queue:resume");
+					},
 					async pause() {
 						events.push("queue:pause");
 					},
@@ -116,6 +135,7 @@ describe("pipeline worker lifecycle", () => {
 				events.push("connections:close");
 			},
 		});
+		expect(events).toContain("queue:resume");
 		events.length = 0;
 		await runtime.close();
 		expect(events).toEqual([

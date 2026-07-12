@@ -33,6 +33,7 @@ export interface ManagedPipelineWorker {
 
 export interface ManagedPipelineQueue {
 	pause(): Promise<void>;
+	resume(): Promise<void>;
 }
 
 export type PipelineWorkerFactory = () =>
@@ -185,6 +186,13 @@ export async function startPipelineWorkers(
 	options: StartPipelineWorkersOptions,
 ): Promise<PipelineRuntime> {
 	await options.recover();
+
+	// Queue pause state is durable in Redis. A previous graceful shutdown may
+	// therefore leave every queue paused across container restarts. Resume all
+	// registered queues before workers start claiming jobs.
+	await Promise.all(
+		Object.values(options.queues ?? {}).map((queue) => queue.resume()),
+	);
 
 	const workers = new Map<PipelineStage, ManagedPipelineWorker>();
 	try {
