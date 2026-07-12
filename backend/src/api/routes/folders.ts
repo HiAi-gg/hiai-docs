@@ -1,8 +1,9 @@
-import { documents, folders } from "@hiai-docs/db/schema";
+import { categories, documents, folders } from "@hiai-docs/db/schema";
 import { and, eq, isNull, sql } from "drizzle-orm";
 import { Elysia } from "elysia";
 import { z } from "zod";
 import { invalidateDocListCache } from "../../lib/doc-cache";
+import { nextAvailableFolderName } from "../../lib/folder-name";
 import { logger } from "../../lib/logger";
 import { reembedDocsInFolder } from "../../lib/reembed";
 import { withTenant } from "../../lib/with-tenant";
@@ -15,6 +16,7 @@ const createFolderSchema = z.object({
 	// `parentId: null` for root-level folders (the previous `.optional()`
 	// rejected `null` with a 400).
 	parentId: z.string().uuid().nullish(),
+	categoryId: z.string().uuid().nullish(),
 });
 
 const updateFolderSchema = z.object({
@@ -216,6 +218,8 @@ export const folderRoutes = new Elysia({ prefix: "/api/folders" })
 		}
 		try {
 			const created = await withTenant(ctx, async (tx) => {
+				const parentId = parsed.data.parentId ?? null;
+				const categoryId = parentId ? null : (parsed.data.categoryId ?? null);
 				if (parsed.data.parentId) {
 					const parent = await tx
 						.select({ id: folders.id })
@@ -231,12 +235,56 @@ export const folderRoutes = new Elysia({ prefix: "/api/folders" })
 						return { notFound: true as const };
 					}
 				}
+				if (categoryId) {
+					const category = await tx
+						.select({ id: categories.id })
+						.from(categories)
+						.where(
+							and(
+								eq(categories.id, categoryId),
+								eq(categories.ownerId, userId),
+							),
+						)
+						.limit(1);
+					if (category.length === 0) {
+						return { categoryNotFound: true as const };
+					}
+				}
+
+				// Serialize allocation within this exact sibling scope. The database
+				// indexes added in migration 0032 are the final race-safety backstop.
+				const scopeKey = parentId
+					? `${userId}:parent:${parentId}`
+					: `${userId}:category:${categoryId ?? "none"}`;
+				await tx.execute(
+					sql`SELECT pg_advisory_xact_lock(hashtextextended(${scopeKey}, 0))`,
+				);
+				const scopeConditions = [eq(folders.ownerId, userId)];
+				if (parentId) {
+					scopeConditions.push(eq(folders.parentId, parentId));
+				} else {
+					scopeConditions.push(isNull(folders.parentId));
+					scopeConditions.push(
+						categoryId
+							? eq(folders.categoryId, categoryId)
+							: isNull(folders.categoryId),
+					);
+				}
+				const siblings = await tx
+					.select({ name: folders.name })
+					.from(folders)
+					.where(and(...scopeConditions));
+				const allocatedName = nextAvailableFolderName(
+					parsed.data.name,
+					siblings.map((s) => s.name),
+				);
 				const [row] = await tx
 					.insert(folders)
 					.values({
 						ownerId: userId,
-						name: parsed.data.name,
-						parentId: parsed.data.parentId ?? null,
+						name: allocatedName,
+						parentId,
+						categoryId,
 					})
 					.returning();
 				return { row };
@@ -244,6 +292,10 @@ export const folderRoutes = new Elysia({ prefix: "/api/folders" })
 			if ("notFound" in created) {
 				set.status = 404;
 				return { error: "Parent folder not found" };
+			}
+			if ("categoryNotFound" in created) {
+				set.status = 404;
+				return { error: "Category not found" };
 			}
 			set.status = 201;
 			return created.row;

@@ -13,9 +13,9 @@ import {
 } from "bun:test";
 import {
   API_KEY,
-  OWNER_ID,
   getState,
   noAuthHeaders,
+	OWNER_ID,
   ownerHeaders,
   request,
   resetState,
@@ -169,6 +169,12 @@ describe("GET /api/folders/:id", () => {
 });
 
 describe("POST /api/folders", () => {
+	const CATEGORY_A = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+	const CATEGORY_B = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+
+	function addCategory(id: string, name: string) {
+		getState().categories.set(id, { id, ownerId: OWNER_ID, name });
+	}
   it("returns 403 from CSRF middleware on POST without Bearer or CSRF token", async () => {
     const res = await request(app, "/api/folders", {
       method: "POST",
@@ -228,6 +234,83 @@ describe("POST /api/folders", () => {
     expect(res.status).toBe(201);
     expect((res.body as any).parentId).toBe(parentId);
   });
+
+	it("numbers duplicate uncategorized root folders and fills suffix gaps", async () => {
+		for (const name of ["Plans", "Plans 2", "Plans 4"]) {
+			const created = await authedPost("/api/folders", { name });
+			expect(created.status).toBe(201);
+		}
+		const duplicate = await authedPost("/api/folders", { name: "Plans" });
+		expect(duplicate.status).toBe(201);
+		expect((duplicate.body as any).name).toBe("Plans 3");
+	});
+
+	it("numbers duplicates only within the same category scope", async () => {
+		addCategory(CATEGORY_A, "Category A");
+		addCategory(CATEGORY_B, "Category B");
+
+		const firstA = await authedPost("/api/folders", {
+			name: "Assets",
+			categoryId: CATEGORY_A,
+		});
+		const secondA = await authedPost("/api/folders", {
+			name: "Assets",
+			categoryId: CATEGORY_A,
+		});
+		const firstB = await authedPost("/api/folders", {
+			name: "Assets",
+			categoryId: CATEGORY_B,
+		});
+
+		expect((firstA.body as any).name).toBe("Assets");
+		expect((firstA.body as any).categoryId).toBe(CATEGORY_A);
+		expect((secondA.body as any).name).toBe("Assets 2");
+		expect((firstB.body as any).name).toBe("Assets");
+	});
+
+	it("numbers duplicates only within the same parent scope", async () => {
+		const state = getState();
+		const parentA = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
+		const parentB = "dddddddd-dddd-4ddd-8ddd-dddddddddddd";
+		state.folders.set(parentA, {
+			id: parentA,
+			ownerId: OWNER_ID,
+			name: "A",
+			parentId: null,
+		});
+		state.folders.set(parentB, {
+			id: parentB,
+			ownerId: OWNER_ID,
+			name: "B",
+			parentId: null,
+		});
+
+		const firstA = await authedPost("/api/folders", {
+			name: "Drafts",
+			parentId: parentA,
+		});
+		const secondA = await authedPost("/api/folders", {
+			name: "Drafts",
+			parentId: parentA,
+		});
+		const firstB = await authedPost("/api/folders", {
+			name: "Drafts",
+			parentId: parentB,
+		});
+
+		expect((firstA.body as any).name).toBe("Drafts");
+		expect((secondA.body as any).name).toBe("Drafts 2");
+		expect((firstB.body as any).name).toBe("Drafts");
+	});
+
+	it("rejects an unknown category", async () => {
+		const res = await authedPost("/api/folders", {
+			name: "Plans",
+			categoryId: CATEGORY_A,
+		});
+		expect(res.status).toBe(404);
+		expect(res.body).toEqual({ error: "Category not found" });
+	});
 });
 
 describe("PATCH /api/folders/:id", () => {
