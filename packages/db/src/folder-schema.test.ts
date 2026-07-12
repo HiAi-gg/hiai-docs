@@ -13,15 +13,11 @@ const journal = JSON.parse(
 ) as { entries: Array<{ idx: number; tag: string }> };
 
 describe("sibling folder name migration", () => {
-	it("normalizes legacy duplicates before creating scoped unique indexes", () => {
+	it("normalizes legacy duplicates without constraining later moves", () => {
 		expect(migration).toContain("row_number() OVER");
 		expect(migration).toContain("duplicate_number > 1");
-		expect(migration).toContain("folders_unique_child_name_idx");
-		expect(migration).toContain("folders_unique_root_category_name_idx");
-		expect(migration).toContain("folders_unique_root_uncategorized_name_idx");
-		expect(migration.indexOf("UPDATE public.folders")).toBeLessThan(
-			migration.indexOf('CREATE UNIQUE INDEX "folders_unique_child_name_idx"'),
-		);
+		expect(migration).toContain("UPDATE public.folders");
+		expect(migration).not.toContain("CREATE UNIQUE INDEX");
 	});
 
 	it("is the latest journaled migration", () => {

@@ -251,8 +251,9 @@ export const folderRoutes = new Elysia({ prefix: "/api/folders" })
 					}
 				}
 
-				// Serialize allocation within this exact sibling scope. The database
-				// indexes added in migration 0032 are the final race-safety backstop.
+				// Serialize allocation within this exact sibling scope. A database
+				// uniqueness constraint is intentionally avoided because category deletion
+				// uses ON DELETE SET NULL and folder moves remain independently editable.
 				const scopeKey = parentId
 					? `${userId}:parent:${parentId}`
 					: `${userId}:category:${categoryId ?? "none"}`;

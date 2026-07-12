@@ -150,15 +150,6 @@ export const folders = pgTable(
     index("folders_owner_id_idx").on(table.ownerId),
     index("folders_parent_id_idx").on(table.parentId),
     index("folders_category_id_idx").on(table.categoryId),
-    uniqueIndex("folders_unique_child_name_idx")
-      .on(table.ownerId, table.parentId, table.name)
-      .where(sql`${table.parentId} IS NOT NULL`),
-    uniqueIndex("folders_unique_root_category_name_idx")
-      .on(table.ownerId, table.categoryId, table.name)
-      .where(sql`${table.parentId} IS NULL AND ${table.categoryId} IS NOT NULL`),
-    uniqueIndex("folders_unique_root_uncategorized_name_idx")
-      .on(table.ownerId, table.name)
-      .where(sql`${table.parentId} IS NULL AND ${table.categoryId} IS NULL`),
   ]
 );
 

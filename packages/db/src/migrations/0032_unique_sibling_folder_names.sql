@@ -50,16 +50,4 @@ BEGIN
     WHERE id = duplicate_row.id;
   END LOOP;
 END
-$$;--> statement-breakpoint
-
-CREATE UNIQUE INDEX "folders_unique_child_name_idx"
-  ON public.folders (owner_id, parent_id, name)
-  WHERE parent_id IS NOT NULL;--> statement-breakpoint
-
-CREATE UNIQUE INDEX "folders_unique_root_category_name_idx"
-  ON public.folders (owner_id, category_id, name)
-  WHERE parent_id IS NULL AND category_id IS NOT NULL;--> statement-breakpoint
-
-CREATE UNIQUE INDEX "folders_unique_root_uncategorized_name_idx"
-  ON public.folders (owner_id, name)
-  WHERE parent_id IS NULL AND category_id IS NULL;
+$$;

@@ -47,7 +47,7 @@ describe("config schema", () => {
 			expect(result.data.EMBEDDING_FALLBACK_BASE_URL).toBeUndefined();
 			expect(result.data.EMBEDDING_FALLBACK_API_KEY).toBeUndefined();
 			expect(result.data.EMBEDDING_FALLBACK_MODEL).toBeUndefined();
-		expect(result.data.STORAGE_PORT).toBe(50702);
+			expect(result.data.STORAGE_PORT).toBe(50702);
 		}
 	});
 
