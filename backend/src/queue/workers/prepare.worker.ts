@@ -5,6 +5,7 @@ import {
 	DEFAULT_EMBED_CHUNKS_PER_JOB,
 	type EmbedBatchJob,
 	JOB_IDS,
+	type PipelineJob,
 	type PrepareJob,
 	prepareJobSchema,
 } from "../contracts";
@@ -25,10 +26,19 @@ export interface PrepareWorkerDependencies {
 			chunkEnd: number;
 		}>;
 	}): Promise<"prepared" | "duplicate" | "stale">;
+	/**
+	 * Finalize a generation that has no chunks. Empty documents still need to
+	 * leave the durable pipeline state, rather than waiting forever in embed.
+	 */
+	completeEmpty(job: PrepareJob): Promise<void>;
 	markStale(job: PrepareJob, errorCode: string): Promise<void>;
 	claimPendingBatches(job: PrepareJob, limit: number): Promise<EmbedBatchJob[]>;
 	enqueueEmbed(
 		data: EmbedBatchJob,
+		options: typeof DEFAULT_JOB_OPTIONS & { jobId: string; priority: number },
+	): Promise<unknown>;
+	enqueueGraph(
+		data: PipelineJob,
 		options: typeof DEFAULT_JOB_OPTIONS & { jobId: string; priority: number },
 	): Promise<unknown>;
 }
@@ -62,6 +72,18 @@ export async function processPrepareJob(
 	if (state !== "prepared") {
 		if (state === "stale") await deps.markStale(job, "stale_prepare");
 		return { status: state, batches: batches.length };
+	}
+	if (batches.length === 0) {
+		await deps.completeEmpty(job);
+		await deps.enqueueGraph(
+			{ ...job, stage: "graph" },
+			{
+				...DEFAULT_JOB_OPTIONS,
+				jobId: JOB_IDS.graph(job.generationId),
+				priority: SOURCE_PRIORITY[job.source],
+			},
+		);
+		return { status: "prepared", batches: 0 };
 	}
 	const initial = await deps.claimPendingBatches(job, maxActiveBatches);
 	await Promise.all(

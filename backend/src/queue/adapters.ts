@@ -263,8 +263,47 @@ export function createPipelineStageDependencies(
 					return "prepared" as const;
 				});
 			},
+			async completeEmpty(job) {
+				await withTenant(admin, async (tx) => {
+					// A zero-chunk generation is still the newest source of truth.
+					// Activate it without inventing a vector/profile, remove any
+					// previous generation rows, and leave downstream optional stages
+					// to mark themselves skipped.
+					await tx
+						.delete(documentEmbeddings)
+						.where(eq(documentEmbeddings.documentId, job.documentId));
+					await tx
+						.update(documents)
+						.set({
+							activeEmbeddingGeneration: job.generationId,
+							pendingEmbeddingGeneration: null,
+							embeddingProfile: null,
+							embeddingStatus: "ready",
+							embeddingErrorCode: null,
+							embeddingUpdatedAt: new Date(),
+						})
+						.where(
+							and(
+								eq(documents.id, job.documentId),
+								eq(documents.ownerId, job.ownerId),
+								eq(documents.pendingEmbeddingGeneration, job.generationId),
+							),
+						);
+					await tx
+						.update(documentPipelineRuns)
+						.set({
+							embedStatus: "skipped",
+							completedBatches: 0,
+							updatedAt: new Date(),
+						})
+						.where(eq(documentPipelineRuns.generationId, job.generationId));
+				});
+			},
 			enqueueEmbed(data, options) {
 				return queue("embed").add("embed", data, options);
+			},
+			enqueueGraph(data, options) {
+				return queue("graph").add("graph", data, options);
 			},
 		},
 		embed: {
@@ -441,6 +480,14 @@ export function createPipelineStageDependencies(
 			},
 			setGraphStatus: (generationId, status, errorCode) =>
 				setStageStatus(generationId, "graph", status, errorCode),
+			async enqueueSummarize(job) {
+				const data: PipelineJob = { ...job, stage: "summarize" };
+				await queue("summarize").add("summarize", data, {
+					...DEFAULT_JOB_OPTIONS,
+					jobId: JOB_IDS.summarize(job.generationId),
+					priority: SOURCE_PRIORITY[job.source],
+				});
+			},
 		},
 		summarize: {
 			async getRun(job) {

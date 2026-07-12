@@ -39,6 +39,7 @@ describe("prepare pipeline worker", () => {
 				preparedBatches = batches;
 				return ++calls === 1 ? ("prepared" as const) : ("duplicate" as const);
 			},
+			completeEmpty: async () => undefined,
 			claimPendingBatches: async (_job: PrepareJob, limit: number) =>
 				preparedBatches.slice(0, limit).map((batch) => ({
 					...job,
@@ -52,6 +53,7 @@ describe("prepare pipeline worker", () => {
 				})),
 			markStale: async () => undefined,
 			enqueueEmbed: async (data: EmbedBatchJob) => jobs.push(data),
+			enqueueGraph: async () => undefined,
 		};
 		const first = await processPrepareJob({ data: job }, deps);
 		const second = await processPrepareJob({ data: job }, deps);
@@ -59,6 +61,33 @@ describe("prepare pipeline worker", () => {
 		expect(jobs.every((queued) => queued.chunkIndexes.length <= 5)).toBe(true);
 		expect(second.status).toBe("duplicate");
 		expect(jobs).toHaveLength(Math.min(2, first.batches));
+	});
+
+	test("advances an empty document through a terminal downstream pipeline", async () => {
+		const queuedStages: string[] = [];
+		const job: PrepareJob = { ...base, stage: "prepare" };
+		const result = await processPrepareJob(
+			{ data: job },
+			{
+				loadDocument: async () => ({
+					title: "",
+					content: "",
+					revision: base.revision,
+				}),
+				prepareRun: async () => "prepared",
+				completeEmpty: async () => undefined,
+				markStale: async () => undefined,
+				claimPendingBatches: async () => [],
+				enqueueEmbed: async () => {
+					throw new Error("empty documents must not enqueue embed jobs");
+				},
+				enqueueGraph: async () => {
+					queuedStages.push("graph");
+				},
+			},
+		);
+		expect(result).toEqual({ status: "prepared", batches: 0 });
+		expect(queuedStages).toEqual(["graph"]);
 	});
 
 	test("rejects a superseded revision before creating batches", async () => {
@@ -76,11 +105,13 @@ describe("prepare pipeline worker", () => {
 					prepared = true;
 					return "prepared";
 				},
+				completeEmpty: async () => undefined,
 				markStale: async (_job, errorCode) => {
 					staleCode = errorCode;
 				},
 				claimPendingBatches: async () => [],
 				enqueueEmbed: async () => undefined,
+				enqueueGraph: async () => undefined,
 			},
 		);
 		expect(result.status).toBe("stale");

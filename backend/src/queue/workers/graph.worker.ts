@@ -27,6 +27,7 @@ export interface GraphWorkerDependencies {
 		status: PipelineStageStatus,
 		errorCode?: string,
 	): Promise<void>;
+	enqueueSummarize(job: ReturnType<typeof graphJobSchema.parse>): Promise<void>;
 }
 
 /**
@@ -58,6 +59,7 @@ export function createGraphWorker(deps: GraphWorkerDependencies) {
 				"skipped",
 				"embedding_not_ready",
 			);
+			await deps.enqueueSummarize(job);
 			return;
 		}
 
@@ -65,12 +67,18 @@ export function createGraphWorker(deps: GraphWorkerDependencies) {
 		try {
 			await deps.extract(job);
 			await deps.setGraphStatus(job.generationId, "ready");
+			await deps.enqueueSummarize(job);
 		} catch (error) {
 			await deps.setGraphStatus(
 				job.generationId,
 				"failed",
 				error instanceof Error ? error.name : "graph_failed",
 			);
+			// GraphRAG is optional. Always advance the pipeline after an
+			// extraction failure so embeddings remain usable and finalize can
+			// publish ready_with_warnings. The deterministic summarize job id
+			// makes retries idempotent in BullMQ.
+			await deps.enqueueSummarize(job);
 			throw error;
 		}
 	};

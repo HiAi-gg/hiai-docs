@@ -1,8 +1,8 @@
 import { Worker } from "bullmq";
 import { createBullMqConnection } from "./connection";
-import { JOB_IDS, type PipelineJob, type PipelineStage } from "./contracts";
+import type { PipelineJob, PipelineStage } from "./contracts";
 import { withOwnerSlot } from "./fair-scheduler";
-import { DEFAULT_JOB_OPTIONS, QUEUE_NAMES, SOURCE_PRIORITY } from "./names";
+import { QUEUE_NAMES } from "./names";
 import { closePipelineQueues, getPipelineQueue } from "./queues";
 import {
 	createEmbedWorker,
@@ -115,16 +115,6 @@ export function createPipelineWorkerFactories(
 				(job) =>
 					withOwnerSlot(job.data.ownerId, "graph", async () => {
 						await graphProcessor(job.data);
-						const data: PipelineJob = { ...job.data, stage: "summarize" };
-						await getPipelineQueue("summarize", redisUrl).add(
-							"summarize",
-							data,
-							{
-								...DEFAULT_JOB_OPTIONS,
-								jobId: JOB_IDS.summarize(job.data.generationId),
-								priority: SOURCE_PRIORITY[job.data.source],
-							},
-						);
 					}),
 				{ connection: connection(), concurrency: settings.graphConcurrency },
 			),

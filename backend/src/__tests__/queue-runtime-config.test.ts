@@ -35,6 +35,7 @@ describe("queue runtime configuration", () => {
 					prepared = batches;
 					return "prepared";
 				},
+				completeEmpty: async () => undefined,
 				markStale: async () => undefined,
 				claimPendingBatches: async (_job, limit) =>
 					prepared.slice(0, limit).map((batch) => ({
@@ -48,6 +49,7 @@ describe("queue runtime configuration", () => {
 						),
 					})),
 				enqueueEmbed: async (data) => jobs.push(data),
+				enqueueGraph: async () => undefined,
 			},
 			2,
 			2,
