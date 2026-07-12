@@ -105,6 +105,7 @@ let folders = $state<FolderType[]>([]);
 let foldersLoading = $state(false);
 let currentFolderId = $state<string | null>(null);
 let showCreateFolderDialog = $state(false);
+let pendingCreatedFolderId = $state<string | null>(null);
 
 // Category management
 import { type Category, listCategories } from "$lib/api/categories";
@@ -636,7 +637,7 @@ async function loadCategories() {
 	}
 }
 
-async function moveToFolder(folderId: string | null) {
+async function moveToFolder(folderId: string | null, propagateError = false) {
 	try {
 		const placement = placementForFolder(folderId, folders, currentCategoryId);
 
@@ -645,8 +646,9 @@ async function moveToFolder(folderId: string | null) {
 		currentCategoryId = placement.categoryId;
 		saveStatus = "saved";
 		refreshDocs();
-	} catch (_e) {
+	} catch (error) {
 		setError(m.doc_save_content_error());
+		if (propagateError) throw error;
 	}
 }
 
@@ -663,12 +665,19 @@ async function moveToCategory(categoryId: string | null) {
 }
 
 async function handleCreateFolder(name: string) {
-	const created = await createFolder(
-		newFolderPlacement(name, currentCategoryId),
-	);
-	folders = [...folders, created];
-	refreshFolders();
-	await moveToFolder(created.id);
+	let folderId = pendingCreatedFolderId;
+	if (!folderId) {
+		const created = await createFolder(
+			newFolderPlacement(name, currentCategoryId),
+		);
+		folders = [...folders, created];
+		folderId = created.id;
+		pendingCreatedFolderId = created.id;
+		refreshFolders();
+	}
+
+	await moveToFolder(folderId, true);
+	pendingCreatedFolderId = null;
 }
 
 // --- Keyboard shortcuts wired by the editor ---------------------------------
@@ -1104,6 +1113,7 @@ $effect(() => {
       bind:open={showCreateFolderDialog}
       mode="create"
       onSave={handleCreateFolder}
+      onClose={() => { pendingCreatedFolderId = null; }}
     />
     <TagCreateDialog
       bind:open={showCreateTagDialog}
