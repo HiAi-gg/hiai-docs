@@ -10,7 +10,7 @@ import {
 } from "@hiai-gg/hiai-ui/components/ui/dialog";
 import { Input } from "@hiai-gg/hiai-ui/components/ui/input";
 import { Label } from "@hiai-gg/hiai-ui/components/ui/label";
-import { Loader2 } from "lucide-svelte";
+import { CheckCircle2, Loader2 } from "lucide-svelte";
 import * as m from "$lib/paraglide/messages.js";
 
 let {
@@ -32,11 +32,13 @@ let {
 let name = $state("");
 let error = $state<string | null>(null);
 let busy = $state(false);
+let createdFolderName = $state<string | null>(null);
 
 $effect(() => {
 	if (!open) return;
 	name = folder?.name ?? "";
 	error = null;
+	createdFolderName = null;
 });
 
 const trimmedName = $derived(name.trim());
@@ -63,10 +65,7 @@ async function handleSubmit(e?: Event) {
 		if (closeOnSave) {
 			close(true);
 		} else {
-			// Sidebar creation deliberately stays open for creating several
-			// folders in sequence. Clear the completed value for the next one.
-			name = "";
-			error = null;
+			createdFolderName = trimmedName;
 		}
 	} catch (err) {
 		console.error("FolderDialog: save failed", err);
@@ -74,6 +73,12 @@ async function handleSubmit(e?: Event) {
 	} finally {
 		busy = false;
 	}
+}
+
+function createAnother() {
+	createdFolderName = null;
+	name = "";
+	error = null;
 }
 
 function close(force = false) {
@@ -91,6 +96,23 @@ function close(force = false) {
 		</DialogDescription>
 	</DialogHeader>
 
+	{#if createdFolderName}
+		<div
+			class="space-y-3 rounded-lg border border-primary/30 bg-primary/10 p-4"
+			role="status"
+			aria-live="polite"
+		>
+			<div class="flex items-start gap-3">
+				<CheckCircle2 class="mt-0.5 size-5 shrink-0 text-primary" />
+				<div>
+					<p class="text-sm font-medium text-foreground">Folder created</p>
+					<p class="text-sm text-muted-foreground">
+						{createdFolderName} is ready to use.
+					</p>
+				</div>
+			</div>
+		</div>
+	{:else}
 	<form onsubmit={handleSubmit} class="space-y-4">
 		<div class="space-y-2">
 			<Label for="folder-dialog-name">{m.doc_new_folder_name()}</Label>
@@ -112,20 +134,27 @@ function close(force = false) {
 			{/if}
 		</div>
 	</form>
+	{/if}
 
 	<DialogFooter>
-		<Button variant="outline" type="button" onclick={() => close()} disabled={busy}>
-			{m.action_cancel()}
-		</Button>
+		{#if createdFolderName}
+			<Button variant="outline" type="button" onclick={createAnother}>
+				Create another
+			</Button>
+		{:else}
+			<Button variant="outline" type="button" onclick={() => close()} disabled={busy}>
+				{m.action_cancel()}
+			</Button>
+		{/if}
 		<Button
 			type="submit"
-			onclick={handleSubmit}
-			disabled={busy || trimmedName.length === 0}
+			onclick={createdFolderName ? () => close() : handleSubmit}
+			disabled={busy || (!createdFolderName && trimmedName.length === 0)}
 		>
 			{#if busy}
 				<Loader2 class="mr-1 size-4 animate-spin" />
 			{/if}
-			{submitLabel}
+			{createdFolderName ? "Done" : submitLabel}
 		</Button>
 	</DialogFooter>
 </Dialog>

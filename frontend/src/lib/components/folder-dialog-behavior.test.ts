@@ -15,8 +15,12 @@ describe("FolderDialog completion behavior", () => {
 		expect(dialogSource).toContain("if (busy && !force) return");
 	});
 
-	test("sidebar keeps the dialog open and clears the name for multi-create", () => {
+	test("sidebar shows success feedback and preserves multi-create", () => {
 		expect(sidebarSource).toContain("closeOnSave={false}");
+		expect(dialogSource).toContain("Folder created");
+		expect(dialogSource).toContain("createdFolderName = trimmedName");
+		expect(dialogSource).toContain("Create another");
+		expect(dialogSource).toContain("function createAnother()");
 		expect(dialogSource).toContain('name = ""');
 	});
 });
