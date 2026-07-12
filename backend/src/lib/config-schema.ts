@@ -14,7 +14,10 @@ export const envSchema = z.object({
 	REDIS_URL: z.string().default("redis://localhost:6384"),
 	AI_PROVIDER: z.enum(["openrouter", "ollama"]).default("openrouter"),
 	OLLAMA_PORT: z.coerce.number().int().min(1).max(65535).default(11_434),
-	EMBEDDING_OLLAMA_URL: z.string().url().optional(),
+	EMBEDDING_OLLAMA_URL: z.preprocess(
+		(value) => (value === "" ? undefined : value),
+		z.string().url().optional(),
+	),
 	QUEUE_PREPARE_CONCURRENCY: z.coerce.number().int().min(1).max(64).default(2),
 	QUEUE_EMBED_CONCURRENCY: z.coerce.number().int().min(1).max(64).default(3),
 	QUEUE_GRAPH_CONCURRENCY: z.coerce.number().int().min(1).max(64).default(2),

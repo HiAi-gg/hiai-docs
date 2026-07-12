@@ -168,6 +168,16 @@ describe("config schema", () => {
 		expect(result.data.OLLAMA_PORT).toBe(11434);
 	});
 
+	test("treats an empty optional Ollama URL from Compose as unset", () => {
+		const result = realEnvSchema.safeParse({ EMBEDDING_OLLAMA_URL: "" });
+		expect(result.success).toBe(true);
+		if (result.success)
+			expect(result.data.EMBEDDING_OLLAMA_URL).toBeUndefined();
+		expect(
+			realEnvSchema.safeParse({ EMBEDDING_OLLAMA_URL: "not-a-url" }).success,
+		).toBe(false);
+	});
+
 	test("rejects unsafe queue and provider runtime bounds", () => {
 		expect(
 			realEnvSchema.safeParse({ QUEUE_EMBED_CONCURRENCY: 0 }).success,
