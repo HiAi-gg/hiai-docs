@@ -414,7 +414,9 @@ async function handleExportDocx() {
 		}
 		const schema = getSchema(editorExtensions);
 		const docNode = Node.fromJSON(schema, normalizeDocxDocumentJson(json));
-		const imageFetcher = createDocxImageFetcher();
+		const imageFetcher = createDocxImageFetcher({
+			documentId: data.document.id,
+		});
 		const serializerOptions = {
 			getImageBuffer: imageFetcher.getImageBuffer,
 			getImageType: imageFetcher.getImageType,

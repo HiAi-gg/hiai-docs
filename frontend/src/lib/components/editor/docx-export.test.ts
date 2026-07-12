@@ -70,6 +70,33 @@ describe("createDocxImageFetcher", () => {
 		expect(request?.headers).toBeUndefined();
 	});
 
+	test("routes document remote images through the authenticated same-origin bridge", async () => {
+		let requestUrl = "";
+		let request: RequestInit | undefined;
+		const fetcher = createDocxImageFetcher({
+			documentId: "doc-1",
+			headers: { "x-share-token": "share-token" },
+			fetchImpl: async (input, init) => {
+				requestUrl = String(input);
+				request = init;
+				return new Response(Uint8Array.from([1]), {
+					headers: { "content-type": "image/png" },
+				});
+			},
+		});
+
+		await fetcher.getImageBuffer("https://images.example.test/photo.png");
+		expect(requestUrl).toContain("/api/attachments/remote-image?");
+		expect(requestUrl).toContain("documentId=doc-1");
+		expect(requestUrl).toContain(
+			encodeURIComponent("https://images.example.test/photo.png"),
+		);
+		expect(request).toMatchObject({
+			credentials: "include",
+			headers: { "x-share-token": "share-token" },
+		});
+	});
+
 	test("decodes inline image data without a network request", async () => {
 		let called = false;
 		const fetcher = createDocxImageFetcher({

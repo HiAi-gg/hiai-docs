@@ -11,6 +11,7 @@ type DocxFetch = (
 
 export interface DocxImageFetcherOptions {
 	headers?: HeadersInit;
+	documentId?: string;
 	maxBytes?: number;
 	fetchImpl?: DocxFetch;
 }
@@ -155,10 +156,19 @@ export function createDocxImageFetcher(
 				throw new Error("DOCX export cannot fetch this image URL");
 			}
 			const sameOrigin = url.origin === browserOrigin();
-			const headers = sameOrigin ? options.headers : undefined;
-			const response = await fetchImpl(url.href, {
-				credentials: sameOrigin ? "include" : "omit",
-				...(headers ? { headers } : {}),
+			const requestUrl =
+				!sameOrigin && options.documentId
+					? new URL(
+							`/api/attachments/remote-image?documentId=${encodeURIComponent(options.documentId)}&url=${encodeURIComponent(url.href)}`,
+							browserOrigin(),
+						)
+					: url;
+			const proxied = requestUrl !== url;
+			const requestHeaders =
+				sameOrigin || proxied ? options.headers : undefined;
+			const response = await fetchImpl(requestUrl.href, {
+				credentials: sameOrigin || proxied ? "include" : "omit",
+				...(requestHeaders ? { headers: requestHeaders } : {}),
 			});
 			if (!response.ok) {
 				throw new Error(`Image request failed with status ${response.status}`);

@@ -11,13 +11,18 @@ import { Elysia } from "elysia";
 import { nanoid } from "nanoid";
 import { config } from "../../lib/config";
 import { logger } from "../../lib/logger";
+import { fetchRemoteImage } from "../../lib/remote-image";
 import {
 	shareTokenAccessForDocument,
 	shareTokenReferencesAttachment,
 } from "../../lib/share-access";
 import { BUCKET, storage, storagePublic } from "../../lib/storage";
 import { withTenant } from "../../lib/with-tenant";
-import { rateLimitHeaders, writeRateLimiter } from "../middleware/rate-limit";
+import {
+	documentRateLimiter,
+	rateLimitHeaders,
+	writeRateLimiter,
+} from "../middleware/rate-limit";
 import { buildTenantContext } from "../middleware/tenant";
 
 /**
@@ -854,5 +859,94 @@ export const attachmentRoutes = new Elysia({ prefix: "/api" })
 			logger.error({ err }, "Failed to stream attachment");
 			set.status = 500;
 			return { error: "Failed to stream attachment" };
+		}
+	})
+	// Same-origin bridge used only by DOCX export. The requested URL must be
+	// present in a document the caller can read; the fetcher additionally
+	// rejects private networks, redirects to private networks, non-images,
+	// oversized responses, and slow upstreams.
+	.get("/attachments/remote-image", async ({ request, set }) => {
+		try {
+			const rateLimit = await documentRateLimiter(
+				await getClientIp(request),
+				request,
+			);
+			if (!rateLimit.allowed) {
+				set.status = 429;
+				set.headers = rateLimitHeaders(0, rateLimit.retryAfter);
+				return { error: "Too many requests" };
+			}
+			set.headers = rateLimitHeaders(rateLimit.remaining);
+			const requestUrl = new URL(request.url);
+			const documentId = requestUrl.searchParams.get("documentId")?.trim();
+			const source = requestUrl.searchParams.get("url")?.trim();
+			if (!documentId || !source || source.length > 4096) {
+				set.status = 400;
+				return { error: "documentId and a valid image URL are required" };
+			}
+
+			const ctx = await buildTenantContext(request);
+			const shareToken =
+				ctx.role === "none" ? request.headers.get("x-share-token") : null;
+			if (ctx.role === "none" && !shareToken) {
+				set.status = 401;
+				return { error: "Authentication required" };
+			}
+			const lookupCtx =
+				ctx.role === "admin"
+					? ctx
+					: { userId: ctx.userId, role: "admin" as const };
+			const document = await withTenant(lookupCtx, async (tx) => {
+				const [row] = await tx
+					.select({
+						ownerId: documents.ownerId,
+						content: documents.content,
+						contentJson: documents.contentJson,
+					})
+					.from(documents)
+					.where(eq(documents.id, documentId))
+					.limit(1);
+				return row ?? null;
+			});
+			if (!document) {
+				set.status = 404;
+				return { error: "Document not found" };
+			}
+			if (ctx.role !== "none") {
+				if (document.ownerId !== ctx.userId) {
+					set.status = 403;
+					return { error: "Forbidden" };
+				}
+			} else if (
+				!shareToken ||
+				(await shareTokenAccessForDocument(
+					lookupCtx,
+					documentId,
+					shareToken,
+				)) !== "granted"
+			) {
+				set.status = 401;
+				return { error: "Authentication required" };
+			}
+			const serialized = JSON.stringify(document.contentJson ?? null);
+			if (
+				!(document.content?.includes(source) || serialized.includes(source))
+			) {
+				set.status = 403;
+				return { error: "Image URL is not referenced by this document" };
+			}
+
+			const image = await fetchRemoteImage(source);
+			return new Response(Buffer.from(image.bytes), {
+				headers: {
+					"Content-Type": image.contentType,
+					"Cache-Control": "private, max-age=300",
+					"X-Content-Type-Options": "nosniff",
+				},
+			});
+		} catch (err) {
+			logger.warn({ err }, "Remote DOCX image fetch rejected");
+			set.status = 422;
+			return { error: "Remote image could not be fetched safely" };
 		}
 	});

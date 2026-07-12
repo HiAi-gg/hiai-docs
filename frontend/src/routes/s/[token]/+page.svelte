@@ -190,6 +190,7 @@ async function copyUrl() {
 function getCurrentDoc() {
 	if (shareData?.type === "document" && shareData.data) {
 		return {
+			id: shareData.data.id || "",
 			title: shareData.data.title || "Untitled Document",
 			content: shareData.data.content || "",
 			contentJson: shareData.data.contentJson,
@@ -197,6 +198,7 @@ function getCurrentDoc() {
 	}
 	if (currentView === "document" && viewedDoc) {
 		return {
+			id: viewedDoc.id,
 			title: viewedDoc.title || "Untitled Document",
 			content: viewedDoc.content || "",
 			contentJson: viewedDoc.contentJson,
@@ -240,6 +242,7 @@ async function handleExportDocx() {
 		const docNode = Node.fromJSON(schema, normalizeDocxDocumentJson(json));
 		const imageFetcher = createDocxImageFetcher({
 			headers: sharedAttachmentHeaders(data.token ?? "", verifiedPassword),
+			documentId: doc.id,
 		});
 		const serializerOptions = {
 			getImageBuffer: imageFetcher.getImageBuffer,
