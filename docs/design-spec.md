@@ -49,7 +49,7 @@ hiai-docs/
 | Frontend (SvelteKit) | 50701 | Web UI |
 | PostgreSQL | 5437 | Shared ai-core instance |
 | Redis | 6384 | Shared ai-core instance |
-| SeaweedFS | 9000/9021 | Object storage (API + Console) |
+| SeaweedFS | 50702/50703 | Object storage (API + Console) |
 | Caddy | 80/443 | Reverse proxy |
 
 ---
@@ -274,9 +274,9 @@ services:
 
   seaweedfs:
     image: chrislusf/seaweedfs:3.85
-    ports: ["9000:9000", "9021:9001"]
+    ports: ["50702:8333", "50703:8888"]
     volumes: [seaweedfs_data:/data]
-    command: server /data --console-address ":9001"
+    command: server /data --console-address ":8888"
 
   api:
     build:

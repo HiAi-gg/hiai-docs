@@ -29,7 +29,7 @@
 - **Module boundaries:** `api/` MUST NOT export internal functions · `embedding/` MUST NOT import from `api/` · `lib/` MUST NOT import from `api/` or `embedding/`
 - **Env access:** ONLY via `src/lib/config.ts` (Zod); every `CORS_ORIGINS`, `EMBEDDING_*`, `GRAPH_*`, `SEARCH_*`, `HYBRID_*`, `CHUNK_*`, `*_REEMBED_BATCH_SIZE` through `.env`
 - **Token import:** `@hiai/ui/styles/tokens.css` (hiai-docs is the token source for the ecosystem)
-- **Ports:** API `50700` · frontend dev `50701` · Postgres `5437` · Redis `6384` · SeaweedFS `9020/9021` · Caddy `80/443`
+- **Ports:** API `50700` · frontend dev `50701` · Postgres `5437` · Redis `6384` · SeaweedFS `50702/50703` · Caddy `80/443`
 - **No Playwright** — use `agent-browser` for E2E
 - **English only** in code, comments, docs, README, AGENTS.md (zero Cyrillic)
 
@@ -102,7 +102,7 @@
 curl -fsS http://localhost:50700/api/health
 psql -h localhost -p 5437 -U aiuser -d hiai_docs -c "SELECT NOW();"
 redis-cli -p 6384 ping
-curl -fsS http://localhost:9020/
+curl -fsS http://localhost:50702/
 ```
 
 ## Architecture
@@ -347,7 +347,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines on code style, testing, an
 |-----------|-------|------|---------|
 | postgres | hiai-postgres:18-custom | 5437:5432 | Database (pgvector + pgvectorscale + AGE) |
 | redis | redis:8-alpine | 6384:6379 | Cache/queue |
-| seaweedfs | chrislusf/seaweedfs:3.85 | 9000:8333, 9021:8888 | File storage |
+| seaweedfs | chrislusf/seaweedfs:3.85 | 50702:8333, 50703:8888 | File storage |
 | api | custom | 50700:50700 | Elysia backend |
 | web | custom | 50701:50701 | SvelteKit frontend |
 | caddy | caddy:2-alpine | 80:80, 443:443 | Reverse proxy (auto-TLS, build with xcaddy + caddy-ratelimit) |

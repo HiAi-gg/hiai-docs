@@ -109,9 +109,9 @@ export const envSchema = z.object({
 		.max(3_600_000)
 		.default(30_000),
 	STORAGE_ENDPOINT: z.string().default("localhost"),
-	STORAGE_PORT: z.coerce.number().default(9020),
+	STORAGE_PORT: z.coerce.number().default(50702),
 	STORAGE_PUBLIC_ENDPOINT: z.string().default("localhost"),
-	STORAGE_PUBLIC_PORT: z.coerce.number().default(9020),
+	STORAGE_PUBLIC_PORT: z.coerce.number().default(50702),
 	STORAGE_ACCESS_KEY: z.string().default("minioadmin"),
 	STORAGE_SECRET_KEY: z.string().default("change-me-to-random-32-chars"),
 	STORAGE_BUCKET: z.string().default("hiai-docs"),

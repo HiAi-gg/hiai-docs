@@ -75,7 +75,7 @@ bun run db:migrate
 | 50701 | Frontend |
 | 5437 | PostgreSQL |
 | 6384 | Redis |
-| 9020 | SeaweedFS S3 |
+| 50702 | SeaweedFS S3 |
 | 80/443 | Caddy |
 
 ## Testing and release gates

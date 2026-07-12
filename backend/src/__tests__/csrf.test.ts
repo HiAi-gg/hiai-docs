@@ -64,14 +64,14 @@ describe("CSRF token generation and verification", () => {
 
 describe("CSRF middleware behavior", () => {
 	it("builds custom-port origins when CORS_ORIGINS is not explicitly set", () => {
-		const webPort = 57001;
+		const webPort = 50701;
 		const allowed = [
 			`http://localhost:${webPort}`,
 			`http://127.0.0.1:${webPort}`,
 		];
 		expect(
 			isAllowedCsrfOrigin(
-				"http://localhost:57001",
+				"http://localhost:50701",
 				"localhost:57000",
 				allowed,
 				"production",
@@ -79,10 +79,10 @@ describe("CSRF middleware behavior", () => {
 		).toBe(true);
 	});
 	it("accepts the exact configured custom web port without allowing other origins", () => {
-		const allowed = ["http://localhost:57001", "http://127.0.0.1:57001"];
+		const allowed = ["http://localhost:50701", "http://127.0.0.1:50701"];
 		expect(
 			isAllowedCsrfOrigin(
-				"http://localhost:57001",
+				"http://localhost:50701",
 				"localhost:57000",
 				allowed,
 				"development",

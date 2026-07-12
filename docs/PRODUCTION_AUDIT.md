@@ -96,7 +96,7 @@ Tag `v0.1.0` exists (`ef831bf`), but HEAD = `14b3fd9`, with post-release fixes (
 ### 12. Port discrepancies across the repo
 Confuses operators; single source of truth is unclear:
 - **DB:** `5433` (PRODUCTION_STATUS, DEPLOYMENT, health-check) vs `5437` (`.env.example:13`, dev-compose) vs default `5433` in prod-compose.
-- **SeaweedFS:** `9020` (`.env.example:23`) vs `9000` (compose default, `scripts/health-check.sh:32`) vs console `9021`/`9001` (`docs/DEPLOYMENT.md` contradicts itself: line 18 — `9001`, line 115 — `9000/9021`).
+- **SeaweedFS:** resolved to the canonical host ports `50702` (S3 gateway) and `50703` (filer UI). Container-internal ports remain `8333` and `8888`.
 - **Redis:** `6384` (compose) vs `6380` (`scripts/health-check.sh:14,30` — default, with comment "matches REDIS_URL in .env.example", which is incorrect) vs internal `6379`; `docs/DEPLOYMENT.md:62` incorrectly writes default `redis://redis:6384` (inside the network, port is 6379).
 - **Caddy:** `80/443` (PRODUCTION_STATUS) vs `50708/50709` (compose).
 

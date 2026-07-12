@@ -53,13 +53,13 @@ services:
           cpus: "0.5"
 
   # SeaweedFS — S3-compatible object storage for uploaded files (PDFs, etc.).
-  # The fixed 9020/9021 host ports avoid clashing with other services.
+  # The canonical 50702/50703 host ports keep storage in the same local range.
   seaweedfs:
     image: chrislusf/seaweedfs:3.85
     restart: unless-stopped
     ports:
-      - "9020:8333"   # S3 Gateway
-      - "9021:8888"   # SeaweedFS Web UI (Filer)
+      - "50702:8333"   # S3 Gateway
+      - "50703:8888"   # SeaweedFS Web UI (Filer)
     volumes:
       - seaweedfs_data:/data
     entrypoint: ["/bin/sh", "-ec"]
@@ -118,7 +118,7 @@ services:
       STORAGE_SECRET_KEY: ${STORAGE_SECRET_KEY:-minioadmin}
       STORAGE_BUCKET: ${STORAGE_BUCKET:-hiai-docs}
       STORAGE_PUBLIC_ENDPOINT: localhost
-      STORAGE_PUBLIC_PORT: 9020
+      STORAGE_PUBLIC_PORT: 50702
       STORAGE_REGION: us-east-1
       STORAGE_FORCE_PATH_STYLE: true
       BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:-dev-only-secret-replace-me}

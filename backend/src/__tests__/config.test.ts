@@ -23,7 +23,7 @@ const envSchema = z.object({
 	EMBEDDING_FALLBACK_API_KEY: z.string().optional(),
 	EMBEDDING_FALLBACK_MODEL: z.string().optional(),
 	STORAGE_ENDPOINT: z.string().default("localhost"),
-	STORAGE_PORT: z.coerce.number().default(9020),
+	STORAGE_PORT: z.coerce.number().default(50702),
 	STORAGE_ACCESS_KEY: z.string().default("minioadmin"),
 	STORAGE_SECRET_KEY: z.string().default("minioadmin"),
 	STORAGE_BUCKET: z.string().default("hiai-docs"),
@@ -47,7 +47,7 @@ describe("config schema", () => {
 			expect(result.data.EMBEDDING_FALLBACK_BASE_URL).toBeUndefined();
 			expect(result.data.EMBEDDING_FALLBACK_API_KEY).toBeUndefined();
 			expect(result.data.EMBEDDING_FALLBACK_MODEL).toBeUndefined();
-			expect(result.data.STORAGE_PORT).toBe(9020);
+		expect(result.data.STORAGE_PORT).toBe(50702);
 		}
 	});
 
