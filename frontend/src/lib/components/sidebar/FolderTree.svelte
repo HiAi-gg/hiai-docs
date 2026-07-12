@@ -71,6 +71,7 @@ import {
 	listFolders,
 	updateFolder,
 } from "$lib/api/folders";
+import FolderDialog from "$lib/components/FolderDialog.svelte";
 import ShareDialog from "$lib/components/ShareDialog.svelte";
 import CategoryDialog from "$lib/components/sidebar/CategoryDialog.svelte";
 import FolderNode from "$lib/components/sidebar/FolderNode.svelte";
@@ -231,9 +232,6 @@ let orderedBuckets = $state<
 >([]);
 
 let showNewFolderDialog = $state(false);
-let newFolderName = $state("");
-let newFolderError = $state<string | null>(null);
-let newFolderSubmitting = $state(false);
 
 // Rename dialog state (shared by folders and documents).
 let showRenameDialog = $state(false);
@@ -637,34 +635,9 @@ function openNewFolderDialog() {
 	showNewFolderDialog = true;
 }
 
-function closeNewFolderDialog() {
-	showNewFolderDialog = false;
-	newFolderName = "";
-	newFolderError = null;
-	newFolderSubmitting = false;
-}
-
-async function handleCreateFolder(e: Event) {
-	e.preventDefault();
-	newFolderError = null;
-
-	const trimmed = newFolderName.trim();
-	if (trimmed.length === 0) {
-		newFolderError = "Name is required";
-		return;
-	}
-
-	newFolderSubmitting = true;
-	try {
-		await createFolder({ name: trimmed, parentId: null });
-		closeNewFolderDialog();
-		await loadFolders();
-	} catch (err) {
-		console.error("FolderTree: createFolder failed", err);
-		newFolderError = err instanceof Error ? err.message : m.error_generic();
-	} finally {
-		newFolderSubmitting = false;
-	}
+async function handleCreateFolder(name: string) {
+	await createFolder({ name, parentId: null, categoryId: null });
+	await loadFolders();
 }
 
 function setZoneItems(zone: DocZone, next: DndDoc[]) {
@@ -1807,52 +1780,11 @@ const buckets = $derived.by(() => {
   </button>
 </div>
 
-<Dialog bind:open={showNewFolderDialog} onOpenChange={(next) => { if (!next) closeNewFolderDialog(); }}>
-  <DialogHeader>
-    <DialogTitle>{m.folders_new()}</DialogTitle>
-    <DialogDescription>{m.folders_name_placeholder()}</DialogDescription>
-  </DialogHeader>
-
-  <form onsubmit={handleCreateFolder} class="space-y-4">
-    <div class="space-y-2">
-      <Label for="new-folder-name">{m.folders_name_placeholder()}</Label>
-      <Input
-        id="new-folder-name"
-        name="name"
-        type="text"
-        bind:value={newFolderName}
-        placeholder={m.folders_name_placeholder()}
-        maxlength={50}
-        required
-        disabled={newFolderSubmitting}
-        aria-invalid={newFolderError ? "true" : undefined}
-        aria-describedby={newFolderError ? "new-folder-name-error" : undefined}
-        autocomplete="off"
-      />
-      {#if newFolderError}
-        <p id="new-folder-name-error" class="text-xs text-destructive" role="alert">{newFolderError}</p>
-      {/if}
-    </div>
-  </form>
-
-  <DialogFooter>
-    <Button
-      variant="outline"
-      type="button"
-      onclick={closeNewFolderDialog}
-      disabled={newFolderSubmitting}
-    >
-      {m.action_cancel()}
-    </Button>
-    <Button
-      type="submit"
-      onclick={handleCreateFolder}
-      disabled={newFolderSubmitting || newFolderName.trim().length === 0}
-    >
-      {newFolderSubmitting ? m.action_loading() : m.action_create()}
-    </Button>
-  </DialogFooter>
-</Dialog>
+<FolderDialog
+  bind:open={showNewFolderDialog}
+  mode="create"
+  onSave={handleCreateFolder}
+/>
 
 <!-- Rename dialog (folders and documents) -->
 <Dialog bind:open={showRenameDialog} onOpenChange={(next) => { if (!next) closeRenameDialog(); }}>

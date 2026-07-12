@@ -43,6 +43,10 @@ import {
 } from "$lib/api/tags";
 import DocumentTitle from "$lib/components/editor/DocumentTitle.svelte";
 import {
+	newFolderPlacement,
+	placementForFolder,
+} from "$lib/components/editor/document-placement";
+import {
 	createDocxImageFetcher,
 	normalizeDocxDocumentJson,
 } from "$lib/components/editor/docx-export";
@@ -53,6 +57,7 @@ import HiAiEditor from "$lib/components/editor/HiAiEditor.svelte";
 import MarkdownToggle from "$lib/components/editor/MarkdownToggle.svelte";
 import { markdownToJson } from "$lib/components/editor/markdown";
 import { markMarkdownTaskItems } from "$lib/components/editor/shared-document";
+import FolderDialog from "$lib/components/FolderDialog.svelte";
 import FolderTreeSelector from "$lib/components/FolderTreeSelector.svelte";
 import SaveAsDialog from "$lib/components/SaveAsDialog.svelte";
 import ShareDialog from "$lib/components/ShareDialog.svelte";
@@ -99,8 +104,7 @@ import type { Folder as FolderType } from "$lib/types.js";
 let folders = $state<FolderType[]>([]);
 let foldersLoading = $state(false);
 let currentFolderId = $state<string | null>(null);
-let creatingFolder = $state(false);
-let newFolderName = $state("");
+let showCreateFolderDialog = $state(false);
 
 // Category management
 import { type Category, listCategories } from "$lib/api/categories";
@@ -634,15 +638,11 @@ async function loadCategories() {
 
 async function moveToFolder(folderId: string | null) {
 	try {
-		const targetFolder = folderId
-			? folders.find((f) => f.id === folderId)
-			: null;
-		const categoryId =
-			(targetFolder ? targetFolder.categoryId : currentCategoryId) ?? null;
+		const placement = placementForFolder(folderId, folders, currentCategoryId);
 
-		await updateDocument(data.document.id, { folderId, categoryId });
-		currentFolderId = folderId;
-		currentCategoryId = categoryId;
+		await updateDocument(data.document.id, placement);
+		currentFolderId = placement.folderId;
+		currentCategoryId = placement.categoryId;
 		saveStatus = "saved";
 		refreshDocs();
 	} catch (_e) {
@@ -662,20 +662,13 @@ async function moveToCategory(categoryId: string | null) {
 	}
 }
 
-async function handleCreateFolder() {
-	const name = newFolderName.trim();
-	if (!name) return;
-	try {
-		const created = await createFolder({ name });
-		folders = [...folders, created];
-		refreshFolders();
-		await moveToFolder(created.id);
-	} catch (_e) {
-		setError(m.error_generic());
-	} finally {
-		creatingFolder = false;
-		newFolderName = "";
-	}
+async function handleCreateFolder(name: string) {
+	const created = await createFolder(
+		newFolderPlacement(name, currentCategoryId),
+	);
+	folders = [...folders, created];
+	refreshFolders();
+	await moveToFolder(created.id);
 }
 
 // --- Keyboard shortcuts wired by the editor ---------------------------------
@@ -731,10 +724,10 @@ $effect(() => {
       <!-- Breadcrumb -->
       <nav class="breadcrumb" aria-label={m.aria_breadcrumb()}>
         <a href="/" class="breadcrumb-link">{m.breadcrumb_home()}</a>
-        {#if data.document.folderName}
+        {#if currentFolderId}
           <ChevronRight size={14} class="breadcrumb-sep" />
-          <a href="/folders/{data.document.folderId}" class="breadcrumb-link">
-            {data.document.folderName}
+          <a href="/folders/{currentFolderId}" class="breadcrumb-link">
+            {currentFolderName}
           </a>
         {/if}
         <ChevronRight size={14} class="breadcrumb-sep" />
@@ -975,37 +968,12 @@ $effect(() => {
               />
             {/if}
             <DropdownMenuSeparator />
-            <DropdownMenuItem onSelect={() => { creatingFolder = true; }}>
+            <DropdownMenuItem onSelect={() => { showCreateFolderDialog = true; }}>
               <Plus size={14} />
               New folder
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
-
-        {#if creatingFolder}
-          <span class="folder-create">
-            <input
-              type="text"
-              bind:value={newFolderName}
-              placeholder="Folder name"
-              aria-label="New folder name"
-              onkeydown={(e) => {
-                if (e.key === "Enter") handleCreateFolder();
-                if (e.key === "Escape") { creatingFolder = false; newFolderName = ""; }
-              }}
-            />
-            <button type="button" class="folder-create-btn" onclick={handleCreateFolder}>
-              {m.action_save()}
-            </button>
-            <button
-              type="button"
-              class="folder-create-btn"
-              onclick={() => { creatingFolder = false; newFolderName = ""; }}
-            >
-              {m.action_cancel()}
-            </button>
-          </span>
-        {/if}
         {#each tags as tag (tag.id)}
           <span
             class="tag-badge"
@@ -1132,6 +1100,11 @@ $effect(() => {
     </div>
 
     <ShareDialog bind:open={showShareDialog} documentId={data.document.id} documentTitle={title} />
+    <FolderDialog
+      bind:open={showCreateFolderDialog}
+      mode="create"
+      onSave={handleCreateFolder}
+    />
     <TagCreateDialog
       bind:open={showCreateTagDialog}
       mode="create"
@@ -1657,37 +1630,6 @@ $effect(() => {
     overflow: visible;
     min-height: 500px;
     background: var(--card);
-  }
-
-  .folder-create {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-  }
-
-  .folder-create input {
-    height: 24px;
-    padding: 0 8px;
-    font-size: 12px;
-    border: 1px solid var(--border);
-    border-radius: 4px;
-    background: var(--background);
-    color: var(--foreground);
-  }
-
-  .folder-create-btn {
-    padding: 2px 8px;
-    font-size: 12px;
-    border: 1px solid var(--border);
-    border-radius: 4px;
-    background: transparent;
-    color: var(--muted-foreground);
-    cursor: pointer;
-  }
-
-  .folder-create-btn:hover {
-    background: var(--muted);
-    color: var(--foreground);
   }
 
   /* Mobile responsive */
