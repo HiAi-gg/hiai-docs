@@ -28,6 +28,10 @@ import { getFilterOptions, type SearchResponse, search } from "$lib/api/search";
 import DatePicker from "$lib/components/DatePicker.svelte";
 import SearchResult from "$lib/components/SearchResult.svelte";
 import * as m from "$lib/paraglide/messages.js";
+import {
+	normalizeSearchQuery,
+	shouldForceSearchResubmit,
+} from "$lib/search/resubmit";
 import { getSelectedTagName } from "$lib/stores/tag-store.svelte";
 import type { Folder as FolderType } from "$lib/types.js";
 
@@ -81,6 +85,10 @@ let loading = $state(false);
 // Search requests can overlap when the query, filters, or sort order change
 // quickly. Only the newest request may publish results or end the loading state.
 let searchRequestGeneration = 0;
+// SvelteKit does not invalidate page data when goto() targets the current URL.
+// This counter makes an explicit repeat submit a distinct search request while
+// leaving passive reactive updates deduplicated.
+let explicitSearchGeneration = $state(0);
 let showFilters = $state(false);
 
 let folders = $state<string[]>([]);
@@ -149,6 +157,8 @@ const hasAnyLocalMatches = $derived(
 // Run search when query or filters change
 $effect(() => {
 	const q = data.query;
+	// Deliberate reactive read: explicit submissions may repeat the current URL.
+	void explicitSearchGeneration;
 	const p = data.page;
 	const sort = sortOrder;
 	const folder = activeFolder;
@@ -224,8 +234,27 @@ function buildUrl(overrides: Record<string, string | undefined>) {
 
 function handleSubmit(e: SubmitEvent) {
 	e.preventDefault();
+	const submittedQuery = normalizeSearchQuery(query);
+	if (!submittedQuery) {
+		clearSearch();
+		return;
+	}
+
+	query = submittedQuery;
+	if (
+		shouldForceSearchResubmit({
+			submittedQuery,
+			loadedQuery: data.query,
+			currentPage,
+		})
+	) {
+		currentPage = 1;
+		explicitSearchGeneration += 1;
+		return;
+	}
+
 	currentPage = 1;
-	goto(buildUrl({ q: query, page: "1" }), { replaceState: true });
+	goto(buildUrl({ q: submittedQuery, page: "1" }), { replaceState: true });
 }
 
 function handleKeydown(e: KeyboardEvent) {

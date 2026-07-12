@@ -26,4 +26,11 @@ describe("semantic search loading state", () => {
 		).toBe(2);
 		expect(searchPage).toContain("searchResponse = null");
 	});
+
+	test("explicitly re-runs an unchanged submitted query", () => {
+		expect(searchPage).toContain("let explicitSearchGeneration = $state(0)");
+		expect(searchPage).toContain("void explicitSearchGeneration");
+		expect(searchPage).toContain("explicitSearchGeneration += 1");
+		expect(searchPage).toContain("shouldForceSearchResubmit");
+	});
 });
