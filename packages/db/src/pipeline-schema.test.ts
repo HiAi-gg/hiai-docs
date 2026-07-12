@@ -141,7 +141,7 @@ describe("BullMQ pipeline state schema", () => {
 		expect(relocationMigration).toContain(
 			"ALTER TYPE ag_catalog.pipeline_status SET SCHEMA public",
 		);
-		expect(journal.entries.at(-1)).toMatchObject({
+		expect(journal.entries.find((entry) => entry.idx === 31)).toMatchObject({
 			idx: 31,
 			tag: "0031_pipeline_tenant_rls",
 		});
