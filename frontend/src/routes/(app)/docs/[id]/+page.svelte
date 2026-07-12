@@ -694,9 +694,6 @@ async function handleCreateFolder(name: string) {
 
 	await moveToFolder(folderId, true);
 	pendingCreatedFolderId = null;
-	// The editor flow is a create-and-place action, not a multi-create flow.
-	// Close it explicitly after the folder and document placement both persist.
-	showCreateFolderDialog = false;
 }
 
 // --- Keyboard shortcuts wired by the editor ---------------------------------

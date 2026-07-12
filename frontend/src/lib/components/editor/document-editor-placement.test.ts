@@ -23,6 +23,7 @@ describe("document editor placement workflow", () => {
 		);
 
 		expect(createFolderHandler).toContain("await moveToFolder(folderId, true)");
-		expect(createFolderHandler).toContain("showCreateFolderDialog = false");
+		expect(editorPage).toContain("bind:open={showCreateFolderDialog}");
+		expect(editorPage).not.toContain("closeOnSave={false}");
 	});
 });

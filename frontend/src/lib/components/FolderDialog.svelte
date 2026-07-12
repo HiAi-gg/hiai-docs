@@ -19,12 +19,14 @@ let {
 	folder,
 	onSave,
 	onClose,
+	closeOnSave = true,
 }: {
 	open: boolean;
 	mode: "create" | "edit";
 	folder?: { id: string; name: string } | null;
 	onSave?: (name: string) => Promise<void> | void;
 	onClose?: () => void;
+	closeOnSave?: boolean;
 } = $props();
 
 let name = $state("");
@@ -58,7 +60,14 @@ async function handleSubmit(e?: Event) {
 	busy = true;
 	try {
 		await onSave(trimmedName);
-		close();
+		if (closeOnSave) {
+			close(true);
+		} else {
+			// Sidebar creation deliberately stays open for creating several
+			// folders in sequence. Clear the completed value for the next one.
+			name = "";
+			error = null;
+		}
 	} catch (err) {
 		console.error("FolderDialog: save failed", err);
 		error = err instanceof Error ? err.message : m.error_generic();
@@ -67,8 +76,8 @@ async function handleSubmit(e?: Event) {
 	}
 }
 
-function close() {
-	if (busy) return;
+function close(force = false) {
+	if (busy && !force) return;
 	open = false;
 	onClose?.();
 }
@@ -105,7 +114,7 @@ function close() {
 	</form>
 
 	<DialogFooter>
-		<Button variant="outline" type="button" onclick={close} disabled={busy}>
+		<Button variant="outline" type="button" onclick={() => close()} disabled={busy}>
 			{m.action_cancel()}
 		</Button>
 		<Button

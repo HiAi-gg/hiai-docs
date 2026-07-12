@@ -1784,6 +1784,7 @@ const buckets = $derived.by(() => {
   bind:open={showNewFolderDialog}
   mode="create"
   onSave={handleCreateFolder}
+  closeOnSave={false}
 />
 
 <!-- Rename dialog (folders and documents) -->
