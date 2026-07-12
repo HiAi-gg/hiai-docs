@@ -7,11 +7,9 @@ describe("document drag-and-drop stability", () => {
 		expect(source).toContain(
 			"const finalizedDocumentId = e.detail.info?.id ?? draggedDocId",
 		);
+		expect(source).toContain("documentDropCoordinator.zone(");
 		expect(source).toContain(
-			"void persistZoneChanges(zone, finalizedDocumentId)",
-		);
-		expect(source).toContain(
-			"async function persistZoneChanges(zone: DocZone, documentId: string)",
+			"const finalizedDocumentId = e.detail.info?.id ?? draggedDocId",
 		);
 		expect(source).not.toContain("for (const item of zoneItems)");
 	});
@@ -24,9 +22,7 @@ describe("document drag-and-drop stability", () => {
 	});
 
 	test("protects the optimistic move from concurrent sidebar refreshes", () => {
-		expect(source).toContain("publishDocumentPlacement(");
-		expect(source).toContain(
-			"acknowledgeDocumentPlacement(documentId, placementVersion)",
-		);
+		expect(source).toContain("createDocumentPlacementWriter({");
+		expect(source).toContain("acknowledge: acknowledgeDocumentPlacement");
 	});
 });

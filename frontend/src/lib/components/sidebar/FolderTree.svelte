@@ -75,6 +75,11 @@ import DeleteDialog from "$lib/components/DeleteDialog.svelte";
 import FolderDialog from "$lib/components/FolderDialog.svelte";
 import ShareDialog from "$lib/components/ShareDialog.svelte";
 import CategoryDialog from "$lib/components/sidebar/CategoryDialog.svelte";
+import {
+	createDocumentDropCoordinator,
+	createDocumentPlacementWriter,
+	type SidebarDocumentPlacement,
+} from "$lib/components/sidebar/document-drop-coordinator";
 import FolderNode from "$lib/components/sidebar/FolderNode.svelte";
 import * as m from "$lib/paraglide/messages.js";
 import {
@@ -209,7 +214,6 @@ let categoryDragActive = $state(false);
 let categoryOrderPending = $state(false);
 let categoryOrderGeneration = 0;
 let categoryOrderQueue: Promise<void> = Promise.resolve();
-let droppedOnHeader = false;
 
 let rootItems = $state<DndDoc[]>([]);
 let folderDocsMap = $state<Record<string, DndDoc[]>>({});
@@ -568,6 +572,58 @@ async function refresh() {
 	await Promise.all([loadFolders(), loadCategories(), loadDocuments()]);
 }
 
+function rollbackDocumentPlacement(
+	documentId: string,
+	placement: SidebarDocumentPlacement,
+) {
+	registerDocument(documentId, placement.folderId, placement.categoryId);
+	documents = documents.map((doc) =>
+		doc.id === documentId ? { ...doc, ...placement } : doc,
+	);
+	resyncZonesFromDocuments();
+}
+
+const writeDocumentPlacement = createDocumentPlacementWriter({
+	patch: (documentId, placement) => updateDocument(documentId, placement),
+	optimistic: (documentId, placement) =>
+		publishDocumentPlacement(
+			documentId,
+			placement.folderId,
+			placement.categoryId,
+		),
+	acknowledge: acknowledgeDocumentPlacement,
+	rollback: rollbackDocumentPlacement,
+	refresh,
+	onError: (error) => {
+		console.error("FolderTree: document move failed", error);
+		setDndError(error instanceof Error ? error.message : "Move failed");
+	},
+	onRefreshError: (error) => {
+		console.error("FolderTree: post-move refresh failed", error);
+	},
+});
+
+function persistDocumentPlacement(
+	documentId: string,
+	placement: SidebarDocumentPlacement,
+) {
+	const original = getDocumentFromRegistry(documentId);
+	if (!original) return;
+	if (
+		original.folderId === placement.folderId &&
+		original.categoryId === placement.categoryId
+	) {
+		return;
+	}
+	void writeDocumentPlacement(documentId, placement, original).catch(
+		() => undefined,
+	);
+}
+
+const documentDropCoordinator = createDocumentDropCoordinator({
+	persist: persistDocumentPlacement,
+});
+
 onMount(() => {
 	if (INITIAL_FETCH_DELAY_MS <= 0) {
 		void refresh();
@@ -751,6 +807,7 @@ function handleConsider(zone: DocZone) {
 		isDraggingDoc = true;
 		if (e.detail.info?.id) {
 			draggedDocId = e.detail.info.id;
+			documentDropCoordinator.begin(e.detail.info.id);
 		}
 		const next = sanitizeItems(e.detail.items);
 		setZoneItems(zone, next);
@@ -772,19 +829,10 @@ function handleFinalize(zone: DocZone) {
 			e.detail.info?.trigger,
 			"isSourceZone:",
 			isSourceZone,
-			"droppedOnHeader:",
-			droppedOnHeader,
 		);
 		const finalizedDocumentId = e.detail.info?.id ?? draggedDocId;
 		if (!isSourceZone && finalizedDocumentId) {
-			if (droppedOnHeader) {
-				debugLog(
-					"[DnD] Skipping persistZoneChanges because droppedOnHeader is true",
-				);
-				droppedOnHeader = false;
-			} else {
-				void persistZoneChanges(zone, finalizedDocumentId);
-			}
+			documentDropCoordinator.zone(finalizedDocumentId, placementForZone(zone));
 		}
 		isDraggingGlobal = false;
 		isDraggingDoc = false;
@@ -801,7 +849,7 @@ function handleFinalize(zone: DocZone) {
 	};
 }
 
-async function persistZoneChanges(zone: DocZone, documentId: string) {
+function placementForZone(zone: DocZone): SidebarDocumentPlacement {
 	const targetFolderId: string | null = zone.kind === "folder" ? zone.id : null;
 	const targetCategoryId: string | null =
 		zone.kind === "category"
@@ -810,58 +858,7 @@ async function persistZoneChanges(zone: DocZone, documentId: string) {
 				? null
 				: // Resolve nested folder category ID using the registry
 					(getFolderFromRegistry(zone.id)?.categoryId ?? null);
-	debugLog(
-		"[DnD] persistZoneChanges zone:",
-		zone,
-		"targetFolderId:",
-		targetFolderId,
-		"targetCategoryId:",
-		targetCategoryId,
-	);
-	const original = getDocumentFromRegistry(documentId);
-	if (!original) {
-		debugLog("[DnD] Item not found in registry:", documentId);
-		return;
-	}
-	const folderChanged = original.folderId !== targetFolderId;
-	const categoryChanged = original.categoryId !== targetCategoryId;
-	if (!folderChanged && !categoryChanged) {
-		debugLog("[DnD] No updates to persist for zone:", zone);
-		return;
-	}
-	const placementVersion = publishDocumentPlacement(
-		documentId,
-		targetFolderId,
-		targetCategoryId,
-	);
-	try {
-		await updateDocument(documentId, {
-			folderId: targetFolderId,
-			categoryId: targetCategoryId,
-		});
-		// Only re-sync from the server when the backend confirmed the move.
-		await refresh();
-		acknowledgeDocumentPlacement(documentId, placementVersion);
-	} catch (err) {
-		acknowledgeDocumentPlacement(documentId, placementVersion);
-		registerDocument(documentId, original.folderId, original.categoryId);
-		documents = documents.map((doc) =>
-			doc.id === documentId
-				? {
-						...doc,
-						folderId: original.folderId,
-						categoryId: original.categoryId,
-					}
-				: doc,
-		);
-		resyncZonesFromDocuments();
-		console.error("FolderTree: persist failed", err);
-		setDndError(
-			err instanceof Error
-				? `Move failed: ${err.message}`
-				: "Move failed: unknown error",
-		);
-	}
+	return { folderId: targetFolderId, categoryId: targetCategoryId };
 }
 
 function handleDragOver(e: DragEvent) {
@@ -873,122 +870,47 @@ function handleDragOver(e: DragEvent) {
 	}
 }
 
-async function handleDropOnCategory(e: DragEvent, categoryId: string) {
+function handleDropOnCategory(e: DragEvent, categoryId: string) {
 	if (!draggedDocId) return;
 	const documentId = draggedDocId;
-	droppedOnHeader = true;
 	e.preventDefault();
 	e.stopPropagation();
 
 	const targetCategoryId = categoryId === UNCATEGORIZED_KEY ? null : categoryId;
 	const original = getDocumentFromRegistry(documentId);
-	if (!original) {
-		droppedOnHeader = false;
-		return;
-	}
+	if (!original) return;
 
 	const folderChanged = original.folderId !== null;
 	const categoryChanged = original.categoryId !== targetCategoryId;
 
 	if (folderChanged || categoryChanged) {
-		const placementVersion = publishDocumentPlacement(
-			documentId,
-			null,
-			targetCategoryId,
-		);
-		documents = documents.map((d) =>
-			d.id === documentId
-				? { ...d, folderId: null, categoryId: targetCategoryId }
-				: d,
-		);
-		resyncZonesFromDocuments();
-
-		try {
-			debugLog(
-				"[DnD] Drop on category header:",
-				categoryId,
-				"doc:",
-				documentId,
-			);
-			await updateDocument(documentId, {
-				folderId: null,
-				categoryId: targetCategoryId,
-			});
-			await refresh();
-			acknowledgeDocumentPlacement(documentId, placementVersion);
-		} catch (err) {
-			acknowledgeDocumentPlacement(documentId, placementVersion);
-			registerDocument(documentId, original.folderId, original.categoryId);
-			documents = documents.map((doc) =>
-				doc.id === documentId ? { ...doc, ...original } : doc,
-			);
-			resyncZonesFromDocuments();
-			console.error("Failed to move document to category header", err);
-			setDndError(err instanceof Error ? err.message : "Move failed");
-		} finally {
-			droppedOnHeader = false;
-		}
+		documentDropCoordinator.header(documentId, {
+			folderId: null,
+			categoryId: targetCategoryId,
+		});
 	}
-	droppedOnHeader = false;
 	draggedDocId = null;
 }
 
-async function handleDropOnFolder(e: DragEvent, folderId: string) {
+function handleDropOnFolder(e: DragEvent, folderId: string) {
 	if (!draggedDocId) return;
 	const documentId = draggedDocId;
-	droppedOnHeader = true;
 	e.preventDefault();
 	e.stopPropagation();
 
 	const targetFolder = getFolderFromRegistry(folderId);
 	const targetCategoryId = targetFolder?.categoryId ?? null;
 	const original = getDocumentFromRegistry(documentId);
-	if (!original) {
-		droppedOnHeader = false;
-		return;
-	}
+	if (!original) return;
 
 	const folderChanged = original.folderId !== folderId;
 
 	if (folderChanged) {
-		const placementVersion = publishDocumentPlacement(
-			documentId,
+		documentDropCoordinator.header(documentId, {
 			folderId,
-			targetCategoryId,
-		);
-		documents = documents.map((d) =>
-			d.id === documentId
-				? { ...d, folderId: folderId, categoryId: targetCategoryId }
-				: d,
-		);
-		resyncZonesFromDocuments();
-
-		try {
-			debugLog("[DnD] Drop on folder header:", folderId, "doc:", documentId);
-			await updateDocument(documentId, {
-				folderId: folderId,
-				categoryId: targetCategoryId,
-			});
-			await refresh();
-			acknowledgeDocumentPlacement(documentId, placementVersion);
-			bumpSubfoldersRefresh(folderId);
-			if (original.folderId) {
-				bumpSubfoldersRefresh(original.folderId);
-			}
-		} catch (err) {
-			acknowledgeDocumentPlacement(documentId, placementVersion);
-			registerDocument(documentId, original.folderId, original.categoryId);
-			documents = documents.map((doc) =>
-				doc.id === documentId ? { ...doc, ...original } : doc,
-			);
-			resyncZonesFromDocuments();
-			console.error("Failed to move document to folder header", err);
-			setDndError(err instanceof Error ? err.message : "Move failed");
-		} finally {
-			droppedOnHeader = false;
-		}
+			categoryId: targetCategoryId,
+		});
 	}
-	droppedOnHeader = false;
 	draggedDocId = null;
 }
 
