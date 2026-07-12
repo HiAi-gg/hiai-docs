@@ -17,7 +17,6 @@
      folder to detach them. -->
 <script lang="ts">
 import { Button } from "@hiai-gg/hiai-ui/components/ui/button";
-import { ConfirmDialog } from "@hiai-gg/hiai-ui/components/ui/confirm-dialog";
 import {
 	Dialog,
 	DialogDescription,
@@ -72,6 +71,7 @@ import {
 	listFolders,
 	updateFolder,
 } from "$lib/api/folders";
+import DeleteDialog from "$lib/components/DeleteDialog.svelte";
 import FolderDialog from "$lib/components/FolderDialog.svelte";
 import ShareDialog from "$lib/components/ShareDialog.svelte";
 import CategoryDialog from "$lib/components/sidebar/CategoryDialog.svelte";
@@ -265,7 +265,6 @@ let deleteTarget = $state<{
 	id: string;
 	name: string;
 } | null>(null);
-let deleteBusy = $state(false);
 
 let showShareDialog = $state(false);
 let shareDocumentId = $state("");
@@ -1414,30 +1413,21 @@ function openShareDialogForFolder(id: string, name: string) {
 function cancelDelete() {
 	showDeleteDialog = false;
 	deleteTarget = null;
-	deleteBusy = false;
 }
 
 async function confirmDelete() {
 	const target = deleteTarget;
-	if (!target || deleteBusy) return;
-	deleteBusy = true;
-	try {
-		if (target.kind === "folder") {
-			// Deleting a folder moves its documents back to the root: the
-			// documents.folder_id foreign key is ON DELETE SET NULL, so the
-			// documents survive and reappear at the top level.
-			await deleteFolder(target.id);
-		} else {
-			await deleteDocument(target.id);
-		}
-		cancelDelete();
-		await refresh();
-		refreshDocs();
-	} catch (err) {
-		console.error("FolderTree: delete failed", err);
-		loadError = err instanceof Error ? err.message : m.error_generic();
-		deleteBusy = false;
+	if (!target) return;
+	if (target.kind === "folder") {
+		// Deleting a folder moves its documents back to the root: the
+		// documents.folder_id foreign key is ON DELETE SET NULL, so the
+		// documents survive and reappear at the top level.
+		await deleteFolder(target.id);
+	} else {
+		await deleteDocument(target.id);
 	}
+	await refresh();
+	refreshDocs();
 }
 
 // --- Category CRUD handlers ---
@@ -1992,18 +1982,21 @@ const buckets = $derived.by(() => {
 </Dialog>
 
 <!-- Delete confirmation (folders and documents) -->
-<ConfirmDialog
-  bind:open={showDeleteDialog}
-  title={deleteTarget?.kind === "folder" ? m.folders_delete_title() : m.doc_delete()}
-  description={deleteTarget?.kind === "folder"
-    ? "Delete this folder? Its documents will be moved to the root and will not be deleted."
-    : m.doc_delete_confirm()}
-  confirmLabel={m.action_delete()}
-  cancelLabel={m.action_cancel()}
-  variant="destructive"
-  busy={deleteBusy}
-  onConfirm={confirmDelete}
-  onCancel={cancelDelete}
+<DeleteDialog
+	bind:open={showDeleteDialog}
+	targetName={deleteTarget?.name ?? ""}
+	title={deleteTarget?.kind === "folder" ? m.folders_delete_title() : m.doc_delete()}
+	description={deleteTarget?.kind === "folder"
+		? "Its documents will be moved to the root and will not be deleted."
+		: m.doc_delete_confirm()}
+	successTitle={deleteTarget?.kind === "folder" ? m.folders_delete_success() : m.doc_delete_success()}
+	successDescription={deleteTarget?.kind === "folder"
+		? m.folders_delete_success_description()
+		: m.doc_delete_success_description()}
+	confirmLabel={m.action_delete()}
+	cancelLabel={m.action_cancel()}
+	onConfirm={confirmDelete}
+	onCancel={cancelDelete}
 />
 
 <!-- Category CRUD dialog -->

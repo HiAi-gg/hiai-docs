@@ -105,6 +105,7 @@ let latestIssuedId = $state<string | null>(null);
 let keyBusy = $state(false);
 let createdCategoryName = $state<string | null>(null);
 let createdCategoryKey = $state<string | null>(null);
+let deletedCategoryName = $state<string | null>(null);
 const latestIssuedKey = $derived(
 	latestIssuedId ? issuedKeys[latestIssuedId] : undefined,
 );
@@ -180,6 +181,7 @@ $effect(() => {
 	categoryKeys = [];
 	createdCategoryName = null;
 	createdCategoryKey = null;
+	deletedCategoryName = null;
 	if (mode === "edit" && category?.id) void refreshCategoryKeys(category.id);
 	error = null;
 });
@@ -190,11 +192,13 @@ const hasAnyPermission = $derived(
 	apiPermissionRead || apiPermissionEdit || apiPermissionWrite,
 );
 const title = $derived(
-	isDeleteMode
-		? m.categories_delete_title()
-		: mode === "edit"
-			? m.categories_edit_title()
-			: m.categories_create_title(),
+	deletedCategoryName
+		? m.categories_delete_success()
+		: isDeleteMode
+			? m.categories_delete_title()
+			: mode === "edit"
+				? m.categories_edit_title()
+				: m.categories_create_title(),
 );
 const submitLabel = $derived(
 	isDeleteMode
@@ -249,7 +253,7 @@ async function handleSubmit(e?: Event) {
 		busy = true;
 		try {
 			await onDelete();
-			close();
+			deletedCategoryName = category?.name ?? "Category";
 		} catch (err) {
 			console.error("CategoryDialog: delete failed", err);
 			error = err instanceof Error ? err.message : m.categories_delete_error();
@@ -318,8 +322,14 @@ function close() {
 <Dialog bind:open onOpenChange={(next) => { if (!next) close(); }}>
 	<DialogHeader>
 		<DialogTitle>{title}</DialogTitle>
-		{#if isDeleteMode}
+		{#if deletedCategoryName}
 			<DialogDescription>
+				<span class="font-medium text-foreground">“{deletedCategoryName}”</span>
+				{m.categories_delete_success_description()}
+			</DialogDescription>
+		{:else if isDeleteMode}
+			<DialogDescription>
+				Delete <span class="font-medium text-foreground">“{category?.name ?? "Category"}”</span>?
 				{m.categories_delete_description()}
 			</DialogDescription>
 		{:else}
@@ -329,7 +339,18 @@ function close() {
 		{/if}
 	</DialogHeader>
 
-	{#if createdCategoryName}
+	{#if deletedCategoryName}
+		<div class="flex items-start gap-3 rounded-lg border border-primary/30 bg-primary/10 p-4" role="status" aria-live="polite">
+			<CheckCircle2 class="mt-0.5 size-5 shrink-0 text-primary" />
+			<div>
+				<p class="text-sm font-medium text-foreground">{m.categories_delete_success()}</p>
+				<p class="text-sm text-muted-foreground">
+					<span class="font-medium text-foreground">“{deletedCategoryName}”</span>
+					{m.categories_delete_success_description()}
+				</p>
+			</div>
+		</div>
+	{:else if createdCategoryName}
 		<div class="space-y-3 rounded-lg border border-primary/30 bg-primary/10 p-4" role="status" aria-live="polite">
 			<div class="flex items-start gap-3">
 				<CheckCircle2 class="mt-0.5 size-5 shrink-0 text-primary" />
@@ -461,7 +482,7 @@ function close() {
 	{/if}
 
 	<DialogFooter>
-		{#if !createdCategoryName}
+		{#if !createdCategoryName && !deletedCategoryName}
 			<Button variant="outline" type="button" onclick={close} disabled={busy}>
 				{m.action_cancel()}
 			</Button>
@@ -469,13 +490,13 @@ function close() {
 		<Button
 			type={isDeleteMode ? "button" : "submit"}
 			variant={isDeleteMode ? "destructive" : "default"}
-			onclick={createdCategoryName ? close : handleSubmit}
-			disabled={busy || (!isDeleteMode && !createdCategoryName && trimmedName.length === 0)}
+			onclick={createdCategoryName || deletedCategoryName ? close : handleSubmit}
+			disabled={busy || (!isDeleteMode && !createdCategoryName && !deletedCategoryName && trimmedName.length === 0)}
 		>
 			{#if busy}
 				<Loader2 class="mr-1 size-4 animate-spin" />
 			{/if}
-			{createdCategoryName ? "Done" : submitLabel}
+			{createdCategoryName || deletedCategoryName ? "Done" : submitLabel}
 		</Button>
 	</DialogFooter>
 </Dialog>
