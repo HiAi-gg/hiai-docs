@@ -1,5 +1,13 @@
 import { describe, expect, test } from "bun:test";
-import { fetchRemoteImage, isPublicAddress } from "../lib/remote-image";
+import {
+	fetchRemoteImage,
+	isPublicAddress,
+	resolvePublicRemoteTarget,
+} from "../lib/remote-image";
+
+const PNG_SIGNATURE = Uint8Array.from([
+	0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
+]);
 
 describe("remote image SSRF protection", () => {
 	test("rejects private and loopback addresses", () => {
@@ -19,15 +27,29 @@ describe("remote image SSRF protection", () => {
 	});
 
 	test("accepts a bounded supported image", async () => {
+		let connectedHost = "";
 		const result = await fetchRemoteImage(
 			"https://93.184.216.34/image",
-			async () =>
-				new Response(Uint8Array.from([1, 2, 3]), {
-					headers: { "content-type": "image/png", "content-length": "3" },
-				}),
+			async (input) => {
+				connectedHost = new URL(String(input)).hostname;
+				return new Response(PNG_SIGNATURE, {
+					headers: { "content-type": "image/png", "content-length": "8" },
+				});
+			},
 		);
 		expect(result.contentType).toBe("image/png");
-		expect(result.bytes).toEqual(Uint8Array.from([1, 2, 3]));
+		expect(result.bytes).toEqual(PNG_SIGNATURE);
+		expect(connectedHost).toBe("93.184.216.34");
+	});
+
+	test("pins a validated hostname to the resolved connect address", async () => {
+		const target = await resolvePublicRemoteTarget(
+			new URL("https://example.com/image.png"),
+			async () => [{ address: "93.184.216.34", family: 4 as const }],
+		);
+		expect(target.connectUrl.hostname).not.toBe("example.com");
+		expect(target.hostHeader).toBe("example.com");
+		expect(target.serverName).toBe("example.com");
 	});
 
 	test("rejects redirects to private hosts", async () => {
@@ -51,5 +73,15 @@ describe("remote image SSRF protection", () => {
 					new Response("secret", { headers: { "content-type": "text/plain" } }),
 			),
 		).rejects.toThrow("Unsupported remote image type");
+	});
+
+	test("rejects a spoofed image body", async () => {
+		await expect(
+			fetchRemoteImage(
+				"https://93.184.216.34/image",
+				async () =>
+					new Response("not png", { headers: { "content-type": "image/png" } }),
+			),
+		).rejects.toThrow("does not match");
 	});
 });

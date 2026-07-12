@@ -100,6 +100,16 @@ export interface ShareDocumentScope {
 	expiresAt: Date | null;
 }
 
+export async function verifyShareScopePassword(
+	scope: Pick<ShareDocumentScope, "passwordHash">,
+	password: string | null,
+	verify: (password: string, hash: string) => Promise<boolean> = Bun.password
+		.verify,
+): Promise<boolean> {
+	if (!scope.passwordHash) return true;
+	return password !== null && verify(password, scope.passwordHash);
+}
+
 export function documentReferencesAttachment(
 	document: { content?: string | null; contentJson?: unknown },
 	attachmentId: string,
@@ -109,6 +119,34 @@ export function documentReferencesAttachment(
 		(document.content?.includes(path) ?? false) ||
 		JSON.stringify(document.contentJson ?? null).includes(path)
 	);
+}
+
+export function documentReferencesRemoteImage(
+	document: { content?: string | null; contentJson?: unknown },
+	source: string,
+): boolean {
+	const visit = (value: unknown): boolean => {
+		if (!value || typeof value !== "object") return false;
+		if (Array.isArray(value)) return value.some(visit);
+		const record = value as Record<string, unknown>;
+		if (
+			record.type === "image" &&
+			record.attrs &&
+			typeof record.attrs === "object" &&
+			(record.attrs as Record<string, unknown>).src === source
+		) {
+			return true;
+		}
+		return Object.values(record).some(visit);
+	};
+	if (visit(document.contentJson)) return true;
+	const markdown = document.content ?? "";
+	for (const match of markdown.matchAll(
+		/!\[[^\]]*\]\((?:<([^>]+)>|([^\s)]+))(?:\s+["'][^"']*["'])?\)/g,
+	)) {
+		if ((match[1] ?? match[2]) === source) return true;
+	}
+	return false;
 }
 
 /**

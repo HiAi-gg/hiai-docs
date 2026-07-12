@@ -13,8 +13,11 @@ import { config } from "../../lib/config";
 import { logger } from "../../lib/logger";
 import { fetchRemoteImage } from "../../lib/remote-image";
 import {
+	documentReferencesRemoteImage,
+	resolveShareDocumentScope,
 	shareTokenAccessForDocument,
 	shareTokenReferencesAttachment,
+	verifyShareScopePassword,
 } from "../../lib/share-access";
 import { BUCKET, storage, storagePublic } from "../../lib/storage";
 import { withTenant } from "../../lib/with-tenant";
@@ -917,21 +920,25 @@ export const attachmentRoutes = new Elysia({ prefix: "/api" })
 					set.status = 403;
 					return { error: "Forbidden" };
 				}
-			} else if (
-				!shareToken ||
-				(await shareTokenAccessForDocument(
-					lookupCtx,
-					documentId,
-					shareToken,
-				)) !== "granted"
-			) {
-				set.status = 401;
-				return { error: "Authentication required" };
+			} else {
+				const scope = shareToken
+					? await resolveShareDocumentScope(lookupCtx, shareToken)
+					: null;
+				if (!scope?.documentIds.includes(documentId)) {
+					set.status = 401;
+					return { error: "Authentication required" };
+				}
+				if (
+					!(await verifyShareScopePassword(
+						scope,
+						request.headers.get("x-share-password"),
+					))
+				) {
+					set.status = 401;
+					return { error: "Authentication required" };
+				}
 			}
-			const serialized = JSON.stringify(document.contentJson ?? null);
-			if (
-				!(document.content?.includes(source) || serialized.includes(source))
-			) {
+			if (!documentReferencesRemoteImage(document, source)) {
 				set.status = 403;
 				return { error: "Image URL is not referenced by this document" };
 			}
