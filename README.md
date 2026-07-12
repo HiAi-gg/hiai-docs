@@ -1,11 +1,13 @@
-# hiai-docs
+# HiAi-Docs
 
-**A self-hosted, AI-native knowledge base for people, applications, and agents.**
+**A self-hosted, AI-native knowledge workspace for people, applications, and agents.**
 
-hiai-docs combines a Markdown-first document workspace with automatic chunking,
-1024-dimensional embeddings, multilingual hybrid search, and GraphRAG. It ships
-with a web application, REST API, TypeScript SDK, CLI, and MCP server, so the
-same knowledge base can be used by people and AI tools.
+HiAi-Docs stores documents in a structured JSON editor model first. Markdown is
+the convenient second format for editing, importing, and exporting content.
+Automatic chunking, 1024-dimensional embeddings, multilingual hybrid search,
+and GraphRAG make the same knowledge base useful to people, applications, and
+agents through the web application, REST API, TypeScript SDK, CLI, and MCP
+server.
 
 [![MIT License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Release](https://img.shields.io/github/v/release/hiai-gg/hiai-docs?sort=semver)](https://github.com/hiai-gg/hiai-docs/releases)
@@ -19,9 +21,9 @@ same knowledge base can be used by people and AI tools.
 [![Drizzle_ORM](https://img.shields.io/badge/Drizzle_ORM-0.45-C5F74F?logo=drizzle&logoColor=black)](https://orm.drizzle.team)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 
-<img width="1920" height="974" alt="hiai-docs document workspace" src="https://github.com/user-attachments/assets/94701d01-a361-4ca1-b16d-de2a0c64d684" />
+<img width="1920" height="974" alt="HiAi-Docs document workspace" src="https://github.com/user-attachments/assets/94701d01-a361-4ca1-b16d-de2a0c64d684" />
 
-## Why hiai-docs?
+## Why HiAi-Docs?
 
 - **Write naturally** in a rich visual editor or raw Markdown.
 - **Find meaning, not only keywords** with exact, lexical, fuzzy, vector,
@@ -36,12 +38,12 @@ same knowledge base can be used by people and AI tools.
 
 ## Fastest installation: give this prompt to your agent
 
-If you are installing hiai-docs through an AI coding agent, use this path first.
+If you are installing HiAi-Docs through an AI coding agent, use this path first.
 It keeps the setup to Docker plus one provider choice and avoids unnecessary
 source-code changes.
 
 ```text
-Install hiai-docs from https://github.com/HiAi-gg/hiai-docs.
+Install HiAi-Docs from https://github.com/HiAi-gg/hiai-docs.
 Verify Docker and Docker Compose v2, clone the repository, and run
 `bash scripts/quickstart.sh`. Do not print or commit .env. Ask me to enter only
 an OpenRouter key or select Ollama, then run quickstart again. Verify
@@ -119,10 +121,10 @@ The canonical local ports are:
 See [Deployment](docs/DEPLOYMENT.md) for domains, TLS, provider tuning,
 backups, and production operation.
 
-## Use hiai-docs from the terminal
+## Use HiAi-Docs from the terminal
 
 The published package includes the CLI. It connects to an already running
-hiai-docs server; installing it does not deploy the server.
+HiAi-Docs server; installing it does not deploy the server.
 
 ```bash
 bunx --package @hiai-gg/hiai-docs hiai-docs init \
@@ -141,7 +143,7 @@ command and configuration precedence.
 
 ## Connect an MCP client
 
-hiai-docs exposes document search, reading, creation, updates, folders,
+HiAi-Docs exposes document search, reading, creation, updates, folders,
 snapshots, history, and export as MCP tools.
 
 ```json
@@ -274,16 +276,16 @@ For pipeline internals and tuning, see [Architecture](docs/ARCHITECTURE.md) and
 
 ## Comparison
 
-hiai-docs overlaps with several excellent open-source knowledge tools, but its
+HiAi-Docs overlaps with several excellent open-source knowledge tools, but its
 focus is a compact knowledge runtime shared equally by humans and agents.
 
-| Project | Primary strength | Difference from hiai-docs |
+| Project | Primary strength | Difference from HiAi-Docs |
 |---|---|---|
-| [Outline](https://github.com/outline/outline) | Polished team wiki and collaboration | hiai-docs emphasizes built-in retrieval, GraphRAG, scoped agent access, CLI, and MCP |
-| [Docmost](https://github.com/docmost/docmost) | Collaborative wiki and real-time editing | hiai-docs centers automatic embeddings and agent-facing integration surfaces |
-| [AppFlowy](https://github.com/AppFlowy-IO/AppFlowy) | Broad local-first productivity workspace | hiai-docs is narrower: a self-hosted document and retrieval service |
-| [AnythingLLM](https://github.com/Mintplex-Labs/anything-llm) | Chat-oriented RAG over imported sources | hiai-docs starts with the editable knowledge base and exposes it to many clients |
-| [Danswer](https://github.com/danswer-ai/danswer) / Onyx | Enterprise search across external connectors | hiai-docs owns and edits its native corpus rather than primarily indexing other systems |
+| [Outline](https://github.com/outline/outline) | Polished team wiki and collaboration | HiAi-Docs emphasizes built-in retrieval, GraphRAG, scoped agent access, CLI, and MCP |
+| [Docmost](https://github.com/docmost/docmost) | Collaborative wiki and real-time editing | HiAi-Docs centers automatic embeddings and agent-facing integration surfaces |
+| [AppFlowy](https://github.com/AppFlowy-IO/AppFlowy) | Broad local-first productivity workspace | HiAi-Docs is narrower: a self-hosted document and retrieval service |
+| [AnythingLLM](https://github.com/Mintplex-Labs/anything-llm) | Chat-oriented RAG over imported sources | HiAi-Docs starts with the editable knowledge base and exposes it to many clients |
+| [Danswer](https://github.com/danswer-ai/danswer) / Onyx | Enterprise search across external connectors | HiAi-Docs owns and edits its native corpus rather than primarily indexing other systems |
 
 This is a product-positioning summary, not a claim that every listed project
 lacks a feature. Check each project's current documentation when choosing a
@@ -315,6 +317,6 @@ report vulnerabilities through [SECURITY.md](SECURITY.md), not a public issue.
 
 ## License
 
-hiai-docs is released under the [MIT License](LICENSE).
+HiAi-Docs is released under the [MIT License](LICENSE).
 
 Part of the [HiAi](https://hiai.gg) open-source ecosystem.
