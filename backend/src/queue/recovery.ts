@@ -34,6 +34,8 @@ export interface RecoverablePipelineJob {
 	stage: PipelineStage;
 	job: PipelineJob;
 	attempts: number;
+	/** Optimistic-lock token captured by the stale scan. */
+	observedUpdatedAt: Date;
 }
 
 export interface RecoveryStore {
@@ -45,6 +47,7 @@ export interface RecoveryStore {
 		runId: string;
 		stage: PipelineStage;
 		maxAttempts: number;
+		observedUpdatedAt: Date;
 	}): Promise<boolean>;
 	markExhausted(input: {
 		runId: string;
@@ -110,6 +113,7 @@ export async function recoverStalledPipeline(
 				runId: candidate.runId,
 				stage: candidate.stage,
 				maxAttempts,
+				observedUpdatedAt: candidate.observedUpdatedAt,
 			}))
 		)
 			continue;
@@ -124,11 +128,17 @@ export async function recoverStalledPipeline(
 }
 
 const admin = adminTenantContext(ZERO_UUID);
+const stalled = ["pending", "processing", "retrying"] as const;
 const active = ["processing", "retrying"] as const;
 
 function stalledStage(
 	run: typeof documentPipelineRuns.$inferSelect,
 ): PipelineStage | null {
+	// The run is committed before Queue.add. Redis loss at that boundary leaves
+	// a pending run without a job. Only prepare is eligible here: pending
+	// downstream stages are normal and must wait for their predecessor.
+	if (run.status === "pending" && run.prepareStatus === "pending")
+		return "prepare";
 	if (active.includes(run.prepareStatus as (typeof active)[number]))
 		return "prepare";
 	if (active.includes(run.embedStatus as (typeof active)[number]))
@@ -150,7 +160,7 @@ export const postgresRecoveryStore: RecoveryStore = {
 				.from(documentPipelineRuns)
 				.where(
 					and(
-						inArray(documentPipelineRuns.status, [...active]),
+						inArray(documentPipelineRuns.status, [...stalled]),
 						lt(documentPipelineRuns.updatedAt, staleBefore),
 					),
 				)
@@ -183,6 +193,7 @@ export const postgresRecoveryStore: RecoveryStore = {
 							runId: run.id,
 							stage,
 							attempts: Math.max(run.attempts, batch.attempts),
+							observedUpdatedAt: run.updatedAt,
 							job: {
 								...base,
 								stage,
@@ -199,6 +210,7 @@ export const postgresRecoveryStore: RecoveryStore = {
 						runId: run.id,
 						stage,
 						attempts: run.attempts,
+						observedUpdatedAt: run.updatedAt,
 						job: { ...base, stage },
 					});
 				}
@@ -206,7 +218,7 @@ export const postgresRecoveryStore: RecoveryStore = {
 			return output;
 		});
 	},
-	async claimRetry({ runId, stage, maxAttempts }) {
+	async claimRetry({ runId, stage, maxAttempts, observedUpdatedAt }) {
 		return withTenant(admin, async (tx) => {
 			const stagePatch =
 				stage === "prepare"
@@ -231,6 +243,7 @@ export const postgresRecoveryStore: RecoveryStore = {
 					and(
 						eq(documentPipelineRuns.id, runId),
 						lt(documentPipelineRuns.attempts, maxAttempts),
+						eq(documentPipelineRuns.updatedAt, observedUpdatedAt),
 					),
 				)
 				.returning({ id: documentPipelineRuns.id });
