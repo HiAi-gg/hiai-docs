@@ -9,7 +9,7 @@ import {
 	withTenant,
 	ZERO_UUID,
 } from "@hiai-docs/db/with-tenant";
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, ne, sql } from "drizzle-orm";
 import { activateEmbeddingGeneration } from "../embedding/generation";
 import { getEmbedding } from "../embedding/index";
 import { chunkHash } from "../lib/chunk-hash";
@@ -269,10 +269,7 @@ export function createPipelineStageDependencies(
 					// Activate it without inventing a vector/profile, remove any
 					// previous generation rows, and leave downstream optional stages
 					// to mark themselves skipped.
-					await tx
-						.delete(documentEmbeddings)
-						.where(eq(documentEmbeddings.documentId, job.documentId));
-					await tx
+					const activated = await tx
 						.update(documents)
 						.set({
 							activeEmbeddingGeneration: job.generationId,
@@ -287,6 +284,16 @@ export function createPipelineStageDependencies(
 								eq(documents.id, job.documentId),
 								eq(documents.ownerId, job.ownerId),
 								eq(documents.pendingEmbeddingGeneration, job.generationId),
+							),
+						)
+						.returning({ id: documents.id });
+					if (activated.length !== 1) return;
+					await tx
+						.delete(documentEmbeddings)
+						.where(
+							and(
+								eq(documentEmbeddings.documentId, job.documentId),
+								ne(documentEmbeddings.generationId, job.generationId),
 							),
 						);
 					await tx
