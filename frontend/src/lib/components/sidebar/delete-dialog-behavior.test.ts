@@ -14,6 +14,8 @@ describe("delete confirmation UX", () => {
 	test("requires an explicit confirmation and prevents duplicate submits", () => {
 		expect(dialogSource).toContain("Delete <span");
 		expect(dialogSource).toContain("if (busy || success) return");
+		expect(dialogSource).toContain("if (!next && busy)");
+		expect(dialogSource).toContain("open = true");
 		expect(dialogSource).toContain('role="alert"');
 	});
 
@@ -31,6 +33,11 @@ describe("delete confirmation UX", () => {
 			'Delete <span class="font-medium text-foreground">',
 		);
 		expect(categoryDialogSource).toContain("m.categories_delete_success()");
+		expect(categoryDialogSource).toContain(
+			"function handleDialogOpenChange(next: boolean)",
+		);
+		expect(categoryDialogSource).toContain("if (!next && busy)");
+		expect(categoryDialogSource).toContain("open = true");
 		expect(categoryDialogSource).toContain(
 			"error = err instanceof Error ? err.message : m.categories_delete_error()",
 		);

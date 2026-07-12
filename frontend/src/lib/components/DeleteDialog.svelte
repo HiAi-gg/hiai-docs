@@ -77,15 +77,23 @@ function handleCancel() {
 	open = false;
 	onCancel?.();
 }
+
+function handleOpenChange(next: boolean) {
+	// bits-ui updates a bindable `open` value before invoking this callback.
+	// Restore it while a destructive request is in flight so Escape,
+	// backdrop clicks, and dialog teardown cannot hide the operation or its
+	// eventual success acknowledgement.
+	if (!next && busy) {
+		open = true;
+		return;
+	}
+	if (!next) handleCancel();
+}
 </script>
 
 <Dialog
 	bind:open
-	onOpenChange={(next: boolean) => {
-		if (!next && !busy) {
-			handleCancel();
-		}
-	}}
+	onOpenChange={handleOpenChange}
 >
 	{#if success}
 		<DialogHeader>

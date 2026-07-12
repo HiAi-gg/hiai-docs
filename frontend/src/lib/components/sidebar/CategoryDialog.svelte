@@ -317,9 +317,20 @@ function close() {
 	open = false;
 	onClose?.();
 }
+
+function handleDialogOpenChange(next: boolean) {
+	// Dialog bindings are updated before this callback runs. Keep the modal
+	// open while a delete/save request is in flight so errors and success
+	// feedback cannot be lost to Escape or a backdrop click.
+	if (!next && busy) {
+		open = true;
+		return;
+	}
+	if (!next) close();
+}
 </script>
 
-<Dialog bind:open onOpenChange={(next) => { if (!next) close(); }}>
+<Dialog bind:open onOpenChange={handleDialogOpenChange}>
 	<DialogHeader>
 		<DialogTitle>{title}</DialogTitle>
 		{#if deletedCategoryName}
