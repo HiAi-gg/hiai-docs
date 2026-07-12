@@ -615,6 +615,19 @@ export const documentRoutes = new Elysia({ prefix: "/api" })
 					}
 					return result;
 				},
+				{
+					// Large imported documents are already stored durably in Postgres.
+					// Duplicating multi-megabyte Markdown/editor JSON in Redis makes a
+					// single open evict useful cache entries and adds avoidable main-thread
+					// JSON serialization pressure to the API process.
+					shouldCache: (value) => {
+						if (!value || "error" in value) return true;
+						const jsonSize = value.contentJson
+							? JSON.stringify(value.contentJson).length
+							: 0;
+						return (value.content?.length ?? 0) + jsonSize <= 512 * 1024;
+					},
+				},
 			);
 		} catch (err) {
 			logger.error({ err }, "Failed to get document");

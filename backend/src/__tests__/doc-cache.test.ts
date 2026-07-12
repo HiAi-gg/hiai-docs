@@ -206,4 +206,15 @@ describe("cacheGetOrSet with user-scoped keys", () => {
 		expect(computedCalled).toBe(false);
 		expect(result).toEqual({ id: docId, ownerId: "user-A" });
 	});
+
+	it("can bypass Redis for oversized computed values", async () => {
+		const key = mod.docSingleKey("doc-large", "user-A");
+		const value = { id: "doc-large", content: "A".repeat(1_000_000) };
+		const result = await mod.cacheGetOrSet(key, 60, async () => value, {
+			shouldCache: (candidate) => candidate.content.length < 512 * 1024,
+		});
+
+		expect(result).toBe(value);
+		expect(fakeStore.has(key)).toBe(false);
+	});
 });

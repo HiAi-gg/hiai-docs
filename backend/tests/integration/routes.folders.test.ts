@@ -166,6 +166,40 @@ describe("GET /api/folders/:id", () => {
     expect((res.body as any).id).toBe(id);
     expect((res.body as any).name).toBe("My Folder");
   });
+
+  it("returns document metadata without loading document bodies", async () => {
+    const state = getState();
+    const id = "11111111-1111-4111-8111-111111111112";
+    const documentId = "22222222-2222-4222-8222-222222222222";
+    state.folders.set(id, {
+      id,
+      ownerId: OWNER_ID,
+      name: "Large documents",
+      parentId: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+    state.documents.set(documentId, {
+      id: documentId,
+      ownerId: OWNER_ID,
+      folderId: id,
+      categoryId: null,
+      title: "Large import",
+      content: "A".repeat(2_000_000),
+      contentJson: null,
+      visibility: "private",
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    const res = await authedGet(`/api/folders/${id}`);
+    expect(res.status).toBe(200);
+    const [document] = (res.body as any).documents;
+    expect(document.id).toBe(documentId);
+    expect(document.title).toBe("Large import");
+		expect(document.content).toHaveLength(200);
+    expect(document).not.toHaveProperty("contentJson");
+  });
 });
 
 describe("POST /api/folders", () => {

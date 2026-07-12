@@ -112,8 +112,17 @@ export const folderRoutes = new Elysia({ prefix: "/api/folders" })
 						and(eq(folders.parentId, params.id), eq(folders.ownerId, userId)),
 					)
 					.orderBy(folders.order, folders.name);
-				const childDocs = await tx
-					.select()
+				const childDocRows = await tx
+					.select({
+						id: documents.id,
+						title: documents.title,
+						content: sql<string>`LEFT(${documents.content}, 200)`.as("content"),
+						folderId: documents.folderId,
+						categoryId: documents.categoryId,
+						visibility: documents.visibility,
+						createdAt: documents.createdAt,
+						updatedAt: documents.updatedAt,
+					})
 					.from(documents)
 					.where(
 						and(
@@ -122,6 +131,10 @@ export const folderRoutes = new Elysia({ prefix: "/api/folders" })
 						),
 					)
 					.orderBy(documents.updatedAt);
+				const childDocs = childDocRows.map((document) => ({
+					...document,
+					content: document.content?.slice(0, 200) ?? "",
+				}));
 				return { ...row, children: childFolders, documents: childDocs };
 			});
 			if (!result) {

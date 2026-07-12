@@ -30,6 +30,7 @@ export async function cacheGetOrSet<T>(
 	key: string,
 	ttl: number,
 	compute: () => Promise<T>,
+	options: { shouldCache?: (value: T) => boolean } = {},
 ): Promise<T> {
 	try {
 		const cached = await redis.get(key);
@@ -38,6 +39,7 @@ export async function cacheGetOrSet<T>(
 		logger.warn({ err, key }, "Redis get failed, falling through to DB");
 	}
 	const value = await compute();
+	if (options.shouldCache && !options.shouldCache(value)) return value;
 	try {
 		await redis.set(key, JSON.stringify(value), "EX", ttl);
 	} catch (err) {

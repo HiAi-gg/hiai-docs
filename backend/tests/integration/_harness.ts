@@ -151,7 +151,10 @@ const markLt = (col: any, val: any) => ({ [TAG_LT]: true, col, val });
 const markGte = (col: any, val: any) => ({ [TAG_GTE]: true, col, val });
 const markLte = (col: any, val: any) => ({ [TAG_LTE]: true, col, val });
 
-const sql: any = () => ({ [TAG_SQL]: true });
+const sql: any = () => ({
+  [TAG_SQL]: true,
+  as: (name: string) => ({ name }),
+});
 sql.raw = () => "RAW";
 
 const OVERRIDES: Record<string, any> = {
