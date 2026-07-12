@@ -1,765 +1,279 @@
 # hiai-docs
 
-**The lightest AI-native self-hosted knowledge vault.**
+**A self-hosted, AI-native knowledge base for people, applications, and agents.**
 
-[![MIT License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
-[![Release](https://img.shields.io/github/v/release/hiai-gg/hiai-docs?sort=semver)](https://github.com/hiai-gg/hiai-docs/releases)
-[![Stars](https://img.shields.io/github/stars/hiai-gg/hiai-docs)](https://github.com/hiai-gg/hiai-docs/stargazers)
-[![CI](https://github.com/hiai-gg/hiai-docs/actions/workflows/ci.yml/badge.svg)](https://github.com/hiai-gg/hiai-docs/actions/workflows/ci.yml)
-[![Bun](https://img.shields.io/badge/Runtime-Bun_1.3-black?logo=bun&logoColor=white)](https://bun.sh)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org)
-[![Svelte](https://img.shields.io/badge/Svelte-5.x-FF3E00?logo=svelte&logoColor=white)](https://svelte.dev)
-[![Elysia](https://img.shields.io/badge/Elysia-1.4-lightgrey?logo=elysia&logoColor=white)](https://elysiajs.com)
-[![Tailwind_CSS](https://img.shields.io/badge/Tailwind_CSS-v4-06B6D4?logo=tailwindcss&logoColor=white)](https://tailwindcss.com)
-[![Drizzle_ORM](https://img.shields.io/badge/Drizzle_ORM-0.45-C5F74F?logo=drizzle&logoColor=black)](https://orm.drizzle.team)
-[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
+hiai-docs combines a Markdown-first document workspace with automatic chunking,
+1024-dimensional embeddings, multilingual hybrid search, and GraphRAG. It ships
+with a web application, REST API, TypeScript SDK, CLI, and MCP server, so the
+same knowledge base can be used by people and AI tools.
 
-hiai-docs is a lightweight **self-hosted knowledge base** built for users who want speed, full data ownership, and strong AI capabilities without heavy enterprise overhead.
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Bun](https://img.shields.io/badge/runtime-Bun-black)](https://bun.sh)
+[![Version](https://img.shields.io/badge/version-0.2.8-6d5dfc)](CHANGELOG.md)
 
-If you are looking for a **local LLM knowledge base** or a **lightweight Outline alternative** / **Docmost alternative**, hiai-docs offers an elegant, **RAG-ready knowledge vault** that automatically generates vector embeddings on every save, supports hybrid semantic search, and provides a clean REST API for AI agent integration.
-
-## Start here: fast installation
-
-The normal user does not need Bun, Node, PostgreSQL, Redis, SeaweedFS, or any
-source-code configuration. You need Docker Engine/Desktop with the Compose
-plugin. The quickstart builds the unified PostgreSQL image, generates local
-secrets, applies every migration, and starts the complete product.
-
-```bash
-git clone https://github.com/hiai-gg/hiai-docs.git
-cd hiai-docs
-cp .env.example .env
-# Choose OpenRouter (paste the key) or Ollama (set AI_PROVIDER and port).
-bash scripts/quickstart.sh
-```
-
-The user-owned ignored root `.env` is copied from `.env.example`. During an
-agentic installation, the agent must not create, read, edit, rotate, or print
-this file; the user supplies the provider input. `scripts/quickstart.sh` then
-fills only placeholder infrastructure/auth/storage values with random local
-secrets and never prints them. That is the only file a user ever needs to edit:
-
-| Provider | Change in `.env` | Models already configured |
-|---|---|---|
-| OpenRouter (default) | Set `OPENROUTER_API_KEY=sk-or-...` | `text-embedding-3-small` → `bge-m3`; Ministral → Gemma for GraphRAG/search |
-| Ollama | Set `AI_PROVIDER=ollama`; optionally change `OLLAMA_PORT` | `bge-m3` embeddings; `qwen3:8b` for extraction/search |
-
-Queue concurrency, retry, recovery, and provider limiter knobs are documented in
-[Deployment: BullMQ pipeline and local Ollama](docs/DEPLOYMENT.md#bullmq-pipeline-and-local-ollama).
-
-After changing the provider value later, run the same command again:
-
-```bash
-bash scripts/quickstart.sh
-```
-
-Open the application at **http://localhost:50701**. The API health endpoint is
-**http://localhost:50700/api/health**. For Ollama, the host must already have
-the selected models (`ollama pull bge-m3` and `ollama pull qwen3:8b`).
-
-These are the canonical public localhost ports. In Docker, `WEB_PORT` and
-`API_PORT` remap only the published host side; containers always listen on
-`50701` and `50700`, and web reaches API at `http://api:50700`. A custom web
-host port also requires matching `CORS_ORIGINS` and public auth URL values.
-
-For a public domain after the local check, enable the bundled Caddy profile:
-
-```bash
-docker compose --env-file .env --profile caddy up -d
-```
-
-### Rules for a safe quickstart
-
-- Keep the root `.env` private; it is ignored by Git.
-- Never put an API key in source code, a commit, a Dockerfile, or a prompt log.
-- Do not edit migrations or application code for a normal installation.
-- Do not delete Docker volumes during troubleshooting unless data loss is
-  explicitly intended and authorized.
-- For a production domain, configure TLS/Caddy after the local health check.
-
-## Agentic installation rules
-
-Give the following instruction to your coding agent. It is intentionally
-provider-first: the agent may inspect the repository and run verification, but
-must not create, read, or edit `.env` or application source files. The user
-creates `.env` and enters the provider input.
+<img width="1920" height="974" alt="hiai-docs document workspace" src="https://github.com/user-attachments/assets/94701d01-a361-4ca1-b16d-de2a0c64d684" />
+## Why hiai-docs?
+- **Write naturally** in a rich visual editor or raw Markdown.
+- **Find meaning, not only keywords** with exact, lexical, fuzzy, vector,
+  multilingual expansion, and graph retrieval fused through RRF.
+- **Keep retrieval current** with automatic, incremental chunking and
+  re-embedding after document or metadata changes.
+- **Connect agents directly** through REST, a typed SDK, CLI, or MCP.
+- **Control access** with global keys or category-scoped `read`, `edit`, and
+  `write` permissions.
+- **Own the full stack**: application data, vectors, graph, queue, and files run
+  on infrastructure you control.
+## Fastest installation: give this prompt to your agent
+If you are installing hiai-docs through an AI coding agent, use this path first.
+It keeps the setup to Docker plus one provider choice and avoids unnecessary
+source-code changes.
 
 ```text
-Install and launch hiai-docs from https://github.com/hiai-gg/hiai-docs.
-
-1. Check Docker Engine/Desktop and Docker Compose v2. Do not install Node or
-   replace the Bun/Docker workflow.
-2. Clone the repository if it is not already present. Ask the user to run
-   `cp .env.example .env` and provide exactly one provider input: an OpenRouter
-   API key, or Ollama host port (default 11434). Never ask the user to edit
-   source code.
-3. Do not read or write `.env`. After the user has entered the provider input,
-   ask them to run `bash scripts/quickstart.sh`; it generates all DB/auth/storage
-   secrets, builds the custom PostgreSQL image, runs migrations 0000 through
-   the current journal, and starts API, web, Redis, and SeaweedFS.
-4. Verify, without printing secrets:
-   - http://localhost:50701 loads;
-   - http://localhost:50700/api/health returns status=ok and storage=ok;
-   - docker compose ps reports healthy services.
-5. If a provider is unavailable, report it as a provider/configuration issue;
-   do not replace GraphRAG, disable RLS, drop volumes, or rewrite migrations.
-6. Report the UI URL, API health result, container status, and any remaining
-   provider prerequisite. Never print the contents of .env.
+Install hiai-docs from https://github.com/HiAi-gg/hiai-docs.
+Verify Docker and Docker Compose v2, clone the repository, and run
+`bash scripts/quickstart.sh`. Do not print or commit .env. Ask me to enter only
+an OpenRouter key or select Ollama, then run quickstart again. Verify
+http://localhost:50701, http://localhost:50700/api/health, and
+`docker compose ps`. Do not replace Bun, rewrite migrations, disable GraphRAG,
+or delete volumes.
 ```
 
----
+After startup, open **http://localhost:50701** and create the first account.
+For manual installation, use the Docker quickstart below.
+## Quickstart
+### Requirements
+- Docker Engine or Docker Desktop
+- Docker Compose v2
+- One of:
+  - an [OpenRouter](https://openrouter.ai/) API key; or
+  - a local [Ollama](https://ollama.com/) instance
 
-## Table of Contents
-
-- [Start here: fast installation](#start-here-fast-installation)
-- [Agentic installation rules](#agentic-installation-rules)
-- [Features](#features)
-- [Screenshots](#screenshots)
-- [Automatic GraphRAG search](#automatic-graphrag-search)
-- [SDK, CLI, and MCP](#sdk-cli-and-mcp)
-- [Stack](#stack)
-- [Comparison](#comparison-with-other-self-hosted-solutions)
-- [Project Structure](#project-structure)
-- [Configuration](#configuration)
-- [Embedding Lifecycle](#embedding-lifecycle)
-- [API Documentation](#api-documentation)
-- [Admin API](#admin-api)
-- [Contributing](#contributing)
-- [License](#license)
-- [Related Projects](#related-projects)
-
----
-
-<img width="1920" height="974" alt="docs" src="https://github.com/user-attachments/assets/94701d01-a361-4ca1-b16d-de2a0c64d684" />
-
-
-## Key Features
-
-- **Smart Re-embed System** — automatic vector refresh on metadata changes (tags, folders, categories) with Redis-deduplicated batch processing to prevent embedding storms
-- **Incremental Chunk Updates** — hash-based chunk comparison ensures only changed content is re-embedded; overlap regions maintain semantic continuity
-- **Automatic GraphRAG with Apache AGE** — entity extraction after ready embeddings and graph expansion on every normal search, with graceful degradation when AGE or an LLM is unavailable
-- **Multilingual adaptive search** — exact/title, lexical, fuzzy, vector, one-pass LLM expansion, and graph channels fused with reciprocal rank fusion (RRF)
-- **Chunk Versioning** — `embedding_model` column tracks which model produced each vector, enabling targeted reindex operations when models change
-- **Admin Tooling** — `/api/admin/*` endpoints for reindexing, embedding stats, provider health checks, and AGE inventory queries
-- **Operator Controls** — `ADMIN_CROSS_TENANT` flag and `?ownerId=` parameter for multi-tenant deployments
-
-## Features
-
-- **Rich WYSIWYG editor** — powerful visual editing with TipTap v3 + svelte-tiptap
-- **AI-native** — automatic chunking + vector embeddings on every save, with folder / tag / category metadata enriched into the chunk text for sharper semantic recall
-- **Unified search stack** — `pgvector` for dense embeddings, `pgvectorscale` StreamingDiskANN with binary quantization for index speed and recall, and Apache AGE for graph expansion, all living in a single PostgreSQL 18 database. RRF combines exact/title, multilingual lexical, fuzzy, vector, expanded, and graph candidates; optional `includeChunks` returns top-3 chunk snippets with character-offset tracking
-- **System-wide re-embed** — every metadata mutation (tag / folder / category rename or delete) automatically refreshes affected vectors, with Redis-coalesced PATCH-storm dedup so rapid edits never spike embedding costs
-- **GraphRAG** — entity extraction + AGE graph expansion surfaces related documents beyond vector similarity; the reference profile enables it automatically and `GRAPH_SEARCH_ENABLED=false` is the operational kill switch
-- **Categories** — collapsible sidebar groups that classify folders and documents independently of the folder hierarchy, filterable from the search page
-- **Folder hierarchy** — nested folders to organize your documents
-- **Keyboard-first** — `Ctrl+K` QuickSearch, `?` ShortcutHelp, editor shortcuts (`Ctrl+Shift+7` toggle markdown, `Ctrl+Shift+E` export), and `Esc` to close any dialog
-- **Sharing** — token-protected links with password, expiration, and viewer/commenter/editor roles
-- **Multi-file import** — drag in many `.md` / `.txt` / `.markdown` / `.json` / `.docx` files at once with a per-file progress overlay
-- **API Keys** — create, list, and revoke user-scoped API keys with Bearer auth for programmatic access
-- **Document visibility** — per-document public/private/shared visibility with RLS-enforced access control
-- **Plugin Registry** — REST API for discovering available editor plugins
-- **Agent-ready** — clean REST API for AI agents (Mastra compatible and others) plus an MCP server
-- **Operator tooling** — admin endpoints for embedding-stats, provider health, targeted reindex, AGE inventory, and graph index introspection
-- **Audit trail** — append-only audit log recording document, share, and API key lifecycle events
-- **Self-hosted** — full data ownership with minimal resource usage
-
-## Screenshots
-<img width="999" height="594" alt="docs_screenshot" src="https://github.com/user-attachments/assets/1ba409e7-32cf-40d3-ae30-f8369e48cb53" />
-
----
-
-## Search stack
-
-Three indexes on the same `document_embeddings` table, all in one database. Pick the right one for the workload.
-
-| Access method | Extension | When to use |
-|---|---|---|
-| `hnsw` | `pgvector` (default) | < 100k rows, low latency, simple ops |
-| `ivfflat` | `pgvector` | < 10k rows, training cost amortized, very small memory |
-| `diskann` | `pgvectorscale` (StreamingDiskANN) | 100k+ rows, larger-than-RAM, SbqCompression for ~10x storage reduction |
-
-The current Docker image ships with all three pre-installed. To switch, replace the `USING` clause in your index DDL:
-
-```sql
--- HNSW (default)
-CREATE INDEX ON document_embeddings
-  USING hnsw (embedding vector_cosine_ops);
-
--- DiskANN (StreamingDiskANN with binary quantization)
-CREATE INDEX ON document_embeddings
-  USING diskann (embedding vector_cosine_ops);
+### Start with Docker
+```bash
+git clone https://github.com/HiAi-gg/hiai-docs.git
+cd hiai-docs
+bash scripts/quickstart.sh
 ```
+On its first run, the script creates an ignored root `.env`, generates the
+database, authentication, and storage secrets, builds the PostgreSQL image,
+applies migrations, and starts the complete application.
 
-**Search ranking** uses reciprocal rank fusion (RRF), not a raw weighted sum. The fast pass retrieves exact/title, multilingual lexical, fuzzy, and vector candidates in parallel. When confidence is low, one structured query-expansion pass adds translated, synonymous, conceptual, and named-entity variants. Graph candidates are then added automatically and fused with all channels. Exact-title and channel-agreement boosts protect strong direct matches, while vector thresholds and a graph contribution cap prevent invalid or weak candidates from ranking.
+For OpenRouter, add one value to `.env` and run the script again:
 
-`HYBRID_TEXT_WEIGHT` and `HYBRID_SEMANTIC_WEIGHT` remain accepted as legacy configuration values for older integrations; they do not control the current orchestrator. See `SEARCH_*` values in [`.env.example`](.env.example) for the active profile.
-
----
-
-## Automatic GraphRAG search
-
-GraphRAG is a core hiai-docs search layer. The reference profile performs entity extraction after a document has a complete, valid embedding generation, then automatically expands every non-empty search through Apache AGE. No user-facing GraphRAG toggle or `?graph=true` parameter is required.
-
-### When to enable it
-
-- Your corpus is small but rich in entity relationships (people, projects, concepts cross-referenced across documents).
-- You want search results to surface *related* documents, not just exact and near-exact matches.
-
-### How it works
-
-1. **Extraction** — when `GRAPH_EXTRACT_ENABLED=true`, the embedding worker calls an OpenAI-compatible chat-completion API only after a complete generation is activated. The LLM extracts entities and relations from each chunk; entities with confidence >= `GRAPH_EXTRACT_MIN_CONFIDENCE` (default `0.5`) are persisted to Apache AGE as graph nodes and edges.
-2. **Search** — when `GRAPH_SEARCH_ENABLED=true`, the orchestrator walks the graph from authorized direct result seeds (1–3 hops, controlled by `SEARCH_GRAPH_MAX_HOPS`). If direct seeds are unavailable, translations, synonyms, concepts, and named entities seed graph lookup. Graph results are fused with RRF and capped by `SEARCH_GRAPH_MAX_CONTRIBUTION`.
-3. **Operator tooling** — `GET /api/admin/graph/stats` reports current AGE inventory (node and edge counts).
-
-> **✅ GraphRAG status:** All GraphRAG audit findings (G1–G9, N1) are resolved. GraphRAG is enabled in the copied `.env.example` reference profile and degrades gracefully when AGE or an LLM is unavailable. Set `GRAPH_SEARCH_ENABLED=false` only as an operator kill switch.
-
-### Where AGE lives
-
-Apache AGE runs in the **same PostgreSQL database** as the rest of the application. There is no separate container or connection string — the embedding worker and search route share the Drizzle client from `lib/db.ts` and dispatch `cypher()` queries against the shared `docs_graph` property graph. See `postgres/Dockerfile` for the unified image.
-
-### Required env vars
-
+```dotenv
+OPENROUTER_API_KEY=sk-or-your-key
 ```
-GRAPH_EXTRACT_ENABLED=true    # enabled in the OpenRouter reference profile
-GRAPH_SEARCH_ENABLED=true     # enabled in the OpenRouter reference profile
-GRAPH_EXPANSION_BOOST=0.3      # graph-neighbor boost (0..2)
-GRAPH_EXTRACT_BASE_URL=https://openrouter.ai/api/v1
-GRAPH_EXTRACT_API_KEY=
-GRAPH_EXTRACT_MODEL=mistralai/ministral-14b-2512
-GRAPH_EXTRACT_REASONING_EFFORT=none # keeps JSON extraction focused for the selected models
-GRAPH_EXTRACT_TIMEOUT_MS=120000 # allows cold local-model loads
-GRAPH_EXTRACT_FALLBACK_BASE_URL=https://openrouter.ai/api/v1
-GRAPH_EXTRACT_FALLBACK_API_KEY=
-GRAPH_EXTRACT_FALLBACK_MODEL=google/gemma-4-31b-it
-GRAPH_EXTRACT_MIN_CONFIDENCE=0.5
+For Ollama, select the local provider instead:
+
+```dotenv
+AI_PROVIDER=ollama
+OLLAMA_PORT=11434
 ```
-
-The public reference profile uses Ministral as the primary extraction model and Gemma as its fallback. Exact OpenRouter hosts may reuse `OPENROUTER_API_KEY` when their provider-specific key is blank. Local no-auth endpoints may leave `GRAPH_EXTRACT_*_API_KEY` blank; custom providers may set a dedicated key. The shared OpenRouter key is never inherited by non-OpenRouter endpoints. GraphRAG is enabled in the copied `.env.example` profile so the product's central feature works immediately after a key is added. The runtime schema retains safe `false` fallbacks when no environment file is supplied; deployments that want automatic GraphRAG must copy the reference profile or set the flags explicitly. See [`.env.example`](.env.example) for the local Ollama alternative.
-## SDK, CLI, and MCP
-
-The Docker quickstart is documented at the top of this README. This section is
-for consumers who already have a running hiai-docs instance and want to use its
-agent-facing packages.
-
-Installing via npm gives you three agent-facing tools. It does **not** deploy hiai-docs —
-you still need a running instance (Docker or git clone).
+Then make sure the configured local models are available:
 
 ```bash
-bun add @hiai-gg/hiai-docs
-# or: npm install @hiai-gg/hiai-docs
+ollama pull bge-m3
+ollama pull qwen3:8b
+bash scripts/quickstart.sh
 ```
+Open **http://localhost:50701**. The API health endpoint is
+**http://localhost:50700/api/health**.
 
-**TypeScript / JavaScript SDK:**
+### First use
+1. Create your account in the web application.
+2. Create a category or folder and add or import a document.
+3. Wait for the document pipeline to finish chunking and embedding.
+4. Search using an exact phrase, a related concept, an alternate language, or
+   a misspelling.
+5. Open **Settings → API** when you want to connect a CLI, MCP client, or
+   external application.
 
-```ts
-import { DocsClient } from "@hiai-gg/hiai-docs";
+The canonical local ports are:
 
-const docs = new DocsClient({
-  baseUrl: process.env.HIAI_DOCS_URL ?? "http://localhost:50700",
-  apiKey: process.env.HIAI_DOCS_API_KEY ?? "",
-});
+| Service | Port |
+|---|---:|
+| Web application | `50701` |
+| REST API | `50700` |
+| PostgreSQL | `5437` |
+| Redis | `6384` |
+| SeaweedFS S3 gateway | `50702` |
+| SeaweedFS filer UI | `50703` |
 
-const { items } = await docs.listDocs({ limit: 20 });
-const results = await docs.search("quarterly planning");
-const doc = await docs.createDoc({ title: "Meeting notes", content: "# Agenda" });
-```
-
-**CLI (terminal):**
+See [Deployment](docs/DEPLOYMENT.md) for domains, TLS, provider tuning,
+backups, and production operation.
+## Use hiai-docs from the terminal
+The published package includes the CLI. It connects to an already running
+hiai-docs server; installing it does not deploy the server.
 
 ```bash
-bunx @hiai-gg/hiai-docs init              # configure URL + API key
-bunx @hiai-gg/hiai-docs search "pgvector" # search docs
-bunx @hiai-gg/hiai-docs list              # list documents
-bunx @hiai-gg/hiai-docs read <id>         # read a document
-bunx @hiai-gg/hiai-docs create --title "Notes" --content "# Hello"
+bunx --package @hiai-gg/hiai-docs hiai-docs init \
+  --url http://localhost:50700 \
+  --key 'your-global-or-category-key'
+
+bunx --package @hiai-gg/hiai-docs hiai-docs search "project architecture"
+bunx --package @hiai-gg/hiai-docs hiai-docs list
+bunx --package @hiai-gg/hiai-docs hiai-docs read <document-id>
+bunx --package @hiai-gg/hiai-docs hiai-docs create \
+  --title "Release notes" --content "# Version 0.2.8"
 ```
-
-**MCP server (Claude Desktop, Cursor, etc.):**
-
-```bash
-bunx @hiai-gg/hiai-docs-mcp               # run the MCP server
-```
-
-**What's in the package:**
-
-| What | How to use |
-|------|-----------|
-| `import { DocsClient }` | TypeScript/JS SDK — typed HTTP client |
-| `import { documents } from "@hiai-gg/hiai-docs/schema"` | Drizzle table definitions |
-| `bunx @hiai-gg/hiai-docs <cmd>` | Terminal CLI (12 commands) |
-| `bunx @hiai-gg/hiai-docs-mcp` | MCP server (10 tools for AI agents) |
-
-The SDK has **no runtime dependencies** — it uses the platform `fetch` built into Bun, Node 18+, and modern browsers.
-
-#### Subpath imports for advanced integration
-
-The npm package exposes deep imports for consumers who want to reuse hiai-docs infrastructure (DB client, RLS tenant context, Redis/SeaweedFS factories) without coupling to hiai-docs' own `.env` validation:
-
-```ts
-// RLS-tenant-scoped DB queries (from shared package)
-import { withTenant, adminTenantContext } from "@hiai-gg/hiai-docs/db/with-tenant";
-
-// Drizzle DB client
-import { db } from "@hiai-gg/hiai-docs/db/client";
-import { documents, folders } from "@hiai-gg/hiai-docs/schema";
-
-// Pure factories — no hiai-docs config dependency (ideal for docsmint / external consumers)
-import { createRedis, type RedisConfig } from "@hiai-gg/hiai-docs/backend/lib/redis";
-import { createObjectStorageClient, ensureBucket, type ObjectStorageConfig } from "@hiai-gg/hiai-docs/backend/lib/storage";
-
-// Example: create your own Redis/SeaweedFS instance with custom config
-const redis = createRedis({ url: "redis://localhost:6384", maxRetriesPerRequest: 3 });
-const storage = createObjectStorageClient({ endpoint: "localhost", port: 50702, accessKey: "hiai-docs", secretKey: "replace-with-a-random-secret", useSSL: false, region: "us-east-1", forcePathStyle: true });
-```
-
-> **Note:** `backend/lib/redis` and `backend/lib/storage` resolve to the pure factory files (`redis-factory.ts`, `storage-factory.ts`). Importing from `backend/lib/redis.ts` or `backend/lib/storage.ts` directly is also supported and equivalent — both re-export from the factory. The `packages/db/with-tenant` path goes through a re-export shim at `backend/src/lib/with-tenant.ts`.
-
-### Local Development (Recommended for hacking)
-
-Two equivalent workflows — pick one. Both give you live-reload at http://localhost:50701.
-
-#### Option A — Hybrid (infra in Docker, api+web on host)
-
-This is the fastest dev loop. `bun run dev` runs `vite dev` (port 50701) and `bun --watch` for the api in parallel; both auto-reload on file changes.
-
-```bash
-# 1. Install JS deps once
-bun install
-
-# 2. Start infrastructure in Docker
-bun run docker:dev          # brings up postgres, redis, seaweedfs
-
-# 3. Push DB schema (one-time, or after schema changes)
-bun run db:push
-
-# 4. Start api + web on the host, with live reload
-bun run dev
-# vite dev -> http://localhost:50701
-# api      -> http://localhost:50700
-```
-
-Stop the infra when done: `bun run stop`
-
-#### Option B — Full Docker with live-reload bind mounts
-
-`docker-compose.dev.yml` mounts the source into the api/web containers, so editing a file on the host is picked up inside the container (vite HMR + bun --watch). Useful when you want everything isolated in Docker.
-
-```bash
-bun run docker:dev
-# Open http://localhost:50701
-```
-
-> The `web` and `api` services in `docker-compose.dev.yml` bind `./:/app`, so any edit on the host is reflected inside the container without rebuilding.
-
-### Why is port 50701 special?
-
-The frontend dev server is pinned to port 50701 in `frontend/vite.config.ts` with `strictPort: true`. That last flag is important: if 50701 is already taken (e.g. a stale container from a previous run), vite will **fail loudly** instead of silently falling back to 5173 — which would leave you staring at an old build at http://localhost:50701. If you see "port 50701 in use", run `docker compose down` (or `bun run stop`) and retry.
-
-### Troubleshooting
-
-#### Docker: permission denied
-
-If you get `permission denied` when running Docker commands:
-
-```bash
-# Add your user to the docker group
-sudo usermod -aG docker $USER
-
-# Log out and back in, or run:
-newgrp docker
-```
-
-Then verify: `docker ps` should work without `sudo`.
-
-- **Port 50701 already in use** — `docker compose down` to stop stale containers, then retry `bun run dev` or `bun run docker:dev`.
-- **Changes not showing up** — `bun run dev` already wires HMR. If running via Docker, confirm the bind mount is in `docker-compose.dev.yml` (not the prod `docker-compose.yml`, which builds an immutable image).
-- **`bun install` complains about the lockfile** — ensure `bun.lock` is in sync: `bun install`.
-- **Docker `web` build works without paraglide patches** — As of `@inlang/paraglide-js@2.x`, the `@inlang/sdk@2.x` rewrite no longer emits the `data:` URLs that triggered Bun's `NameTooLong` error. The old `sed` patch on `frontend/Dockerfile` was removed. i18n is now driven by `@inlang/paraglide-js@2.x` directly (the SvelteKit adapter is deprecated) via `paraglideVitePlugin` in `vite.config.ts` and `paraglideMiddleware` in `src/hooks.server.ts`.
-- **GraphRAG queries return `available: false`** — confirm `GRAPH_EXTRACT_ENABLED` or `GRAPH_SEARCH_ENABLED` is `true` AND the `age` extension is installed in the shared PostgreSQL database (the unified `hiai-postgres` image ships with it; check `SELECT extname, extversion FROM pg_extension` to verify).
-
----
-
-## Stack
-
-| Layer | Technology |
-|-------|----------|
-| Runtime | [Bun](https://bun.sh) 1.3.14+ |
-| Backend | [Elysia](https://elysiajs.com) 1.4.28+ |
-| ORM | [Drizzle ORM](https://orm.drizzle.team) 0.45.2+ |
-| Database | [PostgreSQL](https://postgresql.org) 18 + [pgvector](https://github.com/pgvector/pgvector) |
-| Graph database (optional) | [Apache AGE](https://age.apache.org) 1.7.0 (lives in the same PostgreSQL 18 instance) |
-| Vector index (optional) | [pgvectorscale](https://github.com/timescale/pgvectorscale) 0.9.0 — StreamingDiskANN with SbqCompression |
-| Cache | [Redis](https://redis.io) 8.6+ |
-| Auth | [Better Auth](https://better-auth.com) |
-| Frontend | [SvelteKit](https://kit.svelte.dev) 2.60+ |
-| UI | [shadcn-svelte](https://shadcn-svelte.com) (new-york style) |
-| Editor | [svelte-tiptap](https://github.com/sibiraj-s/svelte-tiptap) + [TipTap v3](https://tiptap.dev) |
-| Embeddings | OpenAI-compatible API (configurable) |
-| Storage | [SeaweedFS](https://github.com/seaweedfs/seaweedfs) (S3-compatible) |
-
----
-
-## Comparison with other self-hosted solutions
-
-| Project            | Best For                              | hiai-docs vs them                              | License / Limitations                          |
-|--------------------|---------------------------------------|------------------------------------------------|------------------------------------------------|
-| **La Suite Docs**  | Government & teams, strong block editor | Much lighter and faster                        | MIT (fully unrestricted)                       |
-| **Outline**        | Teams with integrations               | Lighter + built-in RAG out of the box          | BSL 1.1 – free for self-hosting, restrictions on offering as hosted service |
-| **Docmost**        | Confluence / Notion replacement       | Simpler, faster, lower resource usage          | AGPL-3.0 (Community) – fully open, Enterprise features extra |
-| **Wiki.js**        | Markdown + Git sync                   | Better AI & semantic search                    | AGPL-3.0                                       |
-| **hiai-docs**      | **Lightweight AI-first vault**        | —                                              | MIT (fully unrestricted)                       |
-| **AFFiNE**         | Notion + whiteboard experience        | Much lighter, far lower overhead               | MIT (frontend) + restrictive EE license (backend) – production limits (10 users / 100 GB on free tier) |
-| **Trilium Notes**  | Personal knowledge + scripting        | Better sharing & semantic search               | AGPL-3.0                                       |
-| **SilverBullet**   | Extensible Markdown notes             | Better AI integration & sharing                | MIT                                            |
-
-**hiai-docs** sits in the **lightweight AI-first** niche — ideal when you want built-in embeddings, fast performance, and minimal resource consumption rather than heavy collaboration features or enterprise complexity.
-
----
-
-## Project Structure
-
-```
-hiai-docs/
-├── backend/              # Elysia REST API
-│   ├── src/
-│   │   ├── api/          # Routes + middleware
-│   │   ├── lib/          # Shared utilities
-│   │   │   ├── redis-factory.ts   # Pure createRedis(cfg) factory
-│   │   │   ├── storage-factory.ts   # Pure createObjectStorageClient(cfg) + ensureBucket() factory
-│   │   │   ├── redis.ts           # Singleton re-export wrapper (→ redis-factory)
-│   │   │   ├── storage.ts         # Singleton re-export wrapper (→ storage-factory)
-│   │   │   ├── with-tenant.ts     # Re-export shim (→ packages/db/src/with-tenant)
-│   │   │   └── reembed.ts         # Smart re-embed entry point
-│   │   ├── embedding/    # Embedding pipeline
-│   │   └── index.ts      # Entry point
-│   ├── package.json
-│   └── tsconfig.json
-├── frontend/             # SvelteKit web UI
-│   ├── src/
-│   │   ├── routes/       # Pages
-│   │   ├── lib/          # Components + utils
-│   │   └── app.css       # Tailwind + theme
-│   ├── package.json
-│   └── svelte.config.js
-├── packages/db/          # Drizzle schema + migrations
-│   ├── src/
-│   │   ├── schema.ts     # Table definitions
-│   │   ├── client.ts     # Drizzle client instance
-│   │   ├── with-tenant.ts # RLS context (withTenant, TenantContext, adminTenantContext)
-│   │   ├── migrations/   # SQL migrations
-│   │   └── index.ts      # Re-exports
-│   └── package.json
-├── postgres/             # Custom PostgreSQL image (pgvector + vectorscale + age) — see postgres/Dockerfile
-├── docker-compose.yml    # Production Docker setup
-├── .env.example          # Environment template
-├── AGENTS.md             # Agent instructions
-├── README.md             # This file
-├── LICENSE               # MIT
-└── todo.md               # Development roadmap
-```
-
----
-
-## Configuration
-
-All configuration is stored in the ignored root `.env`. For a normal install,
-run `bash scripts/quickstart.sh`; it generates infrastructure/auth/storage
-secrets automatically. Copy `.env.example` manually only for an explicit
-deployment configuration:
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `DATABASE_URL` | required | PostgreSQL runtime connection string using the non-owner `hiai_app` role |
-| `REDIS_URL` | redis://localhost:6384 | Redis connection URL |
-| `BETTER_AUTH_SECRET` | generated by quickstart | Auth secret |
-| `BETTER_AUTH_URL` | http://localhost:50700 | Auth base URL |
-| `CSRF_SECRET` | — | CSRF signing secret |
-| `WEBHOOK_SECRET` | — | Webhook HMAC secret |
-| `STORAGE_ENDPOINT` | localhost | SeaweedFS host |
-| `STORAGE_PORT` | 50702 | SeaweedFS port |
-| `STORAGE_PUBLIC_ENDPOINT` | localhost | Public SeaweedFS host (for presigned URLs) |
-| `STORAGE_PUBLIC_PORT` | 50702 | Public SeaweedFS port |
-| `STORAGE_ACCESS_KEY` | hiai-docs | SeaweedFS access key |
-| `STORAGE_SECRET_KEY` | generated by quickstart | SeaweedFS secret key |
-| `STORAGE_BUCKET` | hiai-docs | SeaweedFS bucket name |
-| `OPENROUTER_API_KEY` | — | Shared key for the preconfigured OpenRouter embedding profile (never commit a real key) |
-| `EMBEDDING_BASE_URL` | `https://openrouter.ai/api/v1` | Primary OpenAI-compatible embedding URL |
-| `EMBEDDING_API_KEY` | — | Optional primary provider key; overrides `OPENROUTER_API_KEY` |
-| `EMBEDDING_MODEL` | `openai/text-embedding-3-small` | Primary 1024-dimensional embedding model |
-| `EMBEDDING_FALLBACK_BASE_URL` | `https://openrouter.ai/api/v1` | Fallback embedding URL |
-| `EMBEDDING_FALLBACK_API_KEY` | — | Optional fallback key; otherwise uses `OPENROUTER_API_KEY` |
-| `EMBEDDING_FALLBACK_MODEL` | `baai/bge-m3` | Fallback 1024-dimensional embedding model |
-| `CORS_ORIGINS` | http://localhost:50701 | Comma-separated allowed origins (required for local dev) |
-| `GRAPH_EXTRACT_ENABLED` | `true` in `.env.example`; `false` schema fallback | Enable LLM entity extraction into AGE |
-| `GRAPH_SEARCH_ENABLED` | `true` in `.env.example`; `false` schema fallback | Enable graph-neighbor expansion in search |
-| `GRAPH_EXPANSION_BOOST` | 0.3 | Multiplier on graph-neighbor scores (0..2) |
-| `GRAPH_EXTRACT_BASE_URL` | `https://openrouter.ai/api/v1` | Chat-completion URL for entity extraction LLM |
-| `GRAPH_EXTRACT_API_KEY` | — | Optional dedicated key for a custom extraction provider; local no-auth may remain blank; exact OpenRouter hosts may use `OPENROUTER_API_KEY` |
-| `GRAPH_EXTRACT_MODEL` | `mistralai/ministral-14b-2512` | Primary entity extraction model |
-| `GRAPH_EXTRACT_REASONING_EFFORT` | — | Optional reasoning control; use `none` for Ollama Qwen3 |
-| `GRAPH_EXTRACT_TIMEOUT_MS` | 120000 | Entity extraction request timeout; accommodates cold local models |
-| `GRAPH_EXTRACT_MIN_CONFIDENCE` | 0.5 | Minimum entity confidence threshold |
-| `GRAPH_EXTRACT_FALLBACK_BASE_URL` | `https://openrouter.ai/api/v1` | Fallback extraction LLM URL |
-| `GRAPH_EXTRACT_FALLBACK_API_KEY` | — | Optional dedicated fallback key for a custom provider; local no-auth may remain blank; exact OpenRouter hosts may use `OPENROUTER_API_KEY` |
-| `GRAPH_EXTRACT_FALLBACK_MODEL` | `google/gemma-4-31b-it` | Fallback extraction model |
-| `SEARCH_EXPANSION_ENABLED` | `true` | One-pass multilingual query expansion when confidence is low |
-| `SEARCH_EXPANSION_MODEL` | `mistralai/ministral-14b-2512` | Primary expansion model |
-| `SEARCH_EXPANSION_FALLBACK_MODEL` | `google/gemma-4-31b-it` | Expansion fallback model |
-| `SEARCH_EXPANSION_TIMEOUT_MS` | `6000` | Total expansion budget divided across primary and fallback models |
-| `SEARCH_VECTOR_PROVIDER_TIMEOUT_MS` | `2500` | Search-only vector budget; lexical results degrade gracefully when the embedding provider stalls |
-| `SEARCH_EXPANSION_CACHE_TTL_SECONDS` | `86400` | Tenant-scoped expansion cache lifetime |
-| `SEARCH_EXPANSION_MAX_VARIANTS` | `12` | Maximum variants per expansion list |
-| `SEARCH_RRF_K` | `60` | RRF rank constant |
-| `SEARCH_EXACT_BOOST` | `0.02` | Exact/title boost |
-| `SEARCH_CHANNEL_AGREEMENT_BOOST` | `0.01` | Agreement boost for documents found by multiple channels |
-| `SEARCH_VECTOR_MIN_SIMILARITY` | `0.35` | Minimum finite vector similarity |
-| `SEARCH_FUZZY_MIN_SIMILARITY` | `0.25` | Minimum fuzzy similarity |
-| `SEARCH_MIN_CHANNEL_AGREEMENT` | `2` | Fast-pass confidence threshold |
-| `SEARCH_GRAPH_MAX_CONTRIBUTION` | `0.03` | Maximum graph contribution to fused score |
-| `SEARCH_GRAPH_SEED_LIMIT` | `10` | Maximum authorized direct seeds for AGE |
-| `SEARCH_GRAPH_MAX_HOPS` | `2` | AGE traversal depth (1–3) |
-| `SEARCH_GRAPH_RESULT_LIMIT` | `20` | Maximum graph candidates |
-| `FOLDER_REEMBED_BATCH_SIZE` | 100 | Cap on docs re-embedded per folder mutation |
-| `CATEGORY_REEMBED_BATCH_SIZE` | 100 | Cap on docs re-embedded per category mutation |
-| `TAG_REEMBED_BATCH_SIZE` | 500 | Cap on docs re-embedded per tag mutation |
-| `REEMBED_MIN_WORD_CHANGES` | 20 | Min word-change delta to trigger re-embed |
-| `REEMBED_MIN_CHAR_CHANGES` | 100 | Min char-change delta to trigger re-embed |
-| `REEMBED_MAX_IDLE_HOURS` | 24 | Max hours before forced re-embed eligibility |
-| `REEMBED_CRON_INTERVAL_MINUTES` | 15 | Content re-embed cron frequency |
-| `METADATA_REEMBED_CRON_INTERVAL_MINUTES` | 1 | Metadata re-embed cron frequency |
-| `VERSION_RETENTION_COUNT` | 50 | Auto-saved version history size per document |
-| `ADMIN_CROSS_TENANT` | true | Allow cross-tenant admin operations |
-| `ATTACHMENT_MAX_SIZE_MB` | 25 | Max attachment upload size in MB |
-| `ATTACHMENT_PRESIGN_EXPIRY_SECONDS` | 900 | Presigned URL lifetime (seconds) |
-
-See [`.env.example`](.env.example) for the full list with comments and defaults.
-
----
-
-## Embedding Lifecycle
-
-Every document save triggers an embedding pipeline that produces chunk-level vectors and graph entities. The pipeline is best-effort — failures never block document saves, and the last active valid generation remains queryable while a replacement is pending or failed.
-
-Each document transitions through `pending → processing → ready` or `failed/stale`. A generation is queryable only when every stored row is finite, non-zero, exactly 1024-dimensional, profile-consistent, and marked valid. Graph extraction runs only after activation. Zero vectors are never treated as successful embeddings.
-
-### When re-embed fires automatically
-
-| Trigger | Behavior |
-|---------|----------|
-| Document create / update (content or title change) | Hash-aware incremental re-embed via `enqueueReembed`; changed chunks and their overlap neighbors are re-embedded, unchanged chunks keep their vectors |
-| Tag rename | All documents carrying the tag re-embed via `reembedDocsByTag` |
-| Tag delete | All documents carrying the tag re-embed |
-| Tag added / removed from a document | That document re-embeds |
-| Folder rename / delete | All documents in the folder re-embed via `reembedDocsInFolder` |
-| Category rename / delete | All documents directly attached to the category, plus documents in folders attached to it, re-embed via `reembedDocsInCategory` |
-
-The single entry point is `backend/src/lib/reembed.ts`. All helpers coalesce rapid PATCH / auto-save / toggle storms via a Redis `SET NX EX 5` dedup slot — a burst of rapid PATCHes on the same document results in a single worker tick.
-
-### Batch caps
-
-Each metadata-triggered re-embed is bounded by an env var so a rename of a mega-folder cannot spike embedding costs in a single tick. Remaining documents are refreshed on their next edit.
-
-| Env var | Default | Scope |
-|---------|---------|-------|
-| `FOLDER_REEMBED_BATCH_SIZE` | `100` | `reembedDocsInFolder` |
-| `CATEGORY_REEMBED_BATCH_SIZE` | `100` | `reembedDocsInCategory` |
-| `TAG_REEMBED_BATCH_SIZE` | `500` | `reembedDocsByTag` |
-
-Set any of these to `0` to disable the cap (re-embed everything in a single tick — not recommended for production with more than 10k documents per folder).
-
-### Manual reindex (operator)
-
-Use the admin endpoints for bulk re-embed that does not fit the metadata-trigger surface:
-
-```bash
-# Preview affected docs before committing (always do this first)
-curl -X POST -H "x-api-key: $HIAI_DOCS_API_KEY" \
-  "http://localhost:50700/api/admin/reindex/model?dryRun=true"
-
-# Commit: queue a resumable generation-aware reindex; the active generation remains queryable
-curl -X POST -H "x-api-key: $HIAI_DOCS_API_KEY" \
-  "http://localhost:50700/api/admin/reindex/model"
-
-# Bulk re-embed a folder or tag
-curl -X POST -H "x-api-key: $HIAI_DOCS_API_KEY" \
-  "http://localhost:50700/api/admin/reindex/folder/$FOLDER_ID"
-curl -X POST -H "x-api-key: $HIAI_DOCS_API_KEY" \
-  "http://localhost:50700/api/admin/reindex/tag/$TAG_ID"
-
-# Force re-embed a single doc
-curl -X POST -H "x-api-key: $HIAI_DOCS_API_KEY" \
-  "http://localhost:50700/api/admin/reindex/$DOC_ID"
-```
-
-All admin endpoints support `?dryRun=true` to return the affected count without enqueuing. See [docs/API.md](docs/API.md#admin) for the full surface.
-
----
-
-## API Documentation
-
-REST API available at `http://localhost:50700/api/`.
-
-Key endpoints:
-- `POST /api/documents` — Create document
-- `GET /api/documents/:id` — Get document with tags
-- `GET /api/search?q=query` — Automatic multilingual RRF search with adaptive expansion and GraphRAG
-- `POST /api/share` — Create share link
-- `GET /api/share/:token` — Access shared content (public)
-- `POST /api/documents/:id/attachments` — Upload image
-- `WS /ws/collab/:documentId` — Real-time collaborative editing
-
-Full API documentation available in [docs/API.md](docs/API.md).
-
----
-
-## Admin API
-
-The admin surface at `/api/admin` provides operator-only endpoints for embedding pipeline observability, bulk reindex, and graph inventory. All endpoints require the static `HIAI_DOCS_API_KEY` via the `x-api-key` header (or `Authorization: Bearer`).
-
-| Endpoint | Purpose |
-|----------|---------|
-| `GET /api/admin/embedding-stats` | Generation lifecycle counts, active invalid rows, profile mismatches, and pending age |
-| `GET /api/admin/health/embeddings` | Live probe of the configured embedding provider (returns `ok` / `degraded` / `not-configured`) |
-| `POST /api/admin/reindex/:docId` | Force re-embed one document |
-| `POST /api/admin/reindex/model?dryRun=true` | Targeted re-embed for embedding-model mismatch |
-| `POST /api/admin/reindex/folder/:folderId?dryRun=true` | Bulk re-embed a folder (cross-user, operator scope) |
-| `POST /api/admin/reindex/tag/:tagId?dryRun=true` | Bulk re-embed a tag (cross-user, operator scope) |
-| `GET /api/admin/graph/stats` | Apache AGE inventory (node and edge counts) |
-
-Full request/response schemas in [docs/API.md](docs/API.md#admin).
-
-### Quick health check
-
-```bash
-# Pipeline observability
-curl -H "x-api-key: $HIAI_DOCS_API_KEY" http://localhost:50700/api/admin/embedding-stats
-
-# Live provider probe (returns ok / degraded / not-configured)
-curl -H "x-api-key: $HIAI_DOCS_API_KEY" http://localhost:50700/api/admin/health/embeddings
-```
-
----
-
-## For Builders: Extension Points
-
-hiai-docs is designed to be extended from the **outside** — without forking the
-core repository. These are the stable, supported integration surfaces:
-
-### REST API
-
-Every hiai-docs capability is exposed as a REST endpoint at `http://<host>:50700/api`.
-Authenticate with `Authorization: Bearer <HIAI_DOCS_API_KEY>` for server-to-server use,
-or use the session cookie from Better Auth for user-facing flows.
-
-Full schema: [docs/API.md](docs/API.md) · OpenAPI JSON: [docs/openapi.json](docs/openapi.json)
-
-### UI Extension Points (submodule customization)
-
-External projects (such as commercial forks using hiai-docs as a Git submodule) can cleanly customize the editor formatting toolbar and register custom document view tabs without modifying core files:
-
-- **Editor Toolbar Snippet**: Inject custom buttons or dropdown menus (e.g. AI draft generation tools).
-- **Document View Tabs**: Register new custom tabs (e.g. live HTML preview, metadata dashboards, PDF renderers) next to the default Editor tab.
-
-For step-by-step setup guides, component interfaces, and complete API references, see [docs/EXTENDING.md](docs/EXTENDING.md).
-
-
-### MCP Server (AI agents)
-
-For AI coding assistants that support the Model Context Protocol (Claude, Cursor, etc.),
-use the built-in MCP server directly from npm — no clone required:
-
-```bash
-# Run once to verify
-bunx @hiai-gg/hiai-docs-mcp
-```
-
-Claude Desktop config (`~/Library/Application Support/Claude/claude_desktop_config.json`):
+Credentials can also be supplied through `HIAI_DOCS_URL` and
+`HIAI_DOCS_API_KEY`. See the [CLI guide](packages/cli/README.md) for every
+command and configuration precedence.
+## Connect an MCP client
+hiai-docs exposes document search, reading, creation, updates, folders,
+snapshots, history, and export as MCP tools.
 
 ```json
 {
   "mcpServers": {
     "hiai-docs": {
       "command": "bunx",
-      "args": ["@hiai-gg/hiai-docs-mcp"],
+      "args": ["--package", "@hiai-gg/hiai-docs", "hiai-docs-mcp"],
       "env": {
         "HIAI_DOCS_URL": "http://localhost:50700",
-        "HIAI_DOCS_API_KEY": "your-api-key"
+        "HIAI_DOCS_API_KEY": "your-global-or-category-key"
       }
     }
   }
 }
 ```
+Run the server directly to verify the installation:
 
-Available MCP tools: `search`, `get-document`, `create-document`, `update-document`,
-`list-documents`, `list-folders`, `create-folder`, `create-snapshot`, `version-history`, `export-document`.
-
-### Drizzle Schema Import
-
-If your project uses the same PostgreSQL database as hiai-docs and you want to
-write typed Drizzle queries against hiai-docs tables:
-
-```ts
-import { documents, folders, tags, users } from "@hiai-gg/hiai-docs/schema";
-import { drizzle } from "drizzle-orm/postgres-js";
-import postgres from "postgres";
-
-const db = drizzle(postgres(process.env.DATABASE_URL!));
-const docs = await db.select().from(documents).limit(10);
+```bash
+bunx --package @hiai-gg/hiai-docs hiai-docs-mcp
 ```
+The server uses stdio and works with MCP-capable clients such as Claude
+Desktop, Cursor, and coding agents that accept standard MCP configuration. See
+the [MCP guide](packages/mcp-server/README.md) for its ten tools and routes.
+## Agent skills after installation
+The MCP tools are the recommended portable agent skills. A category-bound agent
+can receive only the knowledge and operations it needs; a trusted personal
+agent can use a global key. Agents do not need database or filesystem access.
+After startup, create an API key in **Settings → API** and add the MCP block
+above to the agent client. For custom agent workflows, use the same key through
+the CLI, SDK, or REST API.
+## TypeScript SDK
+```bash
+bun add @hiai-gg/hiai-docs
+```
+```ts
+import { DocsClient } from "@hiai-gg/hiai-docs";
 
-Requires `drizzle-orm` and `postgres` as peer dependencies in your project.
+const docs = new DocsClient({
+  baseUrl: "http://localhost:50700",
+  apiKey: process.env.HIAI_DOCS_API_KEY,
+});
 
-### Webhook Events
+const created = await docs.createDoc({
+  title: "Meeting notes",
+  content: "# Agenda",
+});
 
-hiai-docs emits webhook events for document lifecycle changes. Configure the
-`WEBHOOK_SECRET` and target URL in `.env`. See [docs/API.md](docs/API.md) for
-payload shapes.
+const results = await docs.search("what did we decide?");
+console.log(created.id, results.items);
+```
+The SDK is a typed `fetch` client with retries for transient failures. See the
+[SDK reference](packages/sdk/README.md) and [REST API](docs/API.md).
+## API keys and integrations
+Create and revoke integration keys from **Settings → API**.
 
-### What belongs in core vs. downstream
+| Credential | Intended use | Access |
+|---|---|---|
+| Global API key | Trusted owner-wide CLI, MCP, SDK, or service | All owner content |
+| Category key | Least-privilege agent or product integration | One category with selected permissions |
+| Operator key | Administration and reindex operations | `/api/admin/*` only |
 
-| ✅ Core | ❌ Downstream only |
-|--------|-------------------|
-| Document CRUD, folders, tags, categories | Product-specific analytics / usage tracking |
-| Hybrid search (text + semantic) | Custom embedding providers not in `.env` |
-| Sharing, versioning, attachments | White-label UI themes |
-| GraphRAG (optional, feature-flagged) | Domain-specific document types |
-| Admin / reindex endpoints | Custom auth providers beyond Better Auth |
+Category permissions are explicit and non-hierarchical:
 
-If a feature requires changes to the Drizzle schema, authentication flow, or core
-embedding pipeline, open an issue first to discuss the design.
+- `read` permits list, read, search, and export;
+- `edit` permits updates to existing content, attachments, and versions;
+- `write` permits create, move, delete, share, and publish operations.
 
----
+Combine permissions when an integration needs more than one capability.
+API-key lifecycle operations require the owning browser session; an API key
+cannot create or elevate another key. Server-to-server integrations are not
+affected by browser CORS. Browser integrations must add their exact origin to
+`CORS_ORIGINS`.
+## What is included?
+```text
+frontend/          SvelteKit workspace and TipTap editor
+backend/           Elysia REST API, search, workers, and authentication
+packages/db/       Drizzle schema and migrations
+packages/sdk/      Typed API client
+packages/cli/      Terminal client
+packages/mcp-server/  MCP stdio server
+postgres/          PostgreSQL image with vector and graph extensions
+```
+The Docker deployment runs:
 
-## Contributing
+- **Web** — document editor, folders, categories, sharing, settings, and search;
+- **API** — documents, attachments, versions, keys, search, and administration;
+- **PostgreSQL 18** — relational data, pgvector/pgvectorscale vectors, and the
+  Apache AGE graph in one database;
+- **Redis 8** — BullMQ queues, caching, retries, and job recovery;
+- **SeaweedFS** — S3-compatible attachment storage.
+## How search works
+Every document save schedules background work. Content is chunked, changed
+chunks are embedded, and the completed generation is activated atomically. The
+previous valid generation remains searchable if a provider call fails.
 
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing`)
-3. Commit changes (`git commit -m "feat: add amazing feature"`)
-4. Push to branch (`git push origin feature/amazing`)
-5. Open a Pull Request
+Search combines exact title matches, multilingual lexical search, typo-tolerant
+fuzzy matching, semantic vectors, adaptive query expansion, and Apache AGE
+graph neighbors. Reciprocal rank fusion combines the channels without allowing
+one weak provider result to dominate. Authorization is applied before retrieval
+and again before results are returned.
 
-### Development Rules
+GraphRAG is part of the normal search path in the reference configuration. It
+extracts entities after embeddings are ready and finds related documents beyond
+direct keyword or vector similarity. It degrades gracefully when an external
+model is unavailable.
 
-- **Bun only** — no npm/yarn
-- **ESM only** — no CommonJS
-- **TypeScript strict** — no `any`
-- **English only** — code, comments, docs, commits
-- **No Playwright** — use agent-browser for E2E
-- **Re-embed invariant** — metadata mutations route through `backend/src/lib/reembed.ts`
+For pipeline internals and tuning, see [Architecture](docs/ARCHITECTURE.md) and
+[Deployment](docs/DEPLOYMENT.md).
+## Stack
+- Bun, TypeScript, Elysia, Zod, and Pino
+- Svelte 5, SvelteKit, Tailwind CSS, and TipTap
+- Better Auth and Drizzle ORM
+- PostgreSQL 18, pgvector, pgvectorscale, and Apache AGE
+- Redis 8 and BullMQ
+- SeaweedFS with its S3-compatible API
+- OpenAI-compatible providers through OpenRouter or local Ollama
+## Comparison
+hiai-docs overlaps with several excellent open-source knowledge tools, but its
+focus is a compact knowledge runtime shared equally by humans and agents.
 
----
+| Project | Primary strength | Difference from hiai-docs |
+|---|---|---|
+| [Outline](https://github.com/outline/outline) | Polished team wiki and collaboration | hiai-docs emphasizes built-in retrieval, GraphRAG, scoped agent access, CLI, and MCP |
+| [Docmost](https://github.com/docmost/docmost) | Collaborative wiki and real-time editing | hiai-docs centers automatic embeddings and agent-facing integration surfaces |
+| [AppFlowy](https://github.com/AppFlowy-IO/AppFlowy) | Broad local-first productivity workspace | hiai-docs is narrower: a self-hosted document and retrieval service |
+| [AnythingLLM](https://github.com/Mintplex-Labs/anything-llm) | Chat-oriented RAG over imported sources | hiai-docs starts with the editable knowledge base and exposes it to many clients |
+| [Danswer](https://github.com/danswer-ai/danswer) / Onyx | Enterprise search across external connectors | hiai-docs owns and edits its native corpus rather than primarily indexing other systems |
 
+This is a product-positioning summary, not a claim that every listed project
+lacks a feature. Check each project's current documentation when choosing a
+deployment.
+## Documentation
+- [Documentation index](docs/README.md)
+- [Product usage](docs/USAGE.md)
+- [REST API](docs/API.md) and [OpenAPI JSON](docs/openapi.json)
+- [Architecture](docs/ARCHITECTURE.md)
+- [Deployment and operations](docs/DEPLOYMENT.md)
+- [Extension points](docs/EXTENDING.md)
+- [Maintainer release flow](docs/RELEASING.md)
+- [Security policy](SECURITY.md)
+- [Changelog](CHANGELOG.md)
+## Development
+```bash
+bun install
+bun run lint
+bun run typecheck
+bun run test
+bun run build
+```
+Read [CONTRIBUTING.md](CONTRIBUTING.md) before opening a pull request. Please
+report vulnerabilities through [SECURITY.md](SECURITY.md), not a public issue.
 ## License
+hiai-docs is released under the [MIT License](LICENSE).
 
-[MIT](LICENSE)
-
----
-
-## Related Projects
-
-Part of the [HiAi](https://hiai.gg) open-source ecosystem:
-
-| Project | Description |
-|---------|-------------|
-| [hiai-opencode](https://github.com/hiai-gg/hiai-opencode) | AI coding agent |
-| [hiai-observe](https://github.com/hiai-gg/hiai-observe) | Observability platform |
+Part of the [HiAi](https://hiai.gg) open-source ecosystem.

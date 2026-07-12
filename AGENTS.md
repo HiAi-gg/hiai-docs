@@ -47,14 +47,15 @@
 
 ### Project-specific
 
-- [`docs/design-spec.md`](docs/design-spec.md) — design spec (UI/UX and tokens)
-- [`docs/API.md`](docs/API.md) — REST API reference
-- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — internal architecture (data isolation, embedding pipeline)
-- [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) — deployment (Docker, VPS)
-- [`docs/PRODUCTION_STATUS.md`](docs/PRODUCTION_STATUS.md) — production status
-- [`docs/categories.md`](docs/categories.md), [`docs/keyboard-shortcuts.md`](docs/keyboard-shortcuts.md), [`docs/upload.md`](docs/upload.md), [`docs/openapi.json`](docs/openapi.json) — reference
-- `RELEASE_CHECKLIST.md` — release checklist
-- `init.sql` — initial schema
+- [`docs/README.md`](docs/README.md) — documentation index
+- [`docs/USAGE.md`](docs/USAGE.md) — product usage, imports, and shortcuts
+- [`docs/API.md`](docs/API.md) — REST API and authentication reference
+- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — services, data isolation, search, and embedding pipeline
+- [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) — Docker and production operations
+- [`docs/EXTENDING.md`](docs/EXTENDING.md) — supported UI extension points
+- [`docs/RELEASING.md`](docs/RELEASING.md) — evergreen maintainer release flow
+- [`docs/openapi.json`](docs/openapi.json) — machine-readable HTTP contract
+- `init.sql` — infrastructure bootstrap
 
 ## Runtime Contract
 

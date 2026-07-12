@@ -12,6 +12,8 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 ## [0.2.8] - 2026-07-12
 
 ### Added
+- Global owner-wide and category-bound API keys with an explicit, non-hierarchical `read` / `edit` / `write` authorization matrix across documents, folders, search, graph, versions, attachments, tags, sharing, and visibility.
+- SDK coverage for category/folder placement, document pipeline status, publish/unpublish, attachment presign/confirm, and session-backed API-key lifecycle operations.
 - BullMQ document-processing pipeline with independent prepare, embed, graph,
   summarize, and finalize workers. PostgreSQL is
   the durable source of truth for nonterminal runs while Redis remains the job
@@ -20,6 +22,9 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
   prepare-job migration checks.
 
 ### Changed
+- API-key lifecycle routes now require a real Better Auth browser session. Global raw secrets remain one-time; category secrets are encrypted at rest and recoverable only by the owning session.
+- CLI configuration enforces `0700` directory and `0600` file permissions on POSIX systems; CLI and MCP route contracts and public `bunx` invocation are aligned with the published package.
+- Admin and metrics authentication accepts both `x-api-key` and Bearer forms and fails closed when the operator key is unset.
 - Release verification now includes worker restart, Redis-loss reconciliation,
   owner isolation, and rollback safety checks.
 - Worker scheduling now applies per-owner fairness, bounded per-document fan-out,
@@ -29,6 +34,9 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
   quickstart, release verification, and browser acceptance instructions.
 
 ### Fixed
+- TipTap image insertion and resizing now trigger autosave, persist dimensions, and preserve them in shared/PDF and Markdown rendering; rich Markdown export retains images, tables, and legacy table content.
+- Editor image resizing uses responsive bounds and persisted width/height attributes, while share rendering and document export keep the selected dimensions.
+- The deprecated storage webhook is documented as an inbound signed no-op; false outbound lifecycle-webhook and storage-synchronization claims were removed.
 - SvelteKit's production request-body limit now matches the documented import
   contour, allowing requests up to 100 MB to reach the backend while retaining
   the backend's 10 MB per-file limit.
@@ -235,8 +243,8 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 - **"For Builders: Extension Points" section** in `README.md` — documents the stable integration surfaces (REST API, MCP server, Drizzle schema import, webhooks) and a "core vs. downstream" boundary table.
 - **Extension Guide** in `CONTRIBUTING.md` — code examples for all three integration surfaces and an explicit list of what should not be added to core.
 - **`bin` entries** in `package.public.json` — CLI (`hiai-docs`) and MCP server (`hiai-docs-mcp`) are now properly exposed as runnable binaries:
-  - `bunx @hiai-gg/hiai-docs <command>` — terminal CLI (search, list, read, create, update, delete, folders, history, snapshot, restore, export, config)
-  - `bunx @hiai-gg/hiai-docs-mcp` / point your MCP client at `packages/mcp-server/src/index.ts` — stdio MCP server with 10 tools for AI agents
+  - `bunx --package @hiai-gg/hiai-docs hiai-docs <command>` — terminal CLI (search, list, read, create, update, delete, folders, history, snapshot, restore, export, config)
+  - `bunx --package @hiai-gg/hiai-docs hiai-docs-mcp` / point a source-checkout MCP client at `packages/mcp-server/src/index.ts` — stdio MCP server with 10 tools for AI agents
 
 ## [0.1.5] - 2026-07-02
 

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { rankChunkRows } from "../api/routes/search";
+import { rankChunkRows, restrictSearchResponse } from "../api/routes/search";
 
 describe("search route chunk hydration", () => {
 	test("keeps the top three finite cosine scores, not index order or zero placeholders", () => {
@@ -24,5 +24,29 @@ describe("search route chunk hydration", () => {
 		expect(ranked.get("doc-1")?.map((chunk) => chunk.score)).toEqual([
 			0.95, 0.7, 0.5,
 		]);
+	});
+});
+
+describe("category-scoped search visibility", () => {
+	test("removes an out-of-category strongest result before hydration and counting", () => {
+		const restricted = restrictSearchResponse(
+			{
+				items: [
+					{ documentId: "hidden-strongest", score: 100 },
+					{ documentId: "allowed-weaker", score: 1 },
+				],
+				total: 2,
+				visibleTotal: 2,
+				visibleDocumentIds: ["hidden-strongest", "allowed-weaker"],
+			},
+			["allowed-weaker"],
+		);
+
+		expect(restricted.items).toEqual([
+			{ documentId: "allowed-weaker", score: 1 },
+		]);
+		expect(restricted.total).toBe(1);
+		expect(restricted.visibleTotal).toBe(1);
+		expect(restricted.visibleDocumentIds).toEqual(["allowed-weaker"]);
 	});
 });

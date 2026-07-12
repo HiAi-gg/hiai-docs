@@ -160,3 +160,13 @@ Search queries run exact/title, language-neutral lexical, fuzzy, and active-gene
 - **Rate limiting**: 10 req/min per IP on public share endpoints
 - **Validation**: Zod schemas on all API inputs
 - **No secrets in code**: all config via environment variables
+
+## External integration and authorization boundary
+
+REST is the canonical boundary used by the SDK, CLI, MCP server, and downstream products such as docsmint. The public package exposes typed SDK and schema contracts, but consumers must not bypass owner/category authorization with direct database writes.
+
+Authentication resolves to one principal: Better Auth session, static operator credential, global user API key, or category API key. Global keys receive owner-wide content access. Category keys are restricted to one effective category and an explicit set of `read`, `edit`, and `write` permissions; permissions do not imply each other. Effective category is the document's explicit category or, when absent, the category inherited from folder ancestry. This rule is shared by documents, folders, search, graph, versions, attachments, tags, sharing, and visibility.
+
+API-key issuance, listing, category-secret disclosure, and revocation deliberately bypass the generic Bearer principal resolver and require a Better Auth browser session. Global raw secrets are hash-only and shown once. Category secrets are encrypted at rest so the owning session can recover them. The static operator key is accepted on admin routes through either `x-api-key` or Bearer syntax; an unset operator key fails closed.
+
+hiai-docs does not publish outbound document webhooks. The deprecated signed storage webhook is a no-op compatibility endpoint, not a synchronization mechanism. Consumers should use REST/SDK/MCP and query the durable document pipeline endpoint when they need processing readiness.

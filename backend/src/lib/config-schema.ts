@@ -1,5 +1,8 @@
 import { z } from "zod";
 
+const adminApiKeyPlaceholder =
+	/^(?:change[-_ ]?me|changeme|your[-_ ]?api[-_ ]?key)(?:\b|[-_ ])/i;
+
 // Single source of truth for the runtime environment schema.
 //
 // This module is intentionally free of side effects (no `process.env`
@@ -181,7 +184,18 @@ export const envSchema = z.object({
 	LOG_LEVEL: z
 		.enum(["trace", "debug", "info", "warn", "error", "fatal"])
 		.default("info"),
-	HIAI_DOCS_API_KEY: z.string().optional(),
+	HIAI_DOCS_API_KEY: z
+		.string()
+		.trim()
+		.optional()
+		.default("")
+		.transform((value) => value || undefined)
+		.refine(
+			(value) =>
+				process.env.NODE_ENV !== "production" ||
+				(!!value && !adminApiKeyPlaceholder.test(value)),
+			"HIAI_DOCS_API_KEY must be set to a non-placeholder value in production",
+		),
 	API_KEY_ENCRYPTION_SECRET: z
 		.string()
 		.min(32, "API_KEY_ENCRYPTION_SECRET must be at least 32 characters")

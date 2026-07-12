@@ -111,6 +111,30 @@ describe("Markdown export", () => {
 		);
 	});
 
+	test("preserves resized image dimensions with portable HTML", () => {
+		const markdown = serializeMarkdownExport(
+			{
+				type: "doc",
+				content: [
+					{
+						type: "image",
+						attrs: {
+							src: "/image.png",
+							alt: "Diagram",
+							width: 320,
+							height: 180,
+						},
+					},
+				],
+			},
+			"",
+			{ baseUrl: "http://localhost:50701/docs/id" },
+		);
+		expect(markdown.trim()).toBe(
+			'<img src="http://localhost:50701/image.png" alt="Diagram" width="320" height="180" />',
+		);
+	});
+
 	test("does not emit executable URL schemes from document JSON", () => {
 		const markdown = serializeMarkdownExport(
 			{

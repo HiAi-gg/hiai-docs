@@ -148,10 +148,13 @@ export function renderSharedDocument(doc: ProseMirrorDoc): string {
 			case "image": {
 				const src = (node.attrs?.src as string) ?? "";
 				const alt = (node.attrs?.alt as string) ?? "";
+				const width = Number(node.attrs?.width);
+				const height = Number(node.attrs?.height);
+				const dimensions = `${Number.isFinite(width) && width > 0 ? ` width="${Math.round(width)}"` : ""}${Number.isFinite(height) && height > 0 ? ` height="${Math.round(height)}"` : ""}`;
 				if (ATTACHMENT_PATH.test(src)) {
-					return `<img data-shared-attachment-src="${escapeHtml(src)}" alt="${escapeHtml(alt)}" />`;
+					return `<img data-shared-attachment-src="${escapeHtml(src)}" alt="${escapeHtml(alt)}"${dimensions} />`;
 				}
-				return `<img src="${escapeHtml(src)}" alt="${escapeHtml(alt)}" />`;
+				return `<img src="${escapeHtml(src)}" alt="${escapeHtml(alt)}"${dimensions} />`;
 			}
 			default:
 				return inner;

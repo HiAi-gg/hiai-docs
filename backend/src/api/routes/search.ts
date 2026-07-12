@@ -4,6 +4,11 @@ import { Elysia } from "elysia";
 import { z } from "zod";
 import { getEmbedding } from "../../embedding";
 import type { EmbeddingResult } from "../../embedding/result";
+import {
+	type ContentAccess,
+	canAccessContent,
+	resolveContentAccess,
+} from "../../lib/content-access";
 import { logger } from "../../lib/logger";
 import { resolveShareDocumentScope } from "../../lib/share-access";
 import { withTenant } from "../../lib/with-tenant";
@@ -13,7 +18,6 @@ import type { SearchExplanation } from "../../search/types";
 import { rateLimitHeaders, searchRateLimiter } from "../middleware/rate-limit";
 import {
 	adminTenantContext,
-	buildTenantContext,
 	shareGuestTenantContext,
 } from "../middleware/tenant";
 
@@ -99,6 +103,8 @@ export function rankChunkRows(rows: Array<Record<string, unknown>>) {
 export function createSearchRoutes(
 	search: typeof searchDocuments = searchDocuments,
 	hydrate: typeof hydrateResults = hydrateResults,
+	resolveAccess: typeof resolveContentAccess = resolveContentAccess,
+	loadScopedDocumentIds: typeof loadCategoryDocumentIds = loadCategoryDocumentIds,
 ) {
 	return new Elysia({ prefix: "/api/search" })
 		.get("/", async ({ query, set, request }) => {
@@ -114,11 +120,13 @@ export function createSearchRoutes(
 			}
 			set.headers = rateLimitHeaders(rl.remaining);
 
-			const ctx = await buildTenantContext(request);
+			const access = await resolveAccess(request);
+			const ctx = access.ctx;
 			let searchCtx = ctx;
 			let shareDocumentIds: string[] | undefined;
+			let scopedDocumentIds: string[] | undefined;
 			let graphVisibilityScope: GraphVisibilityScope | undefined;
-			if (ctx.role === "none") {
+			if (!access.principal) {
 				const shareToken = request.headers.get("x-share-token")?.trim();
 				if (!shareToken) {
 					set.status = 401;
@@ -149,9 +157,20 @@ export function createSearchRoutes(
 					ownerId: shareScope.ownerId,
 					allowedDocumentIds: shareScope.documentIds,
 				};
+			} else if (!canAccessContent(access, "read")) {
+				set.status = 403;
+				return { error: "Forbidden" };
 			} else {
-				graphVisibilityScope =
-					ctx.role === "admin"
+				if (access.restricted) {
+					scopedDocumentIds = await loadScopedDocumentIds(access);
+				}
+				graphVisibilityScope = access.restricted
+					? {
+							kind: "share",
+							ownerId: access.userId,
+							allowedDocumentIds: scopedDocumentIds ?? [],
+						}
+					: ctx.role === "admin"
 						? { kind: "admin" }
 						: { kind: "tenant", ownerId: ctx.userId, includePublic: true };
 			}
@@ -200,35 +219,38 @@ export function createSearchRoutes(
 						dateTo,
 						sort,
 					},
-					documentIds: shareDocumentIds,
+					documentIds: shareDocumentIds ?? scopedDocumentIds,
 					visibilityScope: graphVisibilityScope,
 				});
+				const authorizedDomain = scopedDocumentIds
+					? restrictSearchResponse(domain, scopedDocumentIds)
+					: domain;
 				const rows = await hydrate(
 					searchCtx,
-					domain.items,
+					authorizedDomain.items,
 					includeChunks,
 					q,
-					shareDocumentIds,
-					domain.queryEmbedding,
-					domain.visibleDocumentIds,
+					shareDocumentIds ?? scopedDocumentIds,
+					authorizedDomain.queryEmbedding,
+					authorizedDomain.visibleDocumentIds,
 				);
 				// `visibleTotal` is calculated over the complete filtered candidate set,
 				// never from the current page. The hydrator may attach a refreshed count
 				// when a document was deleted or hidden between retrieval and hydration.
 				const hasDomainVisibilityMetadata =
-					domain.visibleTotal !== undefined ||
-					domain.visibleDocumentIds !== undefined;
+					authorizedDomain.visibleTotal !== undefined ||
+					authorizedDomain.visibleDocumentIds !== undefined;
 				const visibleTotal =
 					rows.visibleTotal ??
 					(hasDomainVisibilityMetadata
-						? (domain.visibleTotal ?? domain.total)
+						? (authorizedDomain.visibleTotal ?? authorizedDomain.total)
 						: rows.length);
 				return {
 					items: rows,
 					total: visibleTotal,
 					page,
 					limit,
-					diagnostics: domain.diagnostics,
+					diagnostics: authorizedDomain.diagnostics,
 				};
 			} catch (err) {
 				logger.error({ err }, "Search failed");
@@ -249,10 +271,15 @@ export function createSearchRoutes(
 			}
 			set.headers = rateLimitHeaders(rl.remaining);
 
-			const ctx = await buildTenantContext(request);
-			if (ctx.role === "none") {
+			const access = await resolveAccess(request);
+			const ctx = access.ctx;
+			if (!access.principal) {
 				set.status = 401;
 				return { error: "Unauthorized" };
+			}
+			if (!canAccessContent(access, "read")) {
+				set.status = 403;
+				return { error: "Forbidden" };
 			}
 			const userId = ctx.userId;
 			const parsed = suggestQuerySchema.safeParse(query);
@@ -263,11 +290,24 @@ export function createSearchRoutes(
 			try {
 				const q = parsed.data.q ?? "";
 				if (!q.trim()) return [];
+				const scopedIds = access.restricted
+					? await loadScopedDocumentIds(access)
+					: undefined;
+				if (scopedIds?.length === 0) return [];
 				const results = await withTenant(ctx, async (tx) => {
 					return tx.execute(sql`
 					SELECT id, title, similarity(title, ${q}) as score
 					FROM documents
-					WHERE owner_id = ${userId} AND title % ${q}
+					WHERE owner_id = ${userId}
+						${
+							scopedIds
+								? sql`AND id IN (${sql.join(
+										scopedIds.map((id) => sql`${id}`),
+										sql`, `,
+									)})`
+								: sql``
+						}
+						AND title % ${q}
 					ORDER BY score DESC LIMIT 5
 				`);
 				});
@@ -278,6 +318,63 @@ export function createSearchRoutes(
 				return { error: "Suggest failed" };
 			}
 		});
+}
+
+/** Defence-in-depth: no adapter or ranking bug may restore an out-of-scope ID. */
+export function restrictSearchResponse<
+	T extends {
+		items: Array<{ documentId: string }>;
+		total: number;
+		visibleTotal?: number;
+		visibleDocumentIds?: string[];
+	},
+>(response: T, allowedDocumentIds: string[]): T {
+	const allowed = new Set(allowedDocumentIds);
+	const items = response.items.filter((item) => allowed.has(item.documentId));
+	const visibleDocumentIds = (
+		response.visibleDocumentIds ?? items.map((i) => i.documentId)
+	).filter((id) => allowed.has(id));
+	return {
+		...response,
+		items,
+		total: visibleDocumentIds.length,
+		visibleTotal: visibleDocumentIds.length,
+		visibleDocumentIds,
+	};
+}
+
+/** Resolve the complete allow-list before retrieval so hidden candidates never rank. */
+async function loadCategoryDocumentIds(
+	access: ContentAccess,
+): Promise<string[]> {
+	if (!access.restricted || !access.categoryId) return [];
+	const categoryId = access.categoryId;
+	const { documents, folders } = await import("@hiai-docs/db/schema");
+	const rows = await withTenant(access.ctx, (tx) =>
+		tx
+			.select({ id: documents.id })
+			.from(documents)
+			.leftJoin(
+				folders,
+				and(
+					eq(folders.id, documents.folderId),
+					eq(folders.ownerId, access.userId),
+				),
+			)
+			.where(
+				and(
+					eq(documents.ownerId, access.userId),
+					or(
+						eq(documents.categoryId, categoryId),
+						and(
+							sql`${documents.categoryId} IS NULL`,
+							eq(folders.categoryId, categoryId),
+						),
+					),
+				),
+			),
+	);
+	return rows.map((row) => row.id);
 }
 
 export const searchRoutes = createSearchRoutes();

@@ -10,19 +10,49 @@ import { decryptApiKey, encryptApiKey } from "./api-key-encryption";
 const API_KEY_ADMIN_TENANT = adminTenantContext(ZERO_UUID);
 
 export const GLOBAL_API_SCOPE = "global";
+export const CATEGORY_API_PERMISSIONS = ["read", "edit", "write"] as const;
+export type CategoryApiPermission = (typeof CATEGORY_API_PERMISSIONS)[number];
+export type CategoryApiScope = `category:${string}:${CategoryApiPermission}`;
+export type ApiKeyScope = typeof GLOBAL_API_SCOPE | CategoryApiScope;
+
+const CATEGORY_SCOPE_PATTERN =
+	/^category:([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}):(read|edit|write)$/;
+
+/** Reject unknown, malformed, and duplicate persisted scopes. */
+export function parseApiKeyScopes(value: unknown): ApiKeyScope[] | null {
+	if (!Array.isArray(value) || value.length === 0) return null;
+	const scopes: ApiKeyScope[] = [];
+	const seen = new Set<string>();
+	for (const candidate of value) {
+		if (typeof candidate !== "string" || seen.has(candidate)) return null;
+		if (
+			candidate !== GLOBAL_API_SCOPE &&
+			!CATEGORY_SCOPE_PATTERN.test(candidate)
+		) {
+			return null;
+		}
+		seen.add(candidate);
+		scopes.push(candidate as ApiKeyScope);
+	}
+	return scopes;
+}
 
 export function buildCategoryApiKeyScopes(
 	categoryId: string,
 	permissions: { read: boolean; edit: boolean; write: boolean },
-): string[] {
+): ApiKeyScope[] {
 	return (["read", "edit", "write"] as const)
 		.filter((permission) => permissions[permission])
-		.map((permission) => `category:${categoryId}:${permission}`);
+		.map((permission) => `category:${categoryId}:${permission}` as ApiKeyScope);
 }
 
-export function categoryIdFromApiKeyScopes(scopes: string[]): string | null {
-	for (const scope of scopes) {
-		const match = /^category:([0-9a-f-]{36}):(read|edit|write)$/i.exec(scope);
+export function categoryIdFromApiKeyScopes(
+	scopes: readonly string[],
+): string | null {
+	const parsed = parseApiKeyScopes(scopes);
+	if (!parsed) return null;
+	for (const scope of parsed) {
+		const match = CATEGORY_SCOPE_PATTERN.exec(scope);
 		if (match?.[1]) return match[1];
 	}
 	return null;
@@ -45,7 +75,7 @@ function hashKey(key: string): string {
 export async function createApiKey(
 	ownerId: string,
 	name: string,
-	scopes?: string[],
+	scopes: ApiKeyScope[],
 	expiresAt?: Date,
 	options?: { encryptionSecret?: string },
 ): Promise<{ key: string; prefix: string; id: string }> {
@@ -64,7 +94,7 @@ export async function createApiKey(
 				name,
 				keyHash,
 				prefix,
-				scopes: scopes ?? [],
+				scopes,
 				expiresAt: expiresAt ?? null,
 				encryptedKey,
 			})
@@ -166,9 +196,11 @@ export async function revokeApiKey(
  * Returns { ownerId, scopes } if valid, or null if not found / expired.
  * Updates lastUsedAt on successful validation.
  */
-export async function validateApiKey(
-	key: string,
-): Promise<{ ownerId: string; scopes: string[] } | null> {
+export async function validateApiKey(key: string): Promise<{
+	id: string;
+	ownerId: string;
+	scopes: ApiKeyScope[];
+} | null> {
 	const keyHash = hashKey(key);
 
 	const [row] = await withTenant(API_KEY_ADMIN_TENANT, (tx) =>
@@ -192,6 +224,8 @@ export async function validateApiKey(
 	if (row.expiresAt && new Date(row.expiresAt) < new Date()) {
 		return null;
 	}
+	const scopes = parseApiKeyScopes(row.scopes ?? []);
+	if (!scopes) return null;
 
 	// Update last_used_at
 	await withTenant(API_KEY_ADMIN_TENANT, (tx) =>
@@ -202,7 +236,8 @@ export async function validateApiKey(
 	);
 
 	return {
+		id: row.id,
 		ownerId: row.ownerId,
-		scopes: (row.scopes as string[]) ?? [],
+		scopes,
 	};
 }

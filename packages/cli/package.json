@@ -8,6 +8,7 @@
   },
   "scripts": {
     "dev": "bun run src/index.ts",
+    "test": "bun test --path-ignore-patterns=\"*node_modules*\"",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

@@ -11,17 +11,11 @@ import {
 	revokeApiKey,
 } from "../../lib/api-keys";
 import { recordAuditEvent } from "../../lib/audit";
+import { resolveBrowserSessionUserId } from "../../lib/auth-principal";
 import { config } from "../../lib/config";
 import { logger } from "../../lib/logger";
 import { withTenant } from "../../lib/with-tenant";
 import { rateLimitHeaders, writeRateLimiter } from "../middleware/rate-limit";
-import { buildTenantContext } from "../middleware/tenant";
-
-const createKeySchema = z.object({
-	name: z.string().min(1).max(255),
-	scopes: z.array(z.string()).optional(),
-	expiresAt: z.string().datetime().optional(),
-});
 
 const deleteKeySchema = z.object({});
 const namedKeySchema = z.object({
@@ -65,10 +59,10 @@ export const keysRoutes = new Elysia({ prefix: "/api" })
 			return { error: "Too many requests" };
 		}
 		set.headers = rateLimitHeaders(rl.remaining);
-		const ctx = await buildTenantContext(request);
-		if (ctx.role === "none") {
+		const userId = await resolveBrowserSessionUserId(request.headers);
+		if (!userId) {
 			set.status = 401;
-			return { error: "Unauthorized" };
+			return { error: "Browser session required" };
 		}
 		const parsed = namedKeySchema.safeParse(
 			await request.json().catch(() => ({})),
@@ -78,11 +72,11 @@ export const keysRoutes = new Elysia({ prefix: "/api" })
 			return { error: "Invalid input", details: parsed.error.flatten() };
 		}
 		const result = await createApiKey(
-			ctx.userId,
+			userId,
 			parsed.data.name ?? "Global API key",
 			[GLOBAL_API_SCOPE],
 		);
-		auditKeyCreation(request, ctx.userId, result.id, { access: "global" });
+		auditKeyCreation(request, userId, result.id, { access: "global" });
 		set.status = 201;
 		return result;
 	})
@@ -94,11 +88,12 @@ export const keysRoutes = new Elysia({ prefix: "/api" })
 			return { error: "Too many requests" };
 		}
 		set.headers = rateLimitHeaders(rl.remaining);
-		const ctx = await buildTenantContext(request);
-		if (ctx.role === "none") {
+		const userId = await resolveBrowserSessionUserId(request.headers);
+		if (!userId) {
 			set.status = 401;
-			return { error: "Unauthorized" };
+			return { error: "Browser session required" };
 		}
+		const ctx = { userId, role: "user" as const };
 		const parsed = namedKeySchema.safeParse(
 			await request.json().catch(() => ({})),
 		);
@@ -162,15 +157,15 @@ export const keysRoutes = new Elysia({ prefix: "/api" })
 			"cache-control": "no-store",
 			pragma: "no-cache",
 		};
-		const ctx = await buildTenantContext(request);
-		if (ctx.role === "none") {
+		const userId = await resolveBrowserSessionUserId(request.headers);
+		if (!userId) {
 			set.status = 401;
-			return { error: "Unauthorized" };
+			return { error: "Browser session required" };
 		}
 		try {
 			const key = await revealCategoryApiKey(
 				params.id,
-				ctx.userId,
+				userId,
 				config.API_KEY_ENCRYPTION_SECRET,
 			);
 			if (!key) {
@@ -187,66 +182,6 @@ export const keysRoutes = new Elysia({ prefix: "/api" })
 			return { error: "Failed to reveal category API key" };
 		}
 	})
-	// POST /api/keys — Create API key
-	.post("/keys", async ({ request, set }) => {
-		const ip =
-			request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
-			request.headers.get("x-real-ip") ??
-			"unknown";
-		const rl = await writeRateLimiter(ip, request);
-		if (!rl.allowed) {
-			set.status = 429;
-			set.headers = rateLimitHeaders(0, rl.retryAfter);
-			return { error: "Too many requests" };
-		}
-		set.headers = rateLimitHeaders(rl.remaining);
-
-		const ctx = await buildTenantContext(request);
-		if (ctx.role === "none") {
-			set.status = 401;
-			return { error: "Unauthorized" };
-		}
-		const userId = ctx.userId;
-
-		const body = createKeySchema.safeParse(await request.json());
-		if (!body.success) {
-			set.status = 400;
-			return { error: "Invalid input", details: body.error.flatten() };
-		}
-
-		const { name, scopes, expiresAt } = body.data;
-		try {
-			const result = await createApiKey(
-				userId,
-				name,
-				scopes,
-				expiresAt ? new Date(expiresAt) : undefined,
-			);
-			set.status = 201;
-
-			const ipAddress =
-				request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
-				request.headers.get("x-real-ip") ??
-				"";
-			const userAgent = request.headers.get("user-agent") ?? "";
-			recordAuditEvent({
-				actorId: userId,
-				action: "api-key.create",
-				resourceType: "api-key",
-				resourceId: result.id,
-				details: { name, scopes },
-				ipAddress,
-				userAgent,
-			}).catch(() => {});
-
-			return result;
-		} catch (err) {
-			logger.error({ err }, "Failed to create API key");
-			set.status = 500;
-			return { error: "Failed to create API key" };
-		}
-	})
-
 	// GET /api/keys — List user's API keys
 	.get("/keys", async ({ request, set }) => {
 		const ip =
@@ -261,12 +196,11 @@ export const keysRoutes = new Elysia({ prefix: "/api" })
 		}
 		set.headers = rateLimitHeaders(rl.remaining);
 
-		const ctx = await buildTenantContext(request);
-		if (ctx.role === "none") {
+		const userId = await resolveBrowserSessionUserId(request.headers);
+		if (!userId) {
 			set.status = 401;
-			return { error: "Unauthorized" };
+			return { error: "Browser session required" };
 		}
-		const userId = ctx.userId;
 
 		try {
 			const keys = await listApiKeys(userId);
@@ -292,12 +226,11 @@ export const keysRoutes = new Elysia({ prefix: "/api" })
 		}
 		set.headers = rateLimitHeaders(rl.remaining);
 
-		const ctx = await buildTenantContext(request);
-		if (ctx.role === "none") {
+		const userId = await resolveBrowserSessionUserId(request.headers);
+		if (!userId) {
 			set.status = 401;
-			return { error: "Unauthorized" };
+			return { error: "Browser session required" };
 		}
-		const userId = ctx.userId;
 
 		const parsed = deleteKeySchema.safeParse(params);
 		if (!parsed.success) {

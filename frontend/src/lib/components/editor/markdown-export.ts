@@ -12,6 +12,14 @@ function escapeInline(value: string): string {
 	return value.replace(/([\\`*_{}[\]<>])/g, "\\$1");
 }
 
+function escapeHtmlAttribute(value: string): string {
+	return value
+		.replace(/&/g, "&amp;")
+		.replace(/"/g, "&quot;")
+		.replace(/</g, "&lt;")
+		.replace(/>/g, "&gt;");
+}
+
 function escapeTableCell(value: string): string {
 	return value
 		.replace(/\|/g, "\\|")
@@ -106,6 +114,20 @@ function renderInline(
 			typeof node.attrs?.title === "string" && node.attrs.title
 				? ` "${node.attrs.title.replace(/"/g, '\\"')}"`
 				: "";
+		const width = Number(node.attrs?.width);
+		const height = Number(node.attrs?.height);
+		if (
+			(Number.isFinite(width) && width > 0) ||
+			(Number.isFinite(height) && height > 0)
+		) {
+			const dimensions = `${Number.isFinite(width) && width > 0 ? ` width="${Math.round(width)}"` : ""}${Number.isFinite(height) && height > 0 ? ` height="${Math.round(height)}"` : ""}`;
+			const markdownDestination = destination(src, options.baseUrl);
+			const htmlSource =
+				markdownDestination.startsWith("<") && markdownDestination.endsWith(">")
+					? markdownDestination.slice(1, -1)
+					: markdownDestination;
+			return `<img src="${escapeHtmlAttribute(htmlSource)}" alt="${escapeHtmlAttribute(typeof node.attrs?.alt === "string" ? node.attrs.alt : "image")}"${dimensions} />`;
+		}
 		return `![${alt}](${destination(src, options.baseUrl)}${title})`;
 	}
 	return children(node)

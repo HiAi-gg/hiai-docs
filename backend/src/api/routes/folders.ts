@@ -2,13 +2,18 @@ import { categories, documents, folders } from "@hiai-docs/db/schema";
 import { and, eq, isNull, sql } from "drizzle-orm";
 import { Elysia } from "elysia";
 import { z } from "zod";
+import {
+	canAccessContent,
+	isAuthorizedCategory,
+	resolveContentAccess,
+	resolveFolderEffectiveCategory,
+} from "../../lib/content-access";
 import { invalidateDocListCache } from "../../lib/doc-cache";
 import { nextAvailableFolderName } from "../../lib/folder-name";
 import { logger } from "../../lib/logger";
 import { reembedDocsInFolder } from "../../lib/reembed";
 import { withTenant } from "../../lib/with-tenant";
 import { writeRateLimiter } from "../middleware/rate-limit";
-import { buildTenantContext } from "../middleware/tenant";
 
 const createFolderSchema = z.object({
 	name: z.string().min(1).max(255),
@@ -28,13 +33,27 @@ const updateFolderSchema = z.object({
 
 export const folderRoutes = new Elysia({ prefix: "/api/folders" })
 	.get("/:id", async ({ params, set, request }) => {
-		const ctx = await buildTenantContext(request);
+		const access = await resolveContentAccess(request);
+		const ctx = access.ctx;
 		if (ctx.role === "none") {
 			set.status = 401;
 			return { error: "Unauthorized" };
 		}
+		if (!canAccessContent(access, "read")) {
+			set.status = 403;
+			return { error: "Forbidden" };
+		}
 		const userId = ctx.userId;
 		try {
+			if (access.restricted) {
+				const effectiveCategory = await withTenant(ctx, (tx) =>
+					resolveFolderEffectiveCategory(tx, userId, params.id),
+				);
+				if (!isAuthorizedCategory(access, effectiveCategory ?? null)) {
+					set.status = 404;
+					return { error: "Folder not found" };
+				}
+			}
 			const result = await withTenant(ctx, async (tx) => {
 				const [row] = await tx
 					.select({
@@ -149,13 +168,27 @@ export const folderRoutes = new Elysia({ prefix: "/api/folders" })
 		}
 	})
 	.get("/", async ({ query, set, request }) => {
-		const ctx = await buildTenantContext(request);
+		const access = await resolveContentAccess(request);
+		const ctx = access.ctx;
 		if (ctx.role === "none") {
 			set.status = 401;
 			return { error: "Unauthorized" };
 		}
+		if (!canAccessContent(access, "read")) {
+			set.status = 403;
+			return { error: "Forbidden" };
+		}
 		const userId = ctx.userId;
 		try {
+			if (access.restricted && query.parentId) {
+				const parentId = query.parentId;
+				const parentCategory = await withTenant(ctx, (tx) =>
+					resolveFolderEffectiveCategory(tx, userId, parentId),
+				);
+				if (!isAuthorizedCategory(access, parentCategory ?? null)) {
+					return [];
+				}
+			}
 			const conditions = [eq(folders.ownerId, userId)];
 			if (query.all === "true") {
 				// Don't filter by parentId, get all folders flat!
@@ -201,7 +234,20 @@ export const folderRoutes = new Elysia({ prefix: "/api/folders" })
 					.where(and(...conditions))
 					.orderBy(folders.order, folders.name);
 			});
-			return rows;
+			if (!access.restricted || query.parentId) return rows;
+			const byId = new Map(rows.map((row) => [row.id, row]));
+			return rows.filter((row) => {
+				let cursor: typeof row | undefined = row;
+				const visited = new Set<string>();
+				while (cursor && !visited.has(cursor.id)) {
+					visited.add(cursor.id);
+					if (cursor.categoryId) {
+						return cursor.categoryId === access.categoryId;
+					}
+					cursor = cursor.parentId ? byId.get(cursor.parentId) : undefined;
+				}
+				return false;
+			});
 		} catch (err) {
 			logger.error({ err }, "Failed to list folders");
 			set.status = 500;
@@ -218,10 +264,15 @@ export const folderRoutes = new Elysia({ prefix: "/api/folders" })
 			set.status = 429;
 			return { error: "Rate limited" };
 		}
-		const ctx = await buildTenantContext(request);
+		const access = await resolveContentAccess(request);
+		const ctx = access.ctx;
 		if (ctx.role === "none") {
 			set.status = 401;
 			return { error: "Unauthorized" };
+		}
+		if (!canAccessContent(access, "write")) {
+			set.status = 403;
+			return { error: "Forbidden" };
 		}
 		const userId = ctx.userId;
 		const parsed = createFolderSchema.safeParse(await request.json());
@@ -233,6 +284,12 @@ export const folderRoutes = new Elysia({ prefix: "/api/folders" })
 			const created = await withTenant(ctx, async (tx) => {
 				const parentId = parsed.data.parentId ?? null;
 				const categoryId = parentId ? null : (parsed.data.categoryId ?? null);
+				const effectiveCategory = parentId
+					? await resolveFolderEffectiveCategory(tx, userId, parentId)
+					: categoryId;
+				if (!isAuthorizedCategory(access, effectiveCategory ?? null)) {
+					return { forbidden: true as const };
+				}
 				if (parsed.data.parentId) {
 					const parent = await tx
 						.select({ id: folders.id })
@@ -307,6 +364,10 @@ export const folderRoutes = new Elysia({ prefix: "/api/folders" })
 				set.status = 404;
 				return { error: "Parent folder not found" };
 			}
+			if ("forbidden" in created) {
+				set.status = 403;
+				return { error: "Forbidden" };
+			}
 			if ("categoryNotFound" in created) {
 				set.status = 404;
 				return { error: "Category not found" };
@@ -329,10 +390,15 @@ export const folderRoutes = new Elysia({ prefix: "/api/folders" })
 			set.status = 429;
 			return { error: "Rate limited" };
 		}
-		const ctx = await buildTenantContext(request);
+		const access = await resolveContentAccess(request);
+		const ctx = access.ctx;
 		if (ctx.role === "none") {
 			set.status = 401;
 			return { error: "Unauthorized" };
+		}
+		if (!canAccessContent(access, "write")) {
+			set.status = 403;
+			return { error: "Forbidden" };
 		}
 		const userId = ctx.userId;
 		const parsed = updateFolderSchema.safeParse(await request.json());
@@ -361,6 +427,31 @@ export const folderRoutes = new Elysia({ prefix: "/api/folders" })
 					.limit(1);
 				if (!current) {
 					return { notFound: true as const };
+				}
+				const sourceCategory = await resolveFolderEffectiveCategory(
+					tx,
+					userId,
+					params.id,
+				);
+				if (!isAuthorizedCategory(access, sourceCategory ?? null)) {
+					return { forbidden: true as const };
+				}
+				if (
+					parsed.data.parentId !== undefined ||
+					parsed.data.categoryId !== undefined
+				) {
+					const destinationCategory = parsed.data.parentId
+						? await resolveFolderEffectiveCategory(
+								tx,
+								userId,
+								parsed.data.parentId,
+							)
+						: parsed.data.categoryId === undefined
+							? sourceCategory
+							: parsed.data.categoryId;
+					if (!isAuthorizedCategory(access, destinationCategory ?? null)) {
+						return { forbidden: true as const };
+					}
 				}
 				if (parsed.data.parentId) {
 					if (parsed.data.parentId === params.id) {
@@ -442,6 +533,10 @@ export const folderRoutes = new Elysia({ prefix: "/api/folders" })
 				set.status = 400;
 				return { error: "Folder cannot be its own parent" };
 			}
+			if ("forbidden" in result) {
+				set.status = 403;
+				return { error: "Forbidden" };
+			}
 			if ("parentMissing" in result) {
 				set.status = 404;
 				return { error: "Parent folder not found" };
@@ -491,14 +586,27 @@ export const folderRoutes = new Elysia({ prefix: "/api/folders" })
 			set.status = 429;
 			return { error: "Rate limited" };
 		}
-		const ctx = await buildTenantContext(request);
+		const access = await resolveContentAccess(request);
+		const ctx = access.ctx;
 		if (ctx.role === "none") {
 			set.status = 401;
 			return { error: "Unauthorized" };
 		}
+		if (!canAccessContent(access, "write")) {
+			set.status = 403;
+			return { error: "Forbidden" };
+		}
 		const userId = ctx.userId;
 		try {
 			const deleted = await withTenant(ctx, async (tx) => {
+				const effectiveCategory = await resolveFolderEffectiveCategory(
+					tx,
+					userId,
+					params.id,
+				);
+				if (!isAuthorizedCategory(access, effectiveCategory ?? null)) {
+					return "forbidden" as const;
+				}
 				const existing = await tx
 					.select({ id: folders.id })
 					.from(folders)
@@ -512,6 +620,10 @@ export const folderRoutes = new Elysia({ prefix: "/api/folders" })
 					.where(and(eq(folders.id, params.id), eq(folders.ownerId, userId)));
 				return true;
 			});
+			if (deleted === "forbidden") {
+				set.status = 403;
+				return { error: "Forbidden" };
+			}
 			if (!deleted) {
 				set.status = 404;
 				return { error: "Folder not found" };

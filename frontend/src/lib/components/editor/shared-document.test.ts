@@ -143,6 +143,19 @@ describe("shared document renderer", () => {
 		});
 	});
 
+	test("preserves resized image dimensions in shared and PDF HTML", () => {
+		const html = renderSharedDocument({
+			type: "doc",
+			content: [
+				{
+					type: "image",
+					attrs: { src: "/image.png", alt: "Diagram", width: 420, height: 236 },
+				},
+			],
+		});
+		expect(html).toContain('width="420" height="236"');
+	});
+
 	test("blocks unsafe link protocols in public HTML", () => {
 		const html = renderSharedDocument({
 			type: "doc",

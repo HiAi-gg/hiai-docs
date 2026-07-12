@@ -12,6 +12,12 @@ import { and, count, desc, eq, inArray, sql } from "drizzle-orm";
 import { Elysia } from "elysia";
 import { z } from "zod";
 import { recordAuditEvent } from "../../lib/audit";
+import {
+	canAccessContent,
+	isAuthorizedCategory,
+	resolveContentAccess,
+	resolveFolderEffectiveCategory,
+} from "../../lib/content-access";
 import { contentHash } from "../../lib/content-hash";
 import {
 	cacheGetOrSet,
@@ -37,7 +43,6 @@ import {
 	rateLimitHeaders,
 	writeRateLimiter,
 } from "../middleware/rate-limit";
-import { buildTenantContext } from "../middleware/tenant";
 
 const createDocumentSchema = z.object({
 	title: z.string().min(1).max(500).default("Untitled"),
@@ -275,10 +280,15 @@ export const documentRoutes = new Elysia({ prefix: "/api" })
 		}
 		set.headers = rateLimitHeaders(rl.remaining);
 
-		const ctx = await buildTenantContext(request);
+		const access = await resolveContentAccess(request);
+		const ctx = access.ctx;
 		if (ctx.role === "none") {
 			set.status = 401;
 			return { error: "Unauthorized" };
+		}
+		if (!canAccessContent(access, "read")) {
+			set.status = 403;
+			return { error: "Forbidden" };
 		}
 		const userId = ctx.userId;
 		const parsed = listQuerySchema.safeParse(query);
@@ -288,10 +298,13 @@ export const documentRoutes = new Elysia({ prefix: "/api" })
 		}
 		const { folderId, tag, page, limit } = parsed.data;
 		const offset = (page - 1) * limit;
-		const cacheKey = docListKey(userId, folderId, tag, page, limit);
+		const cacheKey = `${docListKey(userId, folderId, tag, page, limit)}:scope:${access.categoryId ?? "all"}`;
 		try {
 			return await cacheGetOrSet(cacheKey, 30, async () => {
 				const conditions = [eq(documents.ownerId, userId)];
+				if (access.restricted && access.categoryId) {
+					conditions.push(eq(documents.categoryId, access.categoryId));
+				}
 				if (folderId) conditions.push(eq(documents.folderId, folderId));
 
 				if (tag) {
@@ -391,10 +404,15 @@ export const documentRoutes = new Elysia({ prefix: "/api" })
 		}
 		set.headers = rateLimitHeaders(rl.remaining);
 
-		const ctx = await buildTenantContext(request);
+		const access = await resolveContentAccess(request);
+		const ctx = access.ctx;
 		if (ctx.role === "none") {
 			set.status = 401;
 			return { error: "Unauthorized" };
+		}
+		if (!canAccessContent(access, "write")) {
+			set.status = 403;
+			return { error: "Forbidden" };
 		}
 		const userId = ctx.userId;
 		const body = createDocumentSchema.safeParse(await request.json());
@@ -419,6 +437,10 @@ export const documentRoutes = new Elysia({ prefix: "/api" })
 			let categoryId = body.data.categoryId ?? null;
 			if (folderId && !categoryId) {
 				categoryId = await resolveFolderCategory(ctx, folderId);
+			}
+			if (!isAuthorizedCategory(access, categoryId)) {
+				set.status = 403;
+				return { error: "Forbidden" };
 			}
 
 			const created = await withTenant(ctx, async (tx) => {
@@ -483,10 +505,15 @@ export const documentRoutes = new Elysia({ prefix: "/api" })
 
 	// GET /api/documents/:id — Get document with tags
 	.get("/documents/:id/pipeline", async ({ params, set, request }) => {
-		const ctx = await buildTenantContext(request);
+		const access = await resolveContentAccess(request);
+		const ctx = access.ctx;
 		if (ctx.role === "none") {
 			set.status = 401;
 			return { error: "Unauthorized" };
+		}
+		if (!canAccessContent(access, "read")) {
+			set.status = 403;
+			return { error: "Forbidden" };
 		}
 		try {
 			const [run] = await withTenant(ctx, (tx) =>
@@ -507,10 +534,17 @@ export const documentRoutes = new Elysia({ prefix: "/api" })
 						updatedAt: documentPipelineRuns.updatedAt,
 					})
 					.from(documentPipelineRuns)
+					.innerJoin(
+						documents,
+						eq(documents.id, documentPipelineRuns.documentId),
+					)
 					.where(
 						and(
 							eq(documentPipelineRuns.documentId, params.id),
 							eq(documentPipelineRuns.ownerId, ctx.userId),
+							...(access.restricted && access.categoryId
+								? [eq(documents.categoryId, access.categoryId)]
+								: []),
 						),
 					)
 					.orderBy(desc(documentPipelineRuns.updatedAt))
@@ -561,15 +595,20 @@ export const documentRoutes = new Elysia({ prefix: "/api" })
 		}
 		set.headers = rateLimitHeaders(rl.remaining);
 
-		const ctx = await buildTenantContext(request);
+		const access = await resolveContentAccess(request);
+		const ctx = access.ctx;
 		if (ctx.role === "none") {
 			set.status = 401;
 			return { error: "Unauthorized" };
 		}
+		if (!canAccessContent(access, "read")) {
+			set.status = 403;
+			return { error: "Forbidden" };
+		}
 		const userId = ctx.userId;
 		try {
 			return await cacheGetOrSet(
-				docSingleKey(params.id, userId),
+				`${docSingleKey(params.id, userId)}:scope:${access.categoryId ?? "all"}`,
 				60,
 				async () => {
 					const result = await withTenant(ctx, async (tx) => {
@@ -591,7 +630,13 @@ export const documentRoutes = new Elysia({ prefix: "/api" })
 							.from(documents)
 							.leftJoin(folders, eq(folders.id, documents.folderId))
 							.where(
-								and(eq(documents.id, params.id), eq(documents.ownerId, userId)),
+								and(
+									eq(documents.id, params.id),
+									eq(documents.ownerId, userId),
+									...(access.restricted && access.categoryId
+										? [eq(documents.categoryId, access.categoryId)]
+										: []),
+								),
 							)
 							.limit(1);
 
@@ -650,7 +695,8 @@ export const documentRoutes = new Elysia({ prefix: "/api" })
 		}
 		set.headers = rateLimitHeaders(rl.remaining);
 
-		const ctx = await buildTenantContext(request);
+		const access = await resolveContentAccess(request);
+		const ctx = access.ctx;
 		if (ctx.role === "none") {
 			set.status = 401;
 			return { error: "Unauthorized" };
@@ -660,6 +706,23 @@ export const documentRoutes = new Elysia({ prefix: "/api" })
 		if (!body.success) {
 			set.status = 400;
 			return { error: "Invalid input", details: body.error.flatten() };
+		}
+		const hasPlacementInput =
+			body.data.folderId !== undefined || body.data.categoryId !== undefined;
+		const hasEditInput =
+			body.data.title !== undefined ||
+			body.data.content !== undefined ||
+			body.data.contentJson !== undefined ||
+			body.data.metadata !== undefined ||
+			body.data.visibility !== undefined;
+		if (
+			(hasEditInput && !canAccessContent(access, "edit")) ||
+			(!hasEditInput &&
+				!canAccessContent(access, "edit") &&
+				!canAccessContent(access, "write"))
+		) {
+			set.status = 403;
+			return { error: "Forbidden" };
 		}
 		if (
 			!body.data.title &&
@@ -693,6 +756,33 @@ export const documentRoutes = new Elysia({ prefix: "/api" })
 					return null;
 				}
 				const existing = existingRows[0];
+				if (!existing || !isAuthorizedCategory(access, existing.categoryId)) {
+					return { forbidden: true as const };
+				}
+				if (hasPlacementInput) {
+					let destinationCategory: string | null | undefined =
+						body.data.categoryId !== undefined
+							? body.data.categoryId
+							: existing.categoryId;
+					if (body.data.folderId) {
+						destinationCategory = await resolveFolderEffectiveCategory(
+							tx,
+							userId,
+							body.data.folderId,
+						);
+					}
+					if (!isAuthorizedCategory(access, destinationCategory ?? null)) {
+						return { forbidden: true as const };
+					}
+					const placementChanged =
+						(body.data.folderId !== undefined &&
+							body.data.folderId !== existing.folderId) ||
+						(body.data.categoryId !== undefined &&
+							body.data.categoryId !== existing.categoryId);
+					if (placementChanged && !canAccessContent(access, "write")) {
+						return { forbidden: true as const };
+					}
+				}
 
 				await tx.insert(versions).values({
 					documentId: params.id,
@@ -747,6 +837,10 @@ export const documentRoutes = new Elysia({ prefix: "/api" })
 			if (!result) {
 				set.status = 404;
 				return { error: "Document not found" };
+			}
+			if ("forbidden" in result) {
+				set.status = 403;
+				return { error: "Forbidden" };
 			}
 			const { updated, existing } = result;
 
@@ -837,10 +931,15 @@ export const documentRoutes = new Elysia({ prefix: "/api" })
 		}
 		set.headers = rateLimitHeaders(rl.remaining);
 
-		const ctx = await buildTenantContext(request);
+		const access = await resolveContentAccess(request);
+		const ctx = access.ctx;
 		if (ctx.role === "none") {
 			set.status = 401;
 			return { error: "Unauthorized" };
+		}
+		if (!canAccessContent(access, "write")) {
+			set.status = 403;
+			return { error: "Forbidden" };
 		}
 		const userId = ctx.userId;
 		const copiedStorageKeys: string[] = [];
@@ -850,7 +949,13 @@ export const documentRoutes = new Elysia({ prefix: "/api" })
 					.select()
 					.from(documents)
 					.where(
-						and(eq(documents.id, params.id), eq(documents.ownerId, userId)),
+						and(
+							eq(documents.id, params.id),
+							eq(documents.ownerId, userId),
+							...(access.restricted && access.categoryId
+								? [eq(documents.categoryId, access.categoryId)]
+								: []),
+						),
 					)
 					.limit(1);
 				const source = sourceRows[0];
@@ -974,10 +1079,15 @@ export const documentRoutes = new Elysia({ prefix: "/api" })
 		}
 		set.headers = rateLimitHeaders(rl.remaining);
 
-		const ctx = await buildTenantContext(request);
+		const access = await resolveContentAccess(request);
+		const ctx = access.ctx;
 		if (ctx.role === "none") {
 			set.status = 401;
 			return { error: "Unauthorized" };
+		}
+		if (!canAccessContent(access, "write")) {
+			set.status = 403;
+			return { error: "Forbidden" };
 		}
 		const userId = ctx.userId;
 		try {
@@ -986,7 +1096,13 @@ export const documentRoutes = new Elysia({ prefix: "/api" })
 					.select({ id: documents.id })
 					.from(documents)
 					.where(
-						and(eq(documents.id, params.id), eq(documents.ownerId, userId)),
+						and(
+							eq(documents.id, params.id),
+							eq(documents.ownerId, userId),
+							...(access.restricted && access.categoryId
+								? [eq(documents.categoryId, access.categoryId)]
+								: []),
+						),
 					)
 					.limit(1);
 				if (existing.length === 0) {
@@ -1030,10 +1146,15 @@ export const documentRoutes = new Elysia({ prefix: "/api" })
 	})
 
 	.get("/documents/:id/export", async ({ params, set, request }) => {
-		const ctx = await buildTenantContext(request);
+		const access = await resolveContentAccess(request);
+		const ctx = access.ctx;
 		if (ctx.role === "none") {
 			set.status = 401;
 			return { error: "Unauthorized" };
+		}
+		if (!canAccessContent(access, "read")) {
+			set.status = 403;
+			return { error: "Forbidden" };
 		}
 		const userId = ctx.userId;
 		try {
@@ -1046,7 +1167,13 @@ export const documentRoutes = new Elysia({ prefix: "/api" })
 					})
 					.from(documents)
 					.where(
-						and(eq(documents.id, params.id), eq(documents.ownerId, userId)),
+						and(
+							eq(documents.id, params.id),
+							eq(documents.ownerId, userId),
+							...(access.restricted && access.categoryId
+								? [eq(documents.categoryId, access.categoryId)]
+								: []),
+						),
 					)
 					.limit(1);
 				return rows[0];
@@ -1083,10 +1210,15 @@ export const documentRoutes = new Elysia({ prefix: "/api" })
 		set.headers = rateLimitHeaders(rl.remaining);
 		set.headers["X-Request-ID"] = importRequestId;
 
-		const ctx = await buildTenantContext(request);
+		const access = await resolveContentAccess(request);
+		const ctx = access.ctx;
 		if (ctx.role === "none") {
 			set.status = 401;
 			return { error: "Unauthorized" };
+		}
+		if (!canAccessContent(access, "write")) {
+			set.status = 403;
+			return { error: "Forbidden" };
 		}
 		const userId = ctx.userId;
 		let importItemCount = 0;
@@ -1218,6 +1350,10 @@ export const documentRoutes = new Elysia({ prefix: "/api" })
 			let resolvedCategoryId: string | null = null;
 			if (folderId) {
 				resolvedCategoryId = await resolveFolderCategory(ctx, folderId);
+			}
+			if (!isAuthorizedCategory(access, resolvedCategoryId)) {
+				set.status = 403;
+				return { error: "Forbidden" };
 			}
 
 			// All-or-nothing batch create. If any insert fails, the whole

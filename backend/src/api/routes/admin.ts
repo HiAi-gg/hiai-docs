@@ -2,7 +2,8 @@
  * Admin maintenance endpoints.
  *
  * All endpoints live under `/api/admin` and are gated by a static API key
- * (`config.HIAI_DOCS_API_KEY`) supplied via the `x-api-key` header. These
+ * (`config.HIAI_DOCS_API_KEY`) supplied via `x-api-key` or an
+ * `Authorization: Bearer <key>` header. These
  * routes are intentionally NOT scoped per-user — they are operator tooling
  * used by ops scripts and external services (e.g. the embedding monitor
  * from T3.2). They share `searchRateLimiter`, which already bypasses its
@@ -31,28 +32,7 @@ import {
 import { withTenant } from "../../lib/with-tenant";
 import { rateLimitHeaders, searchRateLimiter } from "../middleware/rate-limit";
 import { adminTenantContext } from "../middleware/tenant";
-
-/**
- * Verify the caller presented the configured admin API key. Returns
- * `true` when either (a) no key is configured (dev convenience) or
- * (b) the supplied key matches `config.HIAI_DOCS_API_KEY`.
- *
- * Intentionally permissive in development: if an operator hasn't set the
- * key, we still let requests through so local tooling can hit the
- * endpoints without ceremony. In production the key MUST be set — the
- * `config` module already enforces BETTER_AUTH_SECRET in production;
- * `HIAI_DOCS_API_KEY` is the same class of secret and the operator is
- * expected to set it.
- */
-function verifyAdminKey(request: Request): boolean {
-	const expected = config.HIAI_DOCS_API_KEY;
-	if (!expected) {
-		// No key configured — permissive mode (dev only).
-		return true;
-	}
-	const supplied = request.headers.get("x-api-key");
-	return supplied === expected;
-}
+import { verifyAdminKey } from "./admin-auth";
 
 /**
  * Extract a stable client IP for rate limiting. Mirrors the helper

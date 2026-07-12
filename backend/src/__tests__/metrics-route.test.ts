@@ -97,6 +97,13 @@ describe("GET /api/admin/metrics", () => {
 				}),
 			);
 			expect(ok.status).toBe(200);
+
+			const bearerOk = await app.handle(
+				new Request("http://localhost/api/admin/metrics", {
+					headers: { authorization: `Bearer ${TEST_API_KEY}` },
+				}),
+			);
+			expect(bearerOk.status).toBe(200);
 			const body = (await ok.json()) as {
 				metrics: Record<string, number | number[]>;
 				embeddingStateInventory: Record<string, number>;

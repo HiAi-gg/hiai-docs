@@ -1,404 +1,270 @@
-# Deployment Guide
+# Deployment
 
-## Quick Start (Docker Compose)
+This guide covers supported self-hosted installation and production operation.
+For system internals, HTTP contracts, or maintainer release steps, see
+[Architecture](ARCHITECTURE.md), [API](API.md), and [Releasing](RELEASING.md).
+
+## Supported quick start
+
+Requirements:
+
+- Docker Engine with Docker Compose v2;
+- Git;
+- an OpenRouter API key, or an accessible Ollama installation.
 
 ```bash
-git clone https://github.com/hiai-gg/hiai-docs.git
+git clone https://github.com/HiAi-gg/hiai-docs.git
 cd hiai-docs
 cp .env.example .env
-# Set OPENROUTER_API_KEY, or choose AI_PROVIDER=ollama and OLLAMA_PORT.
+# Add OPENROUTER_API_KEY, or set AI_PROVIDER=ollama and OLLAMA_PORT.
 bash scripts/quickstart.sh
 ```
 
-The user creates the ignored root `.env` from the public template and enters
-the provider input below. `scripts/quickstart.sh` then fills placeholder
-DB/auth/storage values with random local secrets, builds the custom PostgreSQL
-image, applies all migrations, and starts the complete stack. It never prints
-secret values. Agents and CI must not create, read, edit, rotate, or commit
-`.env`; they should ask the user to perform the provider step.
+The root `.env` is user-owned and ignored by Git. The user supplies only the AI
+provider input. `scripts/quickstart.sh` replaces infrastructure placeholders
+with random local secrets, builds the supported PostgreSQL image, runs all
+migrations, and starts the stack. It does not print generated secrets.
 
-The only user-facing provider configuration is:
+Do not copy secrets into source files, command arguments, logs, screenshots, or
+documentation. Keep `.env` or the equivalent production secret store across
+subsequent starts.
+
+### AI provider
+
+OpenRouter is the reference profile:
 
 ```dotenv
-# OpenRouter (default): paste the key only
 OPENROUTER_API_KEY=sk-or-...
+```
 
-# Or local Ollama: use the host port only
+For Ollama running on the Docker host:
+
+```dotenv
 AI_PROVIDER=ollama
 OLLAMA_PORT=11434
 ```
 
-Do not edit source code or migration files for a normal installation. The
-user-owned `.env` is the only file that needs to be kept for subsequent starts.
+The quick-start profile configures the corresponding embedding and extraction
+endpoints. Advanced deployments may override the `EMBEDDING_*`,
+`EMBEDDING_FALLBACK_*`, `GRAPH_EXTRACT_*`, and
+`GRAPH_EXTRACT_FALLBACK_*` variables documented in `.env.example`.
 
-The app will be available at:
-- Frontend: `http://localhost:50701`
-- API: `http://localhost:50700`
-- API Docs: `http://localhost:50700/api/docs`
-- SeaweedFS Console: `http://localhost:50703`
+All embedding providers must return finite, non-zero vectors with exactly 1024
+dimensions. OpenRouter requests that dimension explicitly. For Ollama, install
+a compatible embedding model and an OpenAI-compatible chat model. Set
+`PROVIDER_LIMITER_MODE=local` and `PROVIDER_REQUESTS_PER_MINUTE=0` for an
+unlimited local provider. If GPU memory is exhausted, reduce the queue
+concurrency values in `.env.example` instead of disabling the pipeline.
 
-These are the canonical public localhost ports. Docker host overrides affect
-only published bindings: API remains on container port `50700`, web remains on
-container port `50701`, and container-to-container API traffic uses
-`http://api:50700`.
+## Endpoints and ports
 
-## Local Development
+| Service | Host port | Purpose |
+|---|---:|---|
+| Web | `50701` | Product UI |
+| API | `50700` | REST API and `/api/docs` |
+| PostgreSQL | `5437` | Application database |
+| Redis | `6384` | Cache and BullMQ transport |
+| SeaweedFS S3 | `50702` | Attachment storage |
+| SeaweedFS console | `50703` | Storage administration |
+| Caddy | `80`, `443` | Optional reverse proxy and TLS |
 
-```bash
-bun install
+Docker host-port overrides change only published bindings. Containers continue
+to use `api:50700`, `postgres:5432`, `redis:6379`, and the internal SeaweedFS
+ports on the Compose network.
 
-# Start infrastructure only (use shared ai-core services or local docker)
-docker compose -f docker-compose.dev.yml up -d
-
-# Push database schema
-cd packages/db && bun run db:push && cd ../..
-
-# Start backend and frontend in separate terminals
-cd backend && bun run dev     # → localhost:50700
-cd frontend && bun run dev    # → localhost:50701
-```
-
-## BullMQ pipeline and local Ollama
-
-Document imports and edits are accepted by the API and queued through five
-stages: `prepare`, `embed`, `graph`, `summarize`, and `finalize`. PostgreSQL
-stores durable stage and batch state so workers can recover after a restart;
-Redis/BullMQ is the execution transport. Local API usage has no artificial
-per-user document or job quota. Authentication, payload-size limits, database
-constraints, and infrastructure backpressure still apply.
-
-The validated runtime worker defaults are:
-
-| Knob | Default |
-|------|---------|
-| `QUEUE_PREPARE_CONCURRENCY` | `2` |
-| `QUEUE_EMBED_CONCURRENCY` | `3` |
-| `QUEUE_GRAPH_CONCURRENCY` | `2` |
-| `QUEUE_SUMMARY_CONCURRENCY` | `1` |
-| `QUEUE_FINALIZE_CONCURRENCY` | `2` |
-| `QUEUE_EMBED_BATCH_SIZE` | `5` |
-| `QUEUE_MAX_ACTIVE_BATCHES_PER_DOCUMENT` | `2` |
-| `QUEUE_MAX_ACTIVE_PREPARE_PER_OWNER` | `2` |
-| `QUEUE_MAX_ACTIVE_EMBED_PER_OWNER` | `4` |
-| `QUEUE_MAX_ACTIVE_GRAPH_PER_OWNER` | `1` |
-| `QUEUE_COMPLETED_RETENTION_COUNT` | `1000` |
-| `QUEUE_FAILED_RETENTION_COUNT` | `5000` |
-| `QUEUE_SHUTDOWN_GRACE_MS` | `30000` |
-
-### Local Ollama profile
-
-Use the host Ollama endpoint from the API container and disable remote-provider
-RPM throttling. Replace the model placeholders with models installed in your
-Ollama instance:
-
-```dotenv
-EMBEDDING_BASE_URL=http://host.docker.internal:11434/v1
-EMBEDDING_API_KEY=ollama
-EMBEDDING_MODEL=<installed-embedding-model>
-GRAPH_EXTRACT_BASE_URL=http://host.docker.internal:11434/v1
-GRAPH_EXTRACT_API_KEY=ollama
-GRAPH_EXTRACT_MODEL=<installed-chat-model>
-PROVIDER_LIMITER_MODE=local
-PROVIDER_REQUESTS_PER_MINUTE=0
-```
-
-`PROVIDER_REQUESTS_PER_MINUTE=0` means unlimited requests; it does not disable
-processing. For GPU OOM, lower `QUEUE_EMBED_CONCURRENCY` or
-`QUEUE_GRAPH_CONCURRENCY`. If the GPU is underutilized, raise one concurrency
-value at a time. With large VRAM and a parallel runner, raise
-`QUEUE_EMBED_CONCURRENCY`; when one model is shared by all stages, keep graph
-concurrency at `1`. For OpenRouter, use limiter mode `remote` and provider-
-specific limits.
-
-Do not assume a universal concurrency value for unknown GPU hardware. Observe
-queue wait, provider latency, GPU memory, and error rate before changing a
-knob.
-
-## Environment Variables
-
-`bash scripts/quickstart.sh` fills infrastructure values automatically. Copy
-`.env.example` manually only when you need a fully explicit deployment file.
-The normal user-facing inputs are `OPENROUTER_API_KEY`, or `AI_PROVIDER=ollama`
-plus `OLLAMA_PORT`.
-
-The underlying variables are:
-
-| Variable | Required | Default | Description |
-|----------|----------|---------|-------------|
-| `DATABASE_URL` | Yes | — | PostgreSQL runtime connection string for `hiai_app` |
-| `HIAI_APP_PASSWORD` | Generated by quickstart | — | Unique runtime-role password kept in `.env` |
-| `REDIS_URL` | Yes | `redis://localhost:6384` | Redis connection URL. **Host/macOS:** use `redis://localhost:6384`. **Docker Compose:** the default compose file overrides this to `redis://redis:6379` (container DNS name, internal port 6379) so the api container can reach redis via the Docker network. |
-| `BETTER_AUTH_SECRET` | Generated by quickstart | — | Random auth secret kept in `.env` |
-| `BETTER_AUTH_URL` | Yes | `http://localhost:50700` | Public API URL |
-| `STORAGE_ENDPOINT` | No | `localhost` | SeaweedFS host |
-| `STORAGE_PORT` | No | `50702` | SeaweedFS port |
-| `STORAGE_ACCESS_KEY` | Yes | `hiai-docs` | SeaweedFS access key |
-| `STORAGE_SECRET_KEY` | Generated by quickstart | — | SeaweedFS secret key kept in `.env` |
-| `STORAGE_BUCKET` | Yes | `hiai-docs` | SeaweedFS bucket name |
-| `OPENROUTER_API_KEY` | For the public default | — | OpenRouter key used by both default embedding providers; never commit a real key |
-| `EMBEDDING_BASE_URL` | If embeddings enabled | `https://openrouter.ai/api/v1` | Base URL for the primary OpenAI-compatible embedding API |
-| `EMBEDDING_API_KEY` | No | — | Optional provider-specific key; overrides `OPENROUTER_API_KEY` for the primary provider |
-| `EMBEDDING_MODEL` | No | `openai/text-embedding-3-small` | Primary embedding model (fixed 1024-dimensional output) |
-| `API_PORT` | No | `50700` | Published host port for the API; the container always listens on `50700` |
-| `WEB_PORT` | No | `50701` | Published host port for the frontend; the container always listens on `50701` |
-| `NODE_ENV` | No | `production` | `development` or `production` |
-| `LOG_LEVEL` | No | `info` | `trace`/`debug`/`info`/`warn`/`error`/`fatal` |
-| `CSRF_SECRET` | Generated by quickstart | — | CSRF protection secret kept in `.env` |
-| `WEBHOOK_SECRET` | Generated by quickstart | — | Webhook signature secret kept in `.env` |
-| `CORS_ORIGINS` | No | `http://localhost:50701` | Comma-separated allowed origins |
-| `HIAI_DOCS_API_KEY` | **Yes** | — | Admin API key for `/api/admin/*` endpoints |
-| `OWNER_ID` | No | `api-key-user` | Owner user UUID (first registered user from auth); only needed for multi-tenant setups with `ADMIN_CROSS_TENANT=false` |
-
-### GraphRAG Configuration
-
-| Variable | Required | Default | Description |
-|----------|----------|---------|-------------|
-| `GRAPH_EXTRACT_ENABLED` | No | `true` in `.env.example`; `false` schema fallback | Extract entities after a complete valid embedding generation |
-| `GRAPH_SEARCH_ENABLED` | No | `true` in `.env.example`; `false` schema fallback | Enable automatic graph-neighbor expansion in normal search; operator kill switch |
-| `GRAPH_EXTRACT_BASE_URL` | If extraction enabled | `https://openrouter.ai/api/v1` | OpenAI-compatible chat-completion URL for entity extraction LLM |
-| `GRAPH_EXTRACT_API_KEY` | No for local no-auth; optional for custom providers | — | Dedicated extraction-provider key; exact OpenRouter hosts may use `OPENROUTER_API_KEY`, which is never sent to non-OpenRouter hosts |
-| `GRAPH_EXTRACT_MODEL` | No | `mistralai/ministral-14b-2512` | Primary extraction model |
-| `GRAPH_EXTRACT_REASONING_EFFORT` | No | — | OpenAI-compatible reasoning control; use `none` for Ollama Qwen3 |
-| `GRAPH_EXTRACT_TIMEOUT_MS` | No | `120000` | Entity extraction request timeout in milliseconds |
-| `GRAPH_EXTRACT_MIN_CONFIDENCE` | No | `0.5` | Minimum entity confidence threshold (0.0–1.0) |
-| `GRAPH_EXPANSION_BOOST` | No | `0.3` | Legacy multiplier retained for older integrations; current ranking uses RRF and `SEARCH_GRAPH_MAX_CONTRIBUTION` |
-
-### Adaptive Search and RRF
-
-| Variable | Required | Default | Description |
-|----------|----------|---------|-------------|
-| `SEARCH_EXPANSION_ENABLED` | No | `true` | Run one structured multilingual expansion pass when confidence is low |
-| `SEARCH_EXPANSION_MODEL` | No | `mistralai/ministral-14b-2512` | Primary expansion model |
-| `SEARCH_EXPANSION_FALLBACK_MODEL` | No | `google/gemma-4-31b-it` | Fallback expansion model |
-| `SEARCH_EXPANSION_TIMEOUT_MS` | No | `6000` | Total expansion budget, divided across primary and fallback providers |
-| `SEARCH_VECTOR_PROVIDER_TIMEOUT_MS` | No | `2500` | Search-only vector provider budget; ingestion keeps its longer timeout |
-| `SEARCH_EXPANSION_CACHE_TTL_SECONDS` | No | `86400` | Tenant-scoped expansion cache TTL |
-| `SEARCH_EXPANSION_MAX_VARIANTS` | No | `12` | Maximum generated variants per category |
-| `SEARCH_EXPANSION_ESTIMATED_COST_MICROUNITS` | No | `0` | Operator-supplied successful-expansion cost estimate for metrics |
-| `SEARCH_RRF_K` | No | `60` | Reciprocal rank fusion constant |
-| `SEARCH_EXACT_BOOST` | No | `0.02` | Exact/title boost |
-| `SEARCH_CHANNEL_AGREEMENT_BOOST` | No | `0.01` | Boost when multiple channels agree |
-| `SEARCH_VECTOR_MIN_SIMILARITY` | No | `0.35` | Minimum finite vector similarity |
-| `SEARCH_FUZZY_MIN_SIMILARITY` | No | `0.25` | Minimum fuzzy similarity |
-| `SEARCH_MIN_CHANNEL_AGREEMENT` | No | `2` | Fast-pass agreement threshold |
-| `SEARCH_GRAPH_MAX_CONTRIBUTION` | No | `0.03` | Graph contribution cap in fused ranking |
-| `SEARCH_GRAPH_SEED_LIMIT` | No | `10` | Maximum AGE seeds |
-| `SEARCH_GRAPH_MAX_HOPS` | No | `2` | AGE traversal depth (1–3) |
-| `SEARCH_GRAPH_RESULT_LIMIT` | No | `20` | Maximum graph candidates |
-
-`HYBRID_TEXT_WEIGHT` and `HYBRID_SEMANTIC_WEIGHT` are retained only for compatibility with older clients; the current search path uses exact/title, FTS, fuzzy, vector, expanded, and graph channels fused with RRF.
-
-### Chunking Configuration
-
-| Variable | Required | Default | Description |
-|----------|----------|---------|-------------|
-| `CHUNK_TARGET_TOKENS` | No | `500` | Target tokens per chunk |
-| `CHUNK_OVERLAP_TOKENS` | No | `50` | Overlap tokens between adjacent chunks |
-
-### Re-Embed Batch Caps
-
-| Variable | Required | Default | Description |
-|----------|----------|---------|-------------|
-| `FOLDER_REEMBED_BATCH_SIZE` | No | `100` | Cap on documents re-embedded per folder mutation |
-| `CATEGORY_REEMBED_BATCH_SIZE` | No | `100` | Cap on documents re-embedded per category mutation |
-| `TAG_REEMBED_BATCH_SIZE` | No | `500` | Cap on documents re-embedded per tag mutation |
-
-### Attachments
-
-| Variable | Required | Default | Description |
-|----------|----------|---------|-------------|
-| `ATTACHMENT_MAX_SIZE_MB` | No | `25` | Maximum allowed upload size in MB |
-| `ATTACHMENT_PRESIGN_EXPIRY_SECONDS` | No | `900` | Presigned URL expiry in seconds (15 minutes) |
-
-### Smart Re-Embed
-
-| Variable | Required | Default | Description |
-|----------|----------|---------|-------------|
-| `REEMBED_MIN_WORD_CHANGES` | No | `20` | Min word-change delta to trigger re-embed |
-| `REEMBED_MIN_CHAR_CHANGES` | No | `100` | Min char-change delta to trigger re-embed |
-| `REEMBED_MAX_IDLE_HOURS` | No | `24` | Max hours before forced re-embed eligibility |
-| `REEMBED_CRON_INTERVAL_MINUTES` | No | `15` | Content re-embed cron frequency (minutes) |
-| `METADATA_REEMBED_CRON_INTERVAL_MINUTES` | No | `1` | Metadata re-embed cron frequency (minutes) |
-
-### Version Retention
-
-| Variable | Required | Default | Description |
-|----------|----------|---------|-------------|
-| `VERSION_RETENTION_COUNT` | No | `50` | Number of auto-saved (non-snapshot) versions to retain per document |
-
-### Admin Security
-
-| Variable | Required | Default | Description |
-|----------|----------|---------|-------------|
-| `ADMIN_CROSS_TENANT` | No | `true` | Allow cross-tenant admin operations (set `false` to require explicit `?ownerId=` on admin endpoints) |
-
-### Fallback Embedding
-
-| Variable | Required | Default | Description |
-|----------|----------|---------|-------------|
-| `EMBEDDING_FALLBACK_BASE_URL` | No | `https://openrouter.ai/api/v1` | Fallback embedding provider base URL |
-| `EMBEDDING_FALLBACK_API_KEY` | No | — | Optional fallback-specific key; otherwise `OPENROUTER_API_KEY` is reused |
-| `EMBEDDING_FALLBACK_MODEL` | No | `baai/bge-m3` | Fallback embedding model (fixed 1024-dimensional output) |
-
-### Fallback GraphRAG Extraction
-
-| Variable | Required | Default | Description |
-|----------|----------|---------|-------------|
-| `GRAPH_EXTRACT_FALLBACK_BASE_URL` | No | `https://openrouter.ai/api/v1` | Fallback extraction LLM base URL |
-| `GRAPH_EXTRACT_FALLBACK_API_KEY` | No for local no-auth; optional for custom providers | — | Dedicated fallback-provider key; exact OpenRouter fallbacks may use `OPENROUTER_API_KEY`, which is never sent to non-OpenRouter hosts |
-| `GRAPH_EXTRACT_FALLBACK_MODEL` | No | `google/gemma-4-31b-it` | Fallback extraction model name |
-
-### SeaweedFS Public Endpoint
-
-| Variable | Required | Default | Description |
-|----------|----------|---------|-------------|
-| `STORAGE_PUBLIC_ENDPOINT` | No | `localhost` | Public SeaweedFS host (used for presigned attachment URLs) |
-| `STORAGE_PUBLIC_PORT` | No | `50702` | Public SeaweedFS port |
-
-> **⚠️ Secret hygiene:** All secrets in `.env.example` use `change-me` placeholders with `CHANGE-ME` markers. Run `openssl rand -hex 32` to generate values for `BETTER_AUTH_SECRET`, `CSRF_SECRET`, `WEBHOOK_SECRET`, and `HIAI_DOCS_API_KEY`. The `OWNER_ID` should be your first registered user's UUID from the auth system. Never commit real secrets to `.env.example` or documentation.
-
-### Embedding provider defaults
-
-The checked-in `.env.example` is ready for a public OpenRouter setup:
-
-```dotenv
-OPENROUTER_API_KEY=change-me-paste-your-openrouter-key-here
-EMBEDDING_BASE_URL=https://openrouter.ai/api/v1
-EMBEDDING_MODEL=openai/text-embedding-3-small
-EMBEDDING_FALLBACK_BASE_URL=https://openrouter.ai/api/v1
-EMBEDDING_FALLBACK_MODEL=baai/bge-m3
-```
-
-Both models are requested with `dimensions=1024`, matching the pgvector schema. The runtime uses `OPENROUTER_API_KEY` for both OpenRouter providers unless an explicit `EMBEDDING_API_KEY` or `EMBEDDING_FALLBACK_API_KEY` is supplied. The shared key is never forwarded to a non-OpenRouter URL. If you prefer local inference, replace both base URLs and model names with an Ollama-compatible 1024-dimensional model (for example `bge-m3`); the Ollama path does not require an API key.
-
-The GraphRAG extraction profile is preconfigured for OpenRouter and is enabled in the copied reference profile:
-
-```dotenv
-GRAPH_EXTRACT_ENABLED=true
-GRAPH_SEARCH_ENABLED=true
-GRAPH_EXTRACT_BASE_URL=https://openrouter.ai/api/v1
-GRAPH_EXTRACT_MODEL=mistralai/ministral-14b-2512
-GRAPH_EXTRACT_REASONING_EFFORT=none
-GRAPH_EXTRACT_FALLBACK_BASE_URL=https://openrouter.ai/api/v1
-GRAPH_EXTRACT_FALLBACK_MODEL=google/gemma-4-31b-it
-```
-
-Both extraction and graph search are enabled in the copied reference profile because GraphRAG is a core hiai-docs feature. The runtime schema retains fail-safe `false` fallbacks only when no environment file is supplied. For an exact OpenRouter base URL, each extraction provider may use `OPENROUTER_API_KEY` when its dedicated key is blank. Local no-auth endpoints may leave the dedicated key blank; custom providers may set their own dedicated key. The shared OpenRouter key is never forwarded to a non-OpenRouter URL.
-
-## Production Considerations
-
-### TLS
-
-Use Caddy (included) or a reverse proxy. The default Caddyfile routes:
-- `/api/*` → backend
-- `/*` → frontend
-
-For custom domains, update `Caddyfile` with your domain.
-
-*Note: Caddy requires the `--profile caddy` flag when running with docker compose.*
-
-### Backups
-
-```bash
-# Database
-docker compose exec postgres pg_dump -U aiuser hiai_docs > backup.sql
-
-# Restore
-cat backup.sql | docker compose exec -T postgres psql -U aiuser -d hiai_docs
-
-# SeaweedFS attachments
-docker compose exec seaweedfs ./weed backup /data ./backup-seaweedfs/
-```
-
-### Health Checks
+After installation:
 
 ```bash
 curl -fsS http://localhost:50700/api/health
-# → {"status":"ok","timestamp":"..."}
+docker compose ps
 ```
 
-## Database Migrations
+Open the UI at <http://localhost:50701> and API documentation at
+<http://localhost:50700/api/docs>.
 
-The custom PostgreSQL image installs the extensions and creates the runtime
-role. Drizzle owns all relational and GraphRAG schema objects, including the
-single `docs_graph` in the same PostgreSQL database.
+## PostgreSQL requirement
+
+hiai-docs does **not** support a plain PostgreSQL image for the complete search
+stack. Use the repository image built from `postgres/Dockerfile`. It combines:
+
+- PostgreSQL 18;
+- pgvector;
+- pgvectorscale;
+- Apache AGE;
+- `pg_trgm`.
+
+The image bootstrap installs extensions and creates the restricted `hiai_app`
+runtime role. Drizzle migrations are the sole owner of relational schema,
+indexes, grants, and the `docs_graph` AGE graph. PostgreSQL, vector search, and
+GraphRAG therefore run in one database; no separate graph database is needed.
+
+On a clean installation, Compose builds this image and the one-shot migration
+service applies the full migration journal before the API starts. Replacing it
+with `postgres:18` will fail when migrations reach vector or AGE objects.
+
+## Production deployment
+
+Before exposing the service:
+
+1. Put `.env` values in a protected secret store or restrict the file to the
+   service account.
+2. Set public `BETTER_AUTH_URL`, storage endpoint values, and exact
+   `CORS_ORIGINS`.
+3. Generate a strong `HIAI_DOCS_API_KEY` for operator-only admin routes.
+4. Use durable volumes for PostgreSQL and SeaweedFS.
+5. Configure TLS, backups, monitoring, and provider budgets.
+6. Run `docker compose config --quiet` before starting.
+
+`HIAI_DOCS_API_KEY` is an operator credential for `/api/admin/*` and protected
+metrics. Do not distribute it to CLI, MCP, SDK, or Docsmint users. Create global
+or category-scoped integration keys from an authenticated product session; see
+[API authentication](API.md#authentication-and-keys).
+
+### Reverse proxy, TLS, and CORS
+
+The optional Caddy profile routes `/api/*` to the API and all other paths to the
+web service:
 
 ```bash
-# Generate migration from schema changes
-cd packages/db && bun run db:generate
-
-# Apply migrations from the repository root (the runtime image intentionally
-# does not contain migration source files)
-cd ../.. && bun run db:migrate
-
-# Push schema directly (dev only)
-bun run db:push
+docker compose --profile caddy up -d
 ```
 
-### Generation-aware reindex and relevance benchmark
+Set your domain in `Caddyfile`, make `BETTER_AUTH_URL` match the public API
+origin, and list each permitted browser origin exactly in `CORS_ORIGINS`:
 
-Run migrations before starting the API on a fresh or upgraded database. The
-reindex command is resumable and keeps the previous active generation queryable
-until a complete replacement is validated and atomically activated:
+```dotenv
+BETTER_AUTH_URL=https://docs.example.com
+CORS_ORIGINS=https://docs.example.com,https://app.example.com
+```
+
+Server-to-server SDK, CLI, MCP, and Docsmint calls are not governed by browser
+CORS, but must use the public API origin and a suitable Bearer key. Browser-side
+Docsmint integrations require their precise origin in `CORS_ORIGINS`.
+
+If a proxy terminates TLS, preserve the original host and protocol headers.
+Attachment upload and public/share rendering also require
+`STORAGE_PUBLIC_ENDPOINT` and `STORAGE_PUBLIC_PORT` to describe an address the
+user's browser can reach; an internal container hostname is not sufficient.
+
+## Upgrades and migrations
+
+Read [CHANGELOG](../CHANGELOG.md) before upgrading and take a database and
+attachment backup first. Then update the checkout and rebuild the images:
 
 ```bash
+git pull --ff-only
+docker compose build
+docker compose run --rm migrate
+docker compose up -d
+```
+
+The API runtime image intentionally does not own migration source. The Compose
+`migrate` service applies the checked-in Drizzle journal with the database-owner
+credential. Never edit an already released migration. Generate new migrations
+for schema changes:
+
+```bash
+cd packages/db
+bun run db:generate
 bun run db:migrate
-cd backend && bun run seed:benchmark-search -- --output-dir=/tmp/hiai-docs-benchmark --reset
-cd backend && bun run src/scripts/reindex-embeddings.ts --dry-run --batch=100
-cd backend && bun run src/scripts/reindex-embeddings.ts --batch=100
-cd backend && bun run benchmark:search -- --base-url=http://127.0.0.1:50700 --owner-credentials-file=/tmp/hiai-docs-benchmark/owner-credentials.json --fixture-map-file=/tmp/hiai-docs-benchmark/fixture-map.json
 ```
 
-The seed command is disposable and refuses to run without `--reset`. It creates
-two real UUID-backed users, eight UUID-backed documents, one chunk per document,
-and writes a 0600 owner credential file plus alias-to-UUID fixture map under
-`/tmp` (never in the repository). The seed vectors are deterministic valid
-1024-dimensional rows so the database shape can be smoke-tested; run the real
-embedding reindex shown above before treating semantic recall gates as valid.
+`bun run db:push` is for disposable development databases only. After an
+upgrade, verify the migration container exited successfully, the API is healthy,
+and existing documents remain accessible. Provider/model changes may require a
+controlled reindex; use the admin operations described in [API](API.md), not
+manual edits to embedding rows.
 
-The benchmark requires two separate credential scopes. The operator credential
-for admin metrics is resolved from `HIAI_DOCS_API_KEY` (or `BENCHMARK_API_KEY`)
-via the environment, stdin, or an explicitly configured file. Search probes
-require a JSON map keyed by every fixture owner ID; keep that file outside the
-repository with restrictive permissions. Safe example (placeholders only):
+## Backup and restore
 
-```json
-{
-  "owner-a": { "authorization": "Bearer replace-with-owner-a-token" },
-  "owner-b": { "cookie": "better-auth.session_token=replace-with-owner-b-session" }
-}
+Back up PostgreSQL and attachment data together so database records and stored
+objects describe the same point in time.
+
+```bash
+# Database backup
+docker compose exec -T postgres \
+  pg_dump -U aiuser -d hiai_docs --format=custom > hiai-docs.dump
+
+# Database restore into an empty compatible database
+docker compose exec -T postgres \
+  pg_restore -U aiuser -d hiai_docs --clean --if-exists < hiai-docs.dump
 ```
 
-The command above reads that map from
-`/run/secrets/hiai-docs-benchmark-owners.json`. Never pass the operator API key
-or an owner credential as an argv value (`--api-key=...` is rejected); argv is
-visible to process inspection and shell history. The benchmark fixture checks multilingual recall,
-typos, thematic and graph retrieval, explanation labels, invalid-vector
-exclusion, expansion coverage, latency, and tenant leakage. Release gates are
-Recall@10 ≥ 0.90, MRR@10 ≥ 0.80, zero active invalid vectors, fast p95 ≤ 500 ms,
-expanded p95 ≤ 2.5 s, and zero tenant leakage.
+Back up the SeaweedFS Docker volume with your infrastructure's volume-snapshot
+mechanism. Test restoration periodically against the same hiai-docs PostgreSQL
+image version. Stop application writes or use coordinated snapshots while
+capturing both stores. Never commit backup files.
 
-Embedding lifecycle states are `pending`, `processing`, `ready`, `failed`, and
-`stale`. A document is ready only when its active generation has valid,
-finite, non-zero 1024-dimensional rows for every chunk. Graph extraction runs
-only after activation; a failed replacement never deletes the last active
-generation.
+## Local development
 
-### Secret hygiene
+The production quick start is preferred for evaluating the complete product.
+For source development:
 
-The real OpenRouter key belongs only in `.env` or deployment-secret storage.
-Never place it in Git, package tarballs, Docker layers, logs, screenshots,
-fixtures, benchmark output, or release notes. The checked-in `.env.example`
-contains only the `change-me-paste-your-openrouter-key-here` placeholder.
+```bash
+bun install
+docker compose -f docker-compose.dev.yml up -d
+cd packages/db && bun run db:migrate && cd ../..
+```
 
-## Services
+Then run the backend and frontend in separate terminals:
 
-| Container | Port | Purpose |
-|-----------|------|---------|
-| postgres | 5437 | PostgreSQL 18 + pgvector |
-| redis | 6384 | Cache/queue |
-| seaweedfs | 8333/8888 | S3-compatible file storage |
-| api | 50700 | Elysia REST API |
-| web | 50701 | SvelteKit frontend |
-| caddy | 80/443 | Reverse proxy (auto-TLS) |
-*Note: Run with `--profile caddy` flag*
+```bash
+cd backend && bun run dev
+cd frontend && bun run dev
+```
+
+The same PostgreSQL extension requirement applies to development when vector or
+GraphRAG migrations are enabled.
+
+## Operations and troubleshooting
+
+### Health checks
+
+```bash
+curl -fsS http://localhost:50700/api/health
+docker compose exec postgres pg_isready -U aiuser -d hiai_docs
+docker compose exec redis redis-cli ping
+docker compose ps
+```
+
+### API does not start
+
+- Inspect `docker compose logs migrate api`.
+- Confirm the migration service completed successfully.
+- Validate `DATABASE_URL`, generated passwords, and `BETTER_AUTH_URL`.
+- If vector or AGE extension errors appear, rebuild and use the repository
+  PostgreSQL image rather than a stock image.
+
+### Login, mutations, or imports return 403
+
+- Make the browser origin exactly match `CORS_ORIGINS`.
+- Make the public protocol and host match `BETTER_AUTH_URL`.
+- Preserve proxy forwarded-host and forwarded-proto headers.
+- Confirm cookies are not being downgraded or stripped by the proxy.
+
+### Attachments fail to upload or render
+
+- Check API and SeaweedFS health and credentials.
+- Ensure `STORAGE_PUBLIC_ENDPOINT` is reachable from the browser.
+- Confirm reverse-proxy upload limits exceed `ATTACHMENT_MAX_SIZE_MB`.
+- Do not expose an internal Docker hostname in a presigned URL.
+
+### Search returns no semantic or graph results
+
+- Inspect the document pipeline endpoint and worker logs.
+- Verify Redis is reachable and BullMQ workers are running.
+- Confirm provider URLs, models, credentials, and 1024-dimensional output.
+- Confirm AGE and vector extensions exist in the supported PostgreSQL image.
+- Provider or graph failures degrade search channels; they do not make lexical
+  search unavailable.
+
+### Queues are slow
+
+Embedding and GraphRAG work is asynchronous. A newly imported document may be
+visible before its pipeline is ready. Check `GET /api/documents/:id/pipeline`
+before depending on semantic or graph retrieval. Tune only one queue concurrency
+setting at a time while observing provider latency, error rate, and memory use.
+
+For API routes and credentials, use [API](API.md). For service and pipeline
+design, use [Architecture](ARCHITECTURE.md). For public release verification,
+use [Releasing](RELEASING.md).

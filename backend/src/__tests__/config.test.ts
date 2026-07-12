@@ -289,14 +289,49 @@ describe("production secret guards (real schema)", () => {
 		expect(result.success).toBe(false);
 	});
 
-	test("accepts real non-empty secrets in production", () => {
+	test("rejects a missing admin API key in production", () => {
 		process.env.NODE_ENV = "production";
 		const result = realEnvSchema.safeParse({
+			NODE_ENV: "production",
 			OWNER_ID: "00000000-0000-4000-8000-000000000001",
 			API_KEY_ENCRYPTION_SECRET: "real-api-key-encryption-secret-32-chars",
 			BETTER_AUTH_SECRET: "real-better-auth-secret-32-chars-long",
 			CSRF_SECRET: "real-csrf-secret-32-chars-long-bbbb",
 			WEBHOOK_SECRET: "real-webhook-secret-32-chars-long-cc",
+		});
+		expect(result.success).toBe(false);
+	});
+
+	test("rejects placeholder admin API keys in production", () => {
+		process.env.NODE_ENV = "production";
+		for (const apiKey of [
+			"change-me-generate-new-key",
+			"changeme",
+			"your-api-key",
+		]) {
+			const result = realEnvSchema.safeParse({
+				NODE_ENV: "production",
+				OWNER_ID: "00000000-0000-4000-8000-000000000001",
+				API_KEY_ENCRYPTION_SECRET: "real-api-key-encryption-secret-32-chars",
+				BETTER_AUTH_SECRET: "real-better-auth-secret-32-chars-long",
+				CSRF_SECRET: "real-csrf-secret-32-chars-long-bbbb",
+				WEBHOOK_SECRET: "real-webhook-secret-32-chars-long-cc",
+				HIAI_DOCS_API_KEY: apiKey,
+			});
+			expect(result.success).toBe(false);
+		}
+	});
+
+	test("accepts real non-empty secrets in production", () => {
+		process.env.NODE_ENV = "production";
+		const result = realEnvSchema.safeParse({
+			NODE_ENV: "production",
+			OWNER_ID: "00000000-0000-4000-8000-000000000001",
+			API_KEY_ENCRYPTION_SECRET: "real-api-key-encryption-secret-32-chars",
+			BETTER_AUTH_SECRET: "real-better-auth-secret-32-chars-long",
+			CSRF_SECRET: "real-csrf-secret-32-chars-long-bbbb",
+			WEBHOOK_SECRET: "real-webhook-secret-32-chars-long-cc",
+			HIAI_DOCS_API_KEY: "real-admin-api-key-generated-for-production",
 		});
 		expect(result.success).toBe(true);
 	});
