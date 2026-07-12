@@ -7,12 +7,22 @@ hiai-docs combines a Markdown-first document workspace with automatic chunking,
 with a web application, REST API, TypeScript SDK, CLI, and MCP server, so the
 same knowledge base can be used by people and AI tools.
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Bun](https://img.shields.io/badge/runtime-Bun-black)](https://bun.sh)
-[![Version](https://img.shields.io/badge/version-0.2.8-6d5dfc)](CHANGELOG.md)
+[![MIT License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+[![Release](https://img.shields.io/github/v/release/hiai-gg/hiai-docs?sort=semver)](https://github.com/hiai-gg/hiai-docs/releases)
+[![Stars](https://img.shields.io/github/stars/hiai-gg/hiai-docs)](https://github.com/hiai-gg/hiai-docs/stargazers)
+[![CI](https://github.com/hiai-gg/hiai-docs/actions/workflows/ci.yml/badge.svg)](https://github.com/hiai-gg/hiai-docs/actions/workflows/ci.yml)
+[![Bun](https://img.shields.io/badge/Runtime-Bun_1.3-black?logo=bun&logoColor=white)](https://bun.sh)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org)
+[![Svelte](https://img.shields.io/badge/Svelte-5.x-FF3E00?logo=svelte&logoColor=white)](https://svelte.dev)
+[![Elysia](https://img.shields.io/badge/Elysia-1.4-lightgrey?logo=elysia&logoColor=white)](https://elysiajs.com)
+[![Tailwind_CSS](https://img.shields.io/badge/Tailwind_CSS-v4-06B6D4?logo=tailwindcss&logoColor=white)](https://tailwindcss.com)
+[![Drizzle_ORM](https://img.shields.io/badge/Drizzle_ORM-0.45-C5F74F?logo=drizzle&logoColor=black)](https://orm.drizzle.team)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 
 <img width="1920" height="974" alt="hiai-docs document workspace" src="https://github.com/user-attachments/assets/94701d01-a361-4ca1-b16d-de2a0c64d684" />
+
 ## Why hiai-docs?
+
 - **Write naturally** in a rich visual editor or raw Markdown.
 - **Find meaning, not only keywords** with exact, lexical, fuzzy, vector,
   multilingual expansion, and graph retrieval fused through RRF.
@@ -23,7 +33,9 @@ same knowledge base can be used by people and AI tools.
   `write` permissions.
 - **Own the full stack**: application data, vectors, graph, queue, and files run
   on infrastructure you control.
+
 ## Fastest installation: give this prompt to your agent
+
 If you are installing hiai-docs through an AI coding agent, use this path first.
 It keeps the setup to Docker plus one provider choice and avoids unnecessary
 source-code changes.
@@ -40,8 +52,11 @@ or delete volumes.
 
 After startup, open **http://localhost:50701** and create the first account.
 For manual installation, use the Docker quickstart below.
+
 ## Quickstart
+
 ### Requirements
+
 - Docker Engine or Docker Desktop
 - Docker Compose v2
 - One of:
@@ -49,6 +64,7 @@ For manual installation, use the Docker quickstart below.
   - a local [Ollama](https://ollama.com/) instance
 
 ### Start with Docker
+
 ```bash
 git clone https://github.com/HiAi-gg/hiai-docs.git
 cd hiai-docs
@@ -80,6 +96,7 @@ Open **http://localhost:50701**. The API health endpoint is
 **http://localhost:50700/api/health**.
 
 ### First use
+
 1. Create your account in the web application.
 2. Create a category or folder and add or import a document.
 3. Wait for the document pipeline to finish chunking and embedding.
@@ -101,7 +118,9 @@ The canonical local ports are:
 
 See [Deployment](docs/DEPLOYMENT.md) for domains, TLS, provider tuning,
 backups, and production operation.
+
 ## Use hiai-docs from the terminal
+
 The published package includes the CLI. It connects to an already running
 hiai-docs server; installing it does not deploy the server.
 
@@ -119,7 +138,9 @@ bunx --package @hiai-gg/hiai-docs hiai-docs create \
 Credentials can also be supplied through `HIAI_DOCS_URL` and
 `HIAI_DOCS_API_KEY`. See the [CLI guide](packages/cli/README.md) for every
 command and configuration precedence.
+
 ## Connect an MCP client
+
 hiai-docs exposes document search, reading, creation, updates, folders,
 snapshots, history, and export as MCP tools.
 
@@ -145,14 +166,18 @@ bunx --package @hiai-gg/hiai-docs hiai-docs-mcp
 The server uses stdio and works with MCP-capable clients such as Claude
 Desktop, Cursor, and coding agents that accept standard MCP configuration. See
 the [MCP guide](packages/mcp-server/README.md) for its ten tools and routes.
+
 ## Agent skills after installation
+
 The MCP tools are the recommended portable agent skills. A category-bound agent
 can receive only the knowledge and operations it needs; a trusted personal
 agent can use a global key. Agents do not need database or filesystem access.
 After startup, create an API key in **Settings → API** and add the MCP block
 above to the agent client. For custom agent workflows, use the same key through
 the CLI, SDK, or REST API.
+
 ## TypeScript SDK
+
 ```bash
 bun add @hiai-gg/hiai-docs
 ```
@@ -174,7 +199,9 @@ console.log(created.id, results.items);
 ```
 The SDK is a typed `fetch` client with retries for transient failures. See the
 [SDK reference](packages/sdk/README.md) and [REST API](docs/API.md).
+
 ## API keys and integrations
+
 Create and revoke integration keys from **Settings → API**.
 
 | Credential | Intended use | Access |
@@ -194,7 +221,9 @@ API-key lifecycle operations require the owning browser session; an API key
 cannot create or elevate another key. Server-to-server integrations are not
 affected by browser CORS. Browser integrations must add their exact origin to
 `CORS_ORIGINS`.
+
 ## What is included?
+
 ```text
 frontend/          SvelteKit workspace and TipTap editor
 backend/           Elysia REST API, search, workers, and authentication
@@ -212,7 +241,9 @@ The Docker deployment runs:
   Apache AGE graph in one database;
 - **Redis 8** — BullMQ queues, caching, retries, and job recovery;
 - **SeaweedFS** — S3-compatible attachment storage.
+
 ## How search works
+
 Every document save schedules background work. Content is chunked, changed
 chunks are embedded, and the completed generation is activated atomically. The
 previous valid generation remains searchable if a provider call fails.
@@ -230,7 +261,9 @@ model is unavailable.
 
 For pipeline internals and tuning, see [Architecture](docs/ARCHITECTURE.md) and
 [Deployment](docs/DEPLOYMENT.md).
+
 ## Stack
+
 - Bun, TypeScript, Elysia, Zod, and Pino
 - Svelte 5, SvelteKit, Tailwind CSS, and TipTap
 - Better Auth and Drizzle ORM
@@ -238,7 +271,9 @@ For pipeline internals and tuning, see [Architecture](docs/ARCHITECTURE.md) and
 - Redis 8 and BullMQ
 - SeaweedFS with its S3-compatible API
 - OpenAI-compatible providers through OpenRouter or local Ollama
+
 ## Comparison
+
 hiai-docs overlaps with several excellent open-source knowledge tools, but its
 focus is a compact knowledge runtime shared equally by humans and agents.
 
@@ -253,7 +288,9 @@ focus is a compact knowledge runtime shared equally by humans and agents.
 This is a product-positioning summary, not a claim that every listed project
 lacks a feature. Check each project's current documentation when choosing a
 deployment.
+
 ## Documentation
+
 - [Documentation index](docs/README.md)
 - [Product usage](docs/USAGE.md)
 - [REST API](docs/API.md) and [OpenAPI JSON](docs/openapi.json)
@@ -263,7 +300,9 @@ deployment.
 - [Maintainer release flow](docs/RELEASING.md)
 - [Security policy](SECURITY.md)
 - [Changelog](CHANGELOG.md)
+
 ## Development
+
 ```bash
 bun install
 bun run lint
@@ -273,7 +312,9 @@ bun run build
 ```
 Read [CONTRIBUTING.md](CONTRIBUTING.md) before opening a pull request. Please
 report vulnerabilities through [SECURITY.md](SECURITY.md), not a public issue.
+
 ## License
+
 hiai-docs is released under the [MIT License](LICENSE).
 
 Part of the [HiAi](https://hiai.gg) open-source ecosystem.
