@@ -83,8 +83,10 @@ import {
 	getFolderFromRegistry,
 	getGlobalFolderRefreshNonce,
 	getLatestDocumentPlacement,
+	getPendingDocumentPlacement,
 	registerDocument,
 	registerFolder,
+	supersedePendingDocumentPlacement,
 } from "$lib/stores/subfolders-refresh-store.svelte.js";
 import {
 	getDocRefreshNonce,
@@ -509,13 +511,12 @@ async function loadDocuments() {
 		const tag = getSelectedTag();
 		const res = await listDocuments({ limit: 100, ...(tag ? { tag } : {}) });
 		if (generation !== documentsLoadGeneration) return;
-		const latestPlacement = getLatestDocumentPlacement();
 		documents = (res.items as DndDoc[]).map((doc) =>
-			latestPlacement?.id === doc.id
+			getPendingDocumentPlacement(doc.id)
 				? {
 						...doc,
-						folderId: latestPlacement.folderId,
-						categoryId: latestPlacement.categoryId,
+						folderId: getPendingDocumentPlacement(doc.id)?.folderId ?? null,
+						categoryId: getPendingDocumentPlacement(doc.id)?.categoryId ?? null,
 					}
 				: doc,
 		);
@@ -793,6 +794,7 @@ async function persistZoneChanges(zone: DocZone, zoneItems: DndDoc[]) {
 				categoryId: targetCategoryId,
 			});
 			// Update client-side registry immediately to prevent duplicate runs
+			supersedePendingDocumentPlacement(item.id);
 			registerDocument(item.id, targetFolderId, targetCategoryId);
 		}
 	}
@@ -848,6 +850,7 @@ async function handleDropOnCategory(e: DragEvent, categoryId: string) {
 	const categoryChanged = original.categoryId !== targetCategoryId;
 
 	if (folderChanged || categoryChanged) {
+		supersedePendingDocumentPlacement(draggedDocId);
 		registerDocument(draggedDocId, null, targetCategoryId);
 		documents = documents.map((d) =>
 			d.id === draggedDocId
@@ -890,6 +893,7 @@ async function handleDropOnFolder(e: DragEvent, folderId: string) {
 	const folderChanged = original.folderId !== folderId;
 
 	if (folderChanged) {
+		supersedePendingDocumentPlacement(draggedDocId);
 		registerDocument(draggedDocId, folderId, targetCategoryId);
 		documents = documents.map((d) =>
 			d.id === draggedDocId

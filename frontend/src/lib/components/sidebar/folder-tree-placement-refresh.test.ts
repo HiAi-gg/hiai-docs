@@ -24,8 +24,16 @@ describe("FolderTree placement refresh", () => {
 	});
 
 	test("merges the optimistic placement into a late server response", () => {
-		expect(folderTree).toContain("latestPlacement?.id === doc.id");
-		expect(folderTree).toContain("folderId: latestPlacement.folderId");
-		expect(folderTree).toContain("categoryId: latestPlacement.categoryId");
+		expect(folderTree).toContain("getPendingDocumentPlacement(doc.id)");
+		expect(folderTree).toContain(
+			"folderId: getPendingDocumentPlacement(doc.id)?.folderId ?? null",
+		);
+	});
+
+	test("sidebar moves supersede an acknowledged editor placement", () => {
+		expect(folderTree).toContain("supersedePendingDocumentPlacement(item.id)");
+		expect(folderTree).toContain(
+			"supersedePendingDocumentPlacement(draggedDocId)",
+		);
 	});
 });

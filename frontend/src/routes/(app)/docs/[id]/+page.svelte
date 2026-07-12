@@ -67,6 +67,7 @@ import VersionHistory from "$lib/components/VersionHistory.svelte";
 import * as m from "$lib/paraglide/messages.js";
 import { docTabRegistry } from "$lib/stores/doc-tab-registry.svelte";
 import {
+	acknowledgeDocumentPlacement,
 	publishDocumentPlacement,
 	refreshFolders,
 } from "$lib/stores/subfolders-refresh-store.svelte.js";
@@ -142,6 +143,10 @@ $effect(() => {
 	tags = doc.tags ?? [];
 	currentFolderId = doc.folderId ?? null;
 	currentCategoryId = doc.categoryId ?? null;
+	enqueuePlacementMutation.resetConfirmedPlacement({
+		folderId: doc.folderId ?? null,
+		categoryId: doc.categoryId ?? null,
+	});
 });
 
 function getFolderPathName(folderId: string): string {
@@ -648,8 +653,6 @@ async function loadCategories() {
 }
 
 async function moveToFolder(folderId: string | null, propagateError = false) {
-	const previousFolderId = currentFolderId;
-	const previousCategoryId = currentCategoryId;
 	const placement = placementForFolder(folderId, folders, currentCategoryId);
 
 	// Placement changes are document mutations in their own right. Apply them
@@ -658,7 +661,7 @@ async function moveToFolder(folderId: string | null, propagateError = false) {
 	currentFolderId = placement.folderId;
 	currentCategoryId = placement.categoryId;
 	const revision = ++placementRevision;
-	publishDocumentPlacement(
+	const placementVersion = publishDocumentPlacement(
 		data.document.id,
 		placement.folderId,
 		placement.categoryId,
@@ -666,17 +669,21 @@ async function moveToFolder(folderId: string | null, propagateError = false) {
 	saveStatus = "saving";
 	try {
 		await enqueuePlacementMutation(placement);
+		acknowledgeDocumentPlacement(data.document.id, placementVersion);
 		if (revision === placementRevision) saveStatus = "saved";
 		refreshDocs();
 	} catch (error) {
 		if (revision === placementRevision) {
-			currentFolderId = previousFolderId;
-			currentCategoryId = previousCategoryId;
-			publishDocumentPlacement(
+			const confirmedPlacement =
+				enqueuePlacementMutation.getConfirmedPlacement();
+			currentFolderId = confirmedPlacement.folderId;
+			currentCategoryId = confirmedPlacement.categoryId;
+			const rollbackVersion = publishDocumentPlacement(
 				data.document.id,
-				previousFolderId,
-				previousCategoryId,
+				confirmedPlacement.folderId,
+				confirmedPlacement.categoryId,
 			);
+			acknowledgeDocumentPlacement(data.document.id, rollbackVersion);
 			saveStatus = "unsaved";
 			setError(m.doc_save_content_error());
 		}
@@ -685,27 +692,32 @@ async function moveToFolder(folderId: string | null, propagateError = false) {
 }
 
 async function moveToCategory(categoryId: string | null) {
-	const previousFolderId = currentFolderId;
-	const previousCategoryId = currentCategoryId;
-
 	currentCategoryId = categoryId;
 	currentFolderId = null;
 	const revision = ++placementRevision;
-	publishDocumentPlacement(data.document.id, null, categoryId);
+	const placementVersion = publishDocumentPlacement(
+		data.document.id,
+		null,
+		categoryId,
+	);
 	saveStatus = "saving";
 	try {
 		await enqueuePlacementMutation({ categoryId, folderId: null });
+		acknowledgeDocumentPlacement(data.document.id, placementVersion);
 		if (revision === placementRevision) saveStatus = "saved";
 		refreshDocs();
 	} catch (_e) {
 		if (revision === placementRevision) {
-			currentFolderId = previousFolderId;
-			currentCategoryId = previousCategoryId;
-			publishDocumentPlacement(
+			const confirmedPlacement =
+				enqueuePlacementMutation.getConfirmedPlacement();
+			currentFolderId = confirmedPlacement.folderId;
+			currentCategoryId = confirmedPlacement.categoryId;
+			const rollbackVersion = publishDocumentPlacement(
 				data.document.id,
-				previousFolderId,
-				previousCategoryId,
+				confirmedPlacement.folderId,
+				confirmedPlacement.categoryId,
 			);
+			acknowledgeDocumentPlacement(data.document.id, rollbackVersion);
 			saveStatus = "unsaved";
 			setError(m.doc_save_content_error());
 		}

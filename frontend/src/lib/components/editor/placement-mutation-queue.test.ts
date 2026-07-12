@@ -42,4 +42,17 @@ describe("document placement mutation queue", () => {
 		await enqueue({ categoryId: "cat-a", folderId: "folder-a" });
 		expect(calls).toEqual(["category", "folder-a"]);
 	});
+
+	test("keeps the last confirmed placement when two optimistic writes fail", async () => {
+		const original = { categoryId: "cat-o", folderId: "folder-o" };
+		const enqueue = createPlacementMutationQueue(async () => {
+			throw new Error("failed");
+		}, original);
+
+		const first = enqueue({ categoryId: "cat-a", folderId: null });
+		const second = enqueue({ categoryId: "cat-a", folderId: "folder-b" });
+		await Promise.allSettled([first, second]);
+
+		expect(enqueue.getConfirmedPlacement()).toEqual(original);
+	});
 });

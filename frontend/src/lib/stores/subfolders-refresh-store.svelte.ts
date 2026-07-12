@@ -34,8 +34,11 @@ const documentsRegistry = $state<Record<string, DocumentRegistryEntry>>({});
 
 let documentPlacementNonce = $state(0);
 let latestDocumentPlacement = $state<
-	({ id: string } & DocumentRegistryEntry) | null
+	({ id: string; version: number } & DocumentRegistryEntry) | null
 >(null);
+const pendingDocumentPlacements = $state<
+	Record<string, { version: number } & DocumentRegistryEntry>
+>({});
 
 let globalFolderRefreshNonce = $state(0);
 
@@ -86,10 +89,31 @@ export function publishDocumentPlacement(
 	id: string,
 	folderId: string | null,
 	categoryId: string | null,
-): void {
+): number {
 	registerDocument(id, folderId, categoryId);
-	latestDocumentPlacement = { id, folderId, categoryId };
-	documentPlacementNonce++;
+	const version = ++documentPlacementNonce;
+	latestDocumentPlacement = { id, folderId, categoryId, version };
+	pendingDocumentPlacements[id] = { folderId, categoryId, version };
+	return version;
+}
+
+export function acknowledgeDocumentPlacement(
+	id: string,
+	version: number,
+): void {
+	if (pendingDocumentPlacements[id]?.version === version) {
+		delete pendingDocumentPlacements[id];
+	}
+}
+
+export function supersedePendingDocumentPlacement(id: string): void {
+	delete pendingDocumentPlacements[id];
+}
+
+export function getPendingDocumentPlacement(
+	id: string,
+): ({ version: number } & DocumentRegistryEntry) | undefined {
+	return pendingDocumentPlacements[id];
 }
 
 export function getDocumentPlacementNonce(): number {
@@ -97,7 +121,7 @@ export function getDocumentPlacementNonce(): number {
 }
 
 export function getLatestDocumentPlacement():
-	| ({ id: string } & DocumentRegistryEntry)
+	| ({ id: string; version: number } & DocumentRegistryEntry)
 	| null {
 	return latestDocumentPlacement;
 }
