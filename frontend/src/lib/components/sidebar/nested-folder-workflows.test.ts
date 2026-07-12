@@ -13,9 +13,8 @@ describe("nested folder workflows", () => {
 		expect(treeSource).toContain("onCreateSubfolder={openNewSubfolder}");
 		expect(nodeSource).toContain("onCreateSubfolder(folder.id)");
 		expect(treeSource).toContain("const parentId = newFolderParentId");
-		expect(treeSource).toContain(
-			"createFolder({ name, parentId, categoryId: newFolderCategoryId })",
-		);
+		expect(treeSource).toContain("const createdFolder = await createFolder({");
+		expect(treeSource).toContain("parentId,");
 		expect(treeSource).toContain("categoryId: newFolderCategoryId");
 	});
 

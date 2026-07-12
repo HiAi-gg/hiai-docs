@@ -24,7 +24,7 @@ let {
 	open: boolean;
 	mode: "create" | "edit";
 	folder?: { id: string; name: string } | null;
-	onSave?: (name: string) => Promise<void> | void;
+	onSave?: (name: string) => Promise<unknown> | unknown;
 	onClose?: () => void;
 	closeOnSave?: boolean;
 } = $props();
@@ -61,11 +61,17 @@ async function handleSubmit(e?: Event) {
 	}
 	busy = true;
 	try {
-		await onSave(trimmedName);
+		const savedFolder = await onSave(trimmedName);
 		if (closeOnSave) {
 			close(true);
 		} else {
-			createdFolderName = trimmedName;
+			createdFolderName =
+				typeof savedFolder === "object" &&
+				savedFolder !== null &&
+				"name" in savedFolder &&
+				typeof savedFolder.name === "string"
+					? savedFolder.name
+					: trimmedName;
 		}
 	} catch (err) {
 		console.error("FolderDialog: save failed", err);

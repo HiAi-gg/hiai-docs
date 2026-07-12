@@ -692,12 +692,17 @@ function openNewSubfolder(parentId: string) {
 
 async function handleCreateFolder(name: string) {
 	const parentId = newFolderParentId;
-	await createFolder({ name, parentId, categoryId: newFolderCategoryId });
+	const createdFolder = await createFolder({
+		name,
+		parentId,
+		categoryId: newFolderCategoryId,
+	});
 	await loadFolders();
 	if (parentId) {
 		expandedFolderIds = new Set(expandedFolderIds).add(parentId);
 		bumpSubfoldersRefresh(parentId);
 	}
+	return createdFolder;
 }
 
 function setZoneItems(zone: DocZone, next: DndDoc[]) {

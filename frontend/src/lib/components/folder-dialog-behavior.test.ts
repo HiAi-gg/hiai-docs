@@ -18,7 +18,8 @@ describe("FolderDialog completion behavior", () => {
 	test("sidebar shows success feedback and preserves multi-create", () => {
 		expect(sidebarSource).toContain("closeOnSave={false}");
 		expect(dialogSource).toContain("Folder created");
-		expect(dialogSource).toContain("createdFolderName = trimmedName");
+		expect(dialogSource).toContain('typeof savedFolder.name === "string"');
+		expect(sidebarSource).toContain("return createdFolder");
 		expect(dialogSource).toContain("Create another");
 		expect(dialogSource).toContain("function createAnother()");
 		expect(dialogSource).toContain('name = ""');
