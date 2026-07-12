@@ -9,11 +9,14 @@ import {
 	Tag,
 } from "lucide-svelte";
 import { goto } from "$app/navigation";
+import { page } from "$app/state";
 import SearchBar from "$lib/components/SearchBar.svelte";
 import SettingsDialog from "$lib/components/SettingsDialog.svelte";
 import FolderTree from "$lib/components/sidebar/FolderTree.svelte";
 import RecentDocs from "$lib/components/sidebar/RecentDocs.svelte";
 import TagList from "$lib/components/sidebar/TagList.svelte";
+import { getFrontendExtensions } from "$lib/extensions/context";
+import { resolveExtensions } from "$lib/extensions/resolve";
 import * as m from "$lib/paraglide/messages.js";
 import { cn } from "$lib/utils";
 
@@ -24,6 +27,13 @@ let activePanel = $state<PanelMode>("all");
 
 let width = $state(256); // default is 256px
 let isResizing = $state(false);
+
+const frontendExtensions = getFrontendExtensions();
+const navigationExtensions = $derived(
+	resolveExtensions(frontendExtensions.navigation, {
+		pathname: page.url.pathname,
+	}),
+);
 
 $effect(() => {
 	if (typeof window !== "undefined") {
@@ -141,6 +151,26 @@ function toggleCollapse() {
         <!-- Tags -->
         <TagList />
       {/if}
+
+      {#if activePanel === "all" && navigationExtensions.length > 0}
+        <div class="h-px bg-border"></div>
+        <nav class="space-y-1" aria-label="Product navigation">
+          {#each navigationExtensions as extension (extension.id)}
+            {@const Icon = extension.icon}
+            <a
+              href={extension.href ?? "#"}
+              aria-disabled={extension.disabled}
+              class="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground aria-disabled:pointer-events-none aria-disabled:opacity-50"
+            >
+              {#if Icon}<Icon class="size-4" />{/if}
+              <span class="min-w-0 flex-1 truncate">{extension.label}</span>
+              {#if extension.badge !== undefined}
+                <span class="rounded bg-muted px-1.5 py-0.5 text-xs">{extension.badge}</span>
+              {/if}
+            </a>
+          {/each}
+        </nav>
+      {/if}
     </div>
   {:else}
     <div class="flex flex-1 flex-col items-center gap-1 pt-14">
@@ -176,6 +206,18 @@ function toggleCollapse() {
       >
         <Tag class="size-4" />
       </button>
+      {#each navigationExtensions as extension (extension.id)}
+        {@const Icon = extension.icon}
+        <a
+          href={extension.href ?? "#"}
+          aria-disabled={extension.disabled}
+          class="flex size-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground aria-disabled:pointer-events-none aria-disabled:opacity-50"
+          title={extension.label}
+          aria-label={extension.label}
+        >
+          {#if Icon}<Icon class="size-4" />{:else}<span class="text-xs">{extension.label.slice(0, 1)}</span>{/if}
+        </a>
+      {/each}
     </div>
   {/if}
 

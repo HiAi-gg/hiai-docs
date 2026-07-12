@@ -65,6 +65,8 @@ import SaveAsDialog from "$lib/components/SaveAsDialog.svelte";
 import ShareDialog from "$lib/components/ShareDialog.svelte";
 import TagCreateDialog from "$lib/components/TagCreateDialog.svelte";
 import VersionHistory from "$lib/components/VersionHistory.svelte";
+import { getFrontendExtensions } from "$lib/extensions/context";
+import { resolveExtensions } from "$lib/extensions/resolve";
 import * as m from "$lib/paraglide/messages.js";
 import { docTabRegistry } from "$lib/stores/doc-tab-registry.svelte";
 import {
@@ -85,8 +87,20 @@ let showMenu = $state(false);
 // "editor" is always the default/built-in tab; extension tabs are appended
 // by registerDocTab() calls in the consuming project's layout.
 let activeTab = $state("editor");
+const frontendExtensions = getFrontendExtensions();
+const manifestTabs = $derived(
+	resolveExtensions(frontendExtensions.documentTabs, { pathname: "/docs" }),
+);
+const editorActions = $derived(
+	resolveExtensions(frontendExtensions.editorActions, { pathname: "/docs" }),
+);
 const sortedTabs = $derived(
-	[...docTabRegistry].sort((a, b) => (a.order ?? 0) - (b.order ?? 0)),
+	[
+		...manifestTabs,
+		...docTabRegistry.filter(
+			(legacyTab) => !manifestTabs.some((tab) => tab.id === legacyTab.id),
+		),
+	].sort((a, b) => (a.order ?? 0) - (b.order ?? 0)),
 );
 let loading = $state(true);
 let error = $state<string | null>(null);
@@ -938,7 +952,7 @@ $effect(() => {
     {/if}
 
     <!-- Extension tab bar — only rendered when external projects register tabs -->
-    {#if docTabRegistry.length > 0}
+    {#if sortedTabs.length > 0}
       <nav class="doc-tab-bar" aria-label="Document view tabs">
         <button
           class="doc-tab"
@@ -1128,6 +1142,12 @@ $effect(() => {
               onUpdate={debounceContentSave}
               editable={true}
               documentId={data.document.id}
+              {editorActions}
+              editorActionContext={{
+                documentId: data.document.id,
+                content,
+                contentJson,
+              }}
             />
           {:else}
             <MarkdownToggle {content} onUpdate={debounceContentSave} />

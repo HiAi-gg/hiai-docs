@@ -47,6 +47,8 @@ export type {
 	FrontendExtensions,
 	HiaiDocsFrontendExtensions,
 	NavigationExtension,
+	SearchWidgetExtension,
+	SearchWidgetProps,
 	SettingsSectionExtension,
 	SettingsSectionProps,
 } from "./extensions/types";

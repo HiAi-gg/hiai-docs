@@ -6,6 +6,10 @@ import type { Snippet } from "svelte";
 import { onDestroy, onMount, untrack } from "svelte";
 import { createEditor, type Editor, EditorContent } from "svelte-tiptap";
 import type { CollaborationSession } from "$lib/collaboration";
+import type {
+	EditorActionContext,
+	EditorActionExtension,
+} from "$lib/extensions/types";
 import * as m from "$lib/paraglide/messages.js";
 import {
 	registerShortcut,
@@ -26,6 +30,8 @@ const {
 	collaboration = null,
 	documentId = "",
 	toolbarExtensions = null,
+	editorActions = [],
+	editorActionContext,
 }: {
 	content?: string;
 	contentJson?: object;
@@ -50,6 +56,12 @@ const {
 	toolbarExtensions?: Snippet<
 		[{ editor: import("@tiptap/core").Editor | null }]
 	> | null;
+	/**
+	 * Typed product actions rendered after the built-in toolbar controls.
+	 * An empty list preserves the stock editor exactly.
+	 */
+	editorActions?: readonly EditorActionExtension[];
+	editorActionContext?: Omit<EditorActionContext, "selection" | "commands">;
 } = $props();
 
 let editorStore: ReturnType<typeof createEditor> | null = null;
@@ -273,7 +285,13 @@ function handleWrapperClick(event: MouseEvent) {
 
 <div class="editor-wrapper" onclick={handleWrapperClick} role="presentation">
   {#if ready && editor}
-    <EditorToolbar {editor} {documentId} {toolbarExtensions} />
+    <EditorToolbar
+      {editor}
+      {documentId}
+      {toolbarExtensions}
+      {editorActions}
+      {editorActionContext}
+    />
     <div class="editor-content">
       <EditorContent {editor} />
     </div>

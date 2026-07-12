@@ -13,6 +13,7 @@ export function createFrontendExtensions(
 	return {
 		navigation: [...(initial.navigation ?? [])],
 		dashboardWidgets: [...(initial.dashboardWidgets ?? [])],
+		searchWidgets: [...(initial.searchWidgets ?? [])],
 		documentTabs: [...(initial.documentTabs ?? [])],
 		editorActions: [...(initial.editorActions ?? [])],
 		documentMenuActions: [...(initial.documentMenuActions ?? [])],
@@ -26,8 +27,19 @@ export function createFrontendExtensions(
  * safe for concurrent SSR requests. Do not replace this with a module-level
  * mutable registry.
  */
-export const [getFrontendExtensions, setFrontendExtensions] =
+const [getProvidedFrontendExtensions, setFrontendExtensions] =
 	createContext<HiaiDocsFrontendExtensions>();
+
+export { setFrontendExtensions };
+
+/**
+ * Read the request-scoped manifest, defaulting to an empty manifest for the
+ * standalone open-source application. This keeps every host backward
+ * compatible when no extension provider is mounted above it.
+ */
+export function getFrontendExtensions(): HiaiDocsFrontendExtensions {
+	return getProvidedFrontendExtensions() ?? createFrontendExtensions();
+}
 
 /** Stable aliases for hosts that prefer the product name in their imports. */
 export const getHiaiDocsExtensions = getFrontendExtensions;

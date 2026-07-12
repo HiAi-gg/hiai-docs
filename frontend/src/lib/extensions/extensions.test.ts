@@ -10,6 +10,7 @@ describe("frontend extension manifest", () => {
 		expect(Object.keys(first)).toEqual([
 			"navigation",
 			"dashboardWidgets",
+			"searchWidgets",
 			"documentTabs",
 			"editorActions",
 			"documentMenuActions",
@@ -18,6 +19,7 @@ describe("frontend extension manifest", () => {
 		]);
 		expect(first.navigation).not.toBe(second.navigation);
 		expect(first.documentTabs).not.toBe(second.documentTabs);
+		expect(first.searchWidgets).not.toBe(second.searchWidgets);
 	});
 
 	test("preserves the existing document-tab contract", () => {

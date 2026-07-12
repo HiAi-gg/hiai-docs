@@ -41,6 +41,10 @@ import {
 	isImageFile,
 	uploadAttachment,
 } from "$lib/api/attachments";
+import type {
+	EditorActionContext,
+	EditorActionExtension,
+} from "$lib/extensions/types";
 import * as m from "$lib/paraglide/messages.js";
 import { copyToClipboard } from "$lib/utils/clipboard";
 import CreateSnapshotDialog from "../CreateSnapshotDialog.svelte";
@@ -50,6 +54,8 @@ const {
 	editor = null,
 	documentId = "",
 	toolbarExtensions = null,
+	editorActions = [],
+	editorActionContext,
 }: {
 	editor?: Editor | null;
 	documentId?: string;
@@ -68,7 +74,57 @@ const {
 	 * ```
 	 */
 	toolbarExtensions?: Snippet<[{ editor: Editor | null }]> | null;
+	/** Typed actions supplied by a host extension manifest. */
+	editorActions?: readonly EditorActionExtension[];
+	editorActionContext?: Omit<EditorActionContext, "selection" | "commands">;
 } = $props();
+
+function createExtensionCommands(): Readonly<
+	Record<string, (...args: unknown[]) => unknown>
+> {
+	return {
+		focus: () => editor?.commands.focus(),
+		// The public extension facade intentionally accepts unknown; TipTap validates
+		// the content at its command boundary before applying it.
+		insertContent: (content: unknown) =>
+			editor?.commands.insertContent(content as never),
+		setContent: (content: unknown) =>
+			editor?.commands.setContent(content as never),
+		getJSON: () => editor?.getJSON(),
+		getText: () => editor?.getText(),
+		getHTML: () => editor?.getHTML(),
+	};
+}
+
+function actionIsDisabled(action: EditorActionExtension): boolean {
+	if (typeof action.disabled === "boolean") return action.disabled;
+	if (!action.disabled) return false;
+	try {
+		return action.disabled(createEditorActionContext());
+	} catch {
+		return true;
+	}
+}
+
+function createEditorActionContext(): EditorActionContext {
+	return {
+		documentId: editorActionContext?.documentId ?? documentId,
+		content: editorActionContext?.content ?? "",
+		contentJson: editorActionContext?.contentJson,
+		selection: editor?.state.selection.toJSON(),
+		commands: createExtensionCommands(),
+	};
+}
+
+async function runEditorAction(action: EditorActionExtension) {
+	if (actionIsDisabled(action)) return;
+	try {
+		await action.run(createEditorActionContext());
+	} catch (error) {
+		// A product extension must not take down the stock toolbar when it fails.
+		console.error(`HiAi-Docs editor extension "${action.id}" failed`, error);
+	}
+}
 
 interface ToolbarAction {
 	icon: typeof Bold;
@@ -1198,10 +1254,29 @@ $effect(() => {
 						{@render tablePicker()}
 						{@render imageBtn()}
 						
-						{#if toolbarExtensions}
+						{#if toolbarExtensions || editorActions.length > 0}
 							<div class="toolbar-divider" aria-hidden="true"></div>
 							<!-- Extension zone: custom buttons from external projects -->
-							{@render toolbarExtensions({ editor })}
+							{#if toolbarExtensions}
+								{@render toolbarExtensions({ editor })}
+							{/if}
+							{#each editorActions as action (action.id)}
+								<button
+									type="button"
+									class="toolbar-btn"
+									disabled={actionIsDisabled(action)}
+									onclick={() => void runEditorAction(action)}
+									title={action.label}
+									aria-label={action.label}
+								>
+									{#if action.icon}
+										{@const Icon = action.icon}
+										<Icon size={16} />
+									{:else}
+										<span class="px-1 text-xs">{action.label}</span>
+									{/if}
+								</button>
+							{/each}
 						{/if}
 						
 						<div class="toolbar-divider" aria-hidden="true"></div>
@@ -1222,10 +1297,29 @@ $effect(() => {
 				{@render emojiPicker()}
 				{@render tablePicker()}
 				{@render imageBtn()}
-				{#if toolbarExtensions}
+				{#if toolbarExtensions || editorActions.length > 0}
 					<div class="toolbar-divider" aria-hidden="true"></div>
 					<!-- Extension zone: custom buttons from external projects -->
-					{@render toolbarExtensions({ editor })}
+					{#if toolbarExtensions}
+						{@render toolbarExtensions({ editor })}
+					{/if}
+					{#each editorActions as action (action.id)}
+						<button
+							type="button"
+							class="toolbar-btn"
+							disabled={actionIsDisabled(action)}
+							onclick={() => void runEditorAction(action)}
+							title={action.label}
+							aria-label={action.label}
+						>
+							{#if action.icon}
+								{@const Icon = action.icon}
+								<Icon size={16} />
+							{:else}
+								<span class="px-1 text-xs">{action.label}</span>
+							{/if}
+						</button>
+					{/each}
 				{/if}
 				<div class="toolbar-divider" aria-hidden="true"></div>
 				{@render actionsSnippet()}

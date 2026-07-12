@@ -50,6 +50,26 @@ export interface DashboardWidgetExtension {
 	visible?: ExtensionVisibility;
 }
 
+/**
+ * Read-only state supplied to a search extension.
+ *
+ * Search extensions deliberately receive result metadata only. They cannot
+ * alter retrieval, ranking, filters, or the authenticated API client.
+ */
+export interface SearchWidgetProps {
+	query: string;
+	loading: boolean;
+	total?: number;
+}
+
+export interface SearchWidgetExtension {
+	id: string;
+	title?: string;
+	component: Component<SearchWidgetProps>;
+	order?: number;
+	visible?: ExtensionVisibility;
+}
+
 export interface EditorActionContext {
 	documentId: string;
 	content: string;
@@ -134,6 +154,7 @@ export interface CommandPaletteActionExtension {
 export interface HiaiDocsFrontendExtensions {
 	navigation: readonly NavigationExtension[];
 	dashboardWidgets: readonly DashboardWidgetExtension[];
+	searchWidgets: readonly SearchWidgetExtension[];
 	documentTabs: readonly DocTabDefinition[];
 	editorActions: readonly EditorActionExtension[];
 	documentMenuActions: readonly DocumentMenuActionExtension[];

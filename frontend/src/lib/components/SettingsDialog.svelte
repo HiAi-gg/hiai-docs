@@ -7,9 +7,12 @@ import * as Tabs from "@hiai-gg/hiai-ui/components/ui/tabs";
 import { Loader2, LogOut, Save } from "lucide-svelte";
 import { onMount } from "svelte";
 import { goto } from "$app/navigation";
+import { page } from "$app/state";
 import { getProfile, updateProfile } from "$lib/api/settings";
 import { authClient, signOut } from "$lib/auth-client";
 import ApiAccessSettings from "$lib/components/settings/ApiAccessSettings.svelte";
+import { getFrontendExtensions } from "$lib/extensions/context";
+import { resolveExtensions } from "$lib/extensions/resolve";
 import * as m from "$lib/paraglide/messages.js";
 import { type Theme, themeStore } from "$lib/stores/theme.svelte";
 
@@ -20,6 +23,12 @@ let {
 } = $props();
 
 let activeTab = $state("profile");
+const frontendExtensions = getFrontendExtensions();
+const settingsExtensions = $derived(
+	resolveExtensions(frontendExtensions.settingsSections, {
+		pathname: page.url.pathname,
+	}),
+);
 
 // Profile
 let name = $state("");
@@ -154,7 +163,7 @@ function close() {
 	</Dialog.DialogHeader>
 
 	<Tabs.Tabs bind:value={activeTab} class="w-full">
-		<Tabs.TabsList class="grid w-full grid-cols-4">
+		<Tabs.TabsList class="flex w-full flex-wrap justify-start">
 			<Tabs.TabsTrigger
 				value="profile"
 				selected={activeTab === "profile"}
@@ -183,6 +192,15 @@ function close() {
 			>
 				{m.settings_appearance()}
 			</Tabs.TabsTrigger>
+			{#each settingsExtensions as section (section.id)}
+				<Tabs.TabsTrigger
+					value={section.id}
+					selected={activeTab === section.id}
+					onclick={(value) => (activeTab = value)}
+				>
+					{section.label}
+				</Tabs.TabsTrigger>
+			{/each}
 		</Tabs.TabsList>
 
 		<Tabs.TabsContent value="profile" currentValue={activeTab}>
@@ -285,6 +303,13 @@ function close() {
 		<Tabs.TabsContent value="api" currentValue={activeTab}>
 			<ApiAccessSettings />
 		</Tabs.TabsContent>
+
+		{#each settingsExtensions as section (section.id)}
+			<Tabs.TabsContent value={section.id} currentValue={activeTab}>
+				{@const Section = section.component}
+				<Section />
+			</Tabs.TabsContent>
+		{/each}
 	</Tabs.Tabs>
 
 	<Dialog.DialogFooter>

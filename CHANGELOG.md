@@ -2,12 +2,27 @@
 
 All notable changes to hiai-docs are documented in this file.
 
-<!-- v0.2.8 candidate evidence verified 2026-07-12; publication remains a separate release action. -->
+<!-- v0.2.8 publication verified 2026-07-12. -->
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [0.2.9] - 2026-07-12
+
+### Added
+- Public SvelteKit host components for the dashboard and search surfaces, with
+  request-scoped extension providers for DocsMint and other product builds.
+- Additive frontend extension slots for dashboard widgets, search widgets,
+  navigation links, settings sections, document tabs, and editor actions.
+- Deterministic extension ordering, duplicate-id filtering, and safe visibility
+  predicates that cannot take down the base application.
+
+### Changed
+- Existing HiAi-Docs routes remain thin wrappers around the same page bodies;
+  an empty extension manifest preserves the standalone UI and behavior.
+- Release creation is idempotent when a GitHub Release already exists for a tag.
 
 ## [0.2.8] - 2026-07-12
 

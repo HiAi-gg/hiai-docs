@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 const searchPage = readFileSync(
-	resolve(import.meta.dir, "../../routes/(app)/search/+page.svelte"),
+	resolve(import.meta.dir, "../hosts/HiaiDocsSearchHost.svelte"),
 	"utf8",
 );
 

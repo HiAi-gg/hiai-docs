@@ -135,7 +135,7 @@ bunx --package @hiai-gg/hiai-docs hiai-docs search "project architecture"
 bunx --package @hiai-gg/hiai-docs hiai-docs list
 bunx --package @hiai-gg/hiai-docs hiai-docs read <document-id>
 bunx --package @hiai-gg/hiai-docs hiai-docs create \
-  --title "Release notes" --content "# Version 0.2.8"
+  --title "Release notes" --content "# Version 0.2.9"
 ```
 Credentials can also be supplied through `HIAI_DOCS_URL` and
 `HIAI_DOCS_API_KEY`. See the [CLI guide](packages/cli/README.md) for every

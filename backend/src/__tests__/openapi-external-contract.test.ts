@@ -61,7 +61,7 @@ const backendRouteEvidence = [
 
 describe("OpenAPI external integration contract", () => {
 	test("tracks the release version and critical SDK, CLI, and MCP routes", () => {
-		expect(spec.info.version).toBe("0.2.8");
+		expect(spec.info.version).toBe("0.2.9");
 		for (const [method, path] of requiredOperations) {
 			expect(
 				spec.paths[path]?.[method],
