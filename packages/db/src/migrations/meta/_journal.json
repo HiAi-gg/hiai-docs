@@ -218,6 +218,13 @@
       "when": 1785000000016,
       "tag": "0030_move_pipeline_tables_to_public",
       "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1785000000017,
+      "tag": "0031_pipeline_tenant_rls",
+      "breakpoints": true
     }
   ]
 }
