@@ -20,10 +20,10 @@ describe("sibling folder name migration", () => {
 		expect(migration).not.toContain("CREATE UNIQUE INDEX");
 	});
 
-	it("is the latest journaled migration", () => {
-		expect(journal.entries.at(-1)).toMatchObject({
-			idx: 34,
-			tag: "0034_external_workspace_context",
-		});
+	it("remains present in the migration journal", () => {
+		expect(journal.entries).toContainEqual(expect.objectContaining({
+			idx: 32,
+			tag: "0032_unique_sibling_folder_names",
+		}));
 	});
 });

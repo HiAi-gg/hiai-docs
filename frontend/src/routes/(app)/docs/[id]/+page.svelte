@@ -10,7 +10,6 @@ import {
 } from "@hiai-gg/hiai-ui/components/ui/dropdown-menu";
 import {
 	Bookmark,
-	Braces,
 	Check,
 	ChevronRight,
 	Code,
@@ -70,7 +69,7 @@ const { data } = $props();
 let title = $state("");
 let content = $state("");
 let contentJson = $state<object | undefined>(undefined);
-let mode = $state<"wysiwyg" | "markdown" | "json">("wysiwyg");
+let mode = $state<"wysiwyg" | "markdown">("wysiwyg");
 let saveStatus = $state<"saved" | "saving" | "unsaved">("saved");
 $effect(() => {
 	pwaDirtyState.mark(
@@ -109,14 +108,11 @@ type EditorComponentType =
 	typeof import("$lib/components/editor/HiAiEditor.svelte").default;
 type MarkdownComponentType =
 	typeof import("$lib/components/editor/MarkdownToggle.svelte").default;
-type JsonComponentType =
-	typeof import("$lib/components/editor/JsonToggle.svelte").default;
 type VersionHistoryComponentType =
 	typeof import("$lib/components/VersionHistory.svelte").default;
 
 let EditorComponent = $state<EditorComponentType | null>(null);
 let MarkdownComponent = $state<MarkdownComponentType | null>(null);
-let JsonComponent = $state<JsonComponentType | null>(null);
 let VersionHistoryComponent = $state<VersionHistoryComponentType | null>(null);
 let editorLoading = $state(false);
 
@@ -140,24 +136,14 @@ async function activateMarkdownEditor() {
 	).default;
 }
 
-async function activateJsonEditor() {
-	if (JsonComponent) return;
-	JsonComponent = (await import("$lib/components/editor/JsonToggle.svelte"))
-		.default;
-}
-
 $effect(() => {
 	const modeIsVisible =
 		(mode === "wysiwyg" && editorPreferences.showVisualMode) ||
-		(mode === "markdown" && editorPreferences.showMarkdownMode) ||
-		(mode === "json" && editorPreferences.showJsonMode);
+		(mode === "markdown" && editorPreferences.showMarkdownMode);
 	if (modeIsVisible) return;
 	if (editorPreferences.showMarkdownMode) {
 		mode = "markdown";
 		void activateMarkdownEditor();
-	} else if (editorPreferences.showJsonMode) {
-		mode = "json";
-		void activateJsonEditor();
 	} else {
 		mode = "wysiwyg";
 		void activateEditor();
@@ -166,8 +152,7 @@ $effect(() => {
 
 const visibleEditorModeCount = $derived(
 	Number(editorPreferences.showVisualMode) +
-		Number(editorPreferences.showMarkdownMode) +
-		Number(editorPreferences.showJsonMode),
+		Number(editorPreferences.showMarkdownMode),
 );
 
 async function openVersionHistory() {
@@ -343,8 +328,8 @@ onMount(async () => {
 		mode = "markdown";
 		void activateMarkdownEditor();
 	} else {
-		mode = "json";
-		void activateJsonEditor();
+		mode = "wysiwyg";
+		void activateEditor();
 	}
 	await Promise.all([loadCategories(), loadFolders()]);
 });
@@ -404,6 +389,7 @@ async function saveContent(update: ContentUpdate) {
 				contentJson: update.json,
 			});
 			saveStatus = "saved";
+			refreshDocs();
 			return;
 		} catch (e) {
 			if (
@@ -972,20 +958,6 @@ $effect(() => {
           >
             <Code size={16} />
           </button>{/if}
-          {#if editorPreferences.showJsonMode}<button
-            class="mode-btn"
-            class:active={mode === "json"}
-            onclick={() => {
-              mode = "json";
-              void activateJsonEditor();
-            }}
-            title="Raw JSON"
-            aria-label="JSON mode"
-            role="radio"
-            aria-checked={mode === "json"}
-          >
-            <Braces size={16} />
-          </button>{/if}
         </div>
         {/if}
 
@@ -1338,17 +1310,11 @@ $effect(() => {
 				</div>
 			  </div>
             {/if}
-          {:else if mode === "markdown"}
+          {:else}
             {#if MarkdownComponent}
               <MarkdownComponent {content} onUpdate={debounceContentSave} />
             {:else}
               <div class="editor-loading" aria-live="polite">Loading Markdown editor…</div>
-            {/if}
-          {:else}
-            {#if JsonComponent}
-              <JsonComponent {contentJson} onUpdate={debounceContentSave} />
-            {:else}
-              <div class="editor-loading" aria-live="polite">Loading JSON editor…</div>
             {/if}
           {/if}
         {:else}
@@ -1504,7 +1470,7 @@ $effect(() => {
     flex-wrap: wrap;
     position: sticky;
     top: 0;
-    z-index: 100;
+    z-index: 30;
   }
 
   .breadcrumb {

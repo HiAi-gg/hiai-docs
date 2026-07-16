@@ -1,6 +1,6 @@
 {
   "name": "@hiai-docs/db",
-  "version": "0.3.0",
+  "version": "0.3.2",
   "private": true,
   "type": "module",
   "license": "Apache-2.0",
@@ -17,7 +17,7 @@
     "db:migrate": "bun run scripts/migrate.ts",
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
-    "test": "bun test ./scripts",
+    "test": "bun test ./scripts ./src/*.test.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

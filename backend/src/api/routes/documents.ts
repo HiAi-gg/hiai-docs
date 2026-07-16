@@ -8,7 +8,7 @@ import {
 	tags,
 	versions,
 } from "@hiai-docs/db/schema";
-import { and, count, desc, eq, inArray, sql } from "drizzle-orm";
+import { and, count, desc, eq, inArray, lt, or, sql } from "drizzle-orm";
 import { Elysia } from "elysia";
 import { z } from "zod";
 import { recordAuditEvent } from "../../lib/audit";
@@ -75,6 +75,56 @@ const listQuerySchema = z.object({
 	page: z.coerce.number().int().min(1).default(1),
 	limit: z.coerce.number().int().min(1).max(1000).default(20),
 });
+
+const cursorListQuerySchema = z.object({
+	categoryId: z.string().uuid().optional(),
+	cursor: z.string().min(1).optional(),
+	limit: z.coerce.number().int().min(1).max(100).default(50),
+});
+
+type DocumentCursorV1 = Readonly<{
+	v: 1;
+	updatedAt: string;
+	id: string;
+	scopeHash: string;
+}>;
+
+function cursorScopeHash(input: string): string {
+	return Buffer.from(
+		new Bun.CryptoHasher("sha256").update(input).digest("hex"),
+		"utf8",
+	).toString("base64url");
+}
+
+function decodeDocumentCursor(
+	value: string,
+	expectedScopeHash: string,
+): DocumentCursorV1 {
+	let cursor: unknown;
+	try {
+		cursor = JSON.parse(Buffer.from(value, "base64url").toString("utf8"));
+	} catch {
+		throw new Error("Malformed cursor");
+	}
+	if (!cursor || typeof cursor !== "object")
+		throw new Error("Malformed cursor");
+	const candidate = cursor as Record<string, unknown>;
+	if (
+		candidate.v !== 1 ||
+		typeof candidate.updatedAt !== "string" ||
+		Number.isNaN(Date.parse(candidate.updatedAt)) ||
+		typeof candidate.id !== "string" ||
+		typeof candidate.scopeHash !== "string" ||
+		candidate.scopeHash !== expectedScopeHash
+	) {
+		throw new Error("Cursor does not match this listing scope");
+	}
+	return candidate as DocumentCursorV1;
+}
+
+function encodeDocumentCursor(cursor: DocumentCursorV1): string {
+	return Buffer.from(JSON.stringify(cursor), "utf8").toString("base64url");
+}
 
 const ALLOWED_IMPORT_EXTENSIONS = [
 	".md",
@@ -394,6 +444,99 @@ export const documentRoutes = new Elysia({ prefix: "/api" })
 			});
 		} catch (err) {
 			logger.error({ err }, "Failed to list documents");
+			set.status = 500;
+			return { error: "Failed to list documents" };
+		}
+	})
+	// GET /api/documents/cursor — bounded, scope-bound cursor listing.
+	.get("/documents/cursor", async ({ query, request, set }) => {
+		const access = await resolveContentAccess(request);
+		const ctx = access.ctx;
+		if (ctx.role === "none") {
+			set.status = 401;
+			return { error: "Unauthorized" };
+		}
+		if (!canAccessContent(access, "read")) {
+			set.status = 403;
+			return { error: "Forbidden" };
+		}
+		const parsed = cursorListQuerySchema.safeParse(query);
+		if (!parsed.success) {
+			set.status = 400;
+			return { error: "Invalid query", details: parsed.error.flatten() };
+		}
+		const { categoryId, cursor: encodedCursor, limit } = parsed.data;
+		const effectiveCategoryId = access.restricted
+			? (access.categoryId ?? categoryId)
+			: categoryId;
+		const scopeHash = cursorScopeHash(
+			JSON.stringify({
+				workspaceId: ctx.workspaceId ?? null,
+				actorUserId: access.userId,
+				categoryId: effectiveCategoryId ?? null,
+			}),
+		);
+		let cursor: DocumentCursorV1 | undefined;
+		if (encodedCursor) {
+			try {
+				cursor = decodeDocumentCursor(encodedCursor, scopeHash);
+			} catch (error) {
+				set.status = 400;
+				return {
+					error: error instanceof Error ? error.message : "Malformed cursor",
+				};
+			}
+		}
+		const conditions = [
+			tenantOwnerCondition(documents.ownerId, documents.workspaceId, ctx),
+			...(effectiveCategoryId
+				? [eq(documents.categoryId, effectiveCategoryId)]
+				: []),
+			...(cursor
+				? [
+						or(
+							lt(documents.updatedAt, new Date(cursor.updatedAt)),
+							and(
+								eq(documents.updatedAt, new Date(cursor.updatedAt)),
+								lt(documents.id, cursor.id),
+							),
+						),
+					]
+				: []),
+		];
+		try {
+			const rows = await withTenant(ctx, (tx) =>
+				tx
+					.select({
+						id: documents.id,
+						title: documents.title,
+						content: sql<string>`LEFT(${documents.content}, 200)`.as("content"),
+						folderId: documents.folderId,
+						createdAt: documents.createdAt,
+						updatedAt: documents.updatedAt,
+					})
+					.from(documents)
+					.where(and(...conditions))
+					.orderBy(desc(documents.updatedAt), desc(documents.id))
+					.limit(limit + 1),
+			);
+			const hasMore = rows.length > limit;
+			const page = rows.slice(0, limit);
+			const last = page.at(-1);
+			return {
+				items: await withTags(ctx, page),
+				nextCursor:
+					hasMore && last
+						? encodeDocumentCursor({
+								v: 1,
+								updatedAt: new Date(last.updatedAt).toISOString(),
+								id: last.id,
+								scopeHash,
+							})
+						: null,
+			};
+		} catch (error) {
+			logger.error({ error }, "Failed to list cursor documents");
 			set.status = 500;
 			return { error: "Failed to list documents" };
 		}

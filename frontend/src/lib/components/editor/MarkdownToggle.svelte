@@ -13,18 +13,27 @@ const {
 	onUpdate?: (output: EditorOutput) => void;
 } = $props();
 
-let textarea = $state<HTMLTextAreaElement | null>(null);
 let copied = $state(false);
+let rawEditor = $state<HTMLDivElement | null>(null);
+let textarea = $state<HTMLTextAreaElement | null>(null);
+let initialEditorHeight = 0;
 
 function resizeTextarea() {
 	if (!textarea) return;
+	if (initialEditorHeight === 0) {
+		const containerHeight =
+			textarea.closest<HTMLElement>(".editor-container")?.clientHeight ?? 0;
+		initialEditorHeight = Math.max(
+			rawEditor?.clientHeight ?? 0,
+			containerHeight,
+		);
+	}
+	textarea.style.minHeight = `${initialEditorHeight}px`;
 	textarea.style.height = "auto";
-	textarea.style.height = `${textarea.scrollHeight}px`;
+	textarea.style.height = `${Math.max(initialEditorHeight, textarea.scrollHeight)}px`;
 }
 
 $effect(() => {
-	// Re-measure after the bound value and DOM have settled, including when a
-	// long document is opened directly in raw Markdown mode.
 	content;
 	if (typeof window !== "undefined") queueMicrotask(resizeTextarea);
 });
@@ -57,7 +66,7 @@ function copyToClipboard() {
 }
 </script>
 
-<div class="markdown-toggle">
+<div class="markdown-toggle" bind:this={rawEditor}>
 	<button
 		type="button"
 		class="copy-btn"
@@ -88,12 +97,8 @@ function copyToClipboard() {
 
 <style>
 	.markdown-toggle {
-		position: relative;
-		flex: none;
-		display: flex;
-		flex-direction: column;
-		width: 100%;
-		min-height: 500px;
+		position: relative; display: flex; flex: 1; flex-direction: column;
+		width: 100%; min-height: 0;
 	}
 
 	.copy-btn {
@@ -129,16 +134,12 @@ function copyToClipboard() {
 	}
 
 	.markdown-textarea {
-		flex: none;
-		width: 100%;
-		height: auto;
-		min-height: max(720px, calc(100vh - 180px));
+		display: block; flex: none; width: 100%; height: 100%; min-height: 0;
 		padding: 56px 24px 24px 24px;
+		box-sizing: border-box;
 		border: none;
 		outline: none;
-		resize: none;
-		/* Grow with the document so the editor-main owns the single scroll
-		 * surface, matching the JSON/Tiptap editor view. */
+		resize: vertical;
 		overflow-y: hidden;
 		font-family: 'Fira Code', 'Consolas', 'Courier New', monospace;
 		font-size: 14px;

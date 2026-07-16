@@ -360,6 +360,8 @@ jobs:
           cp package.json /tmp/hiai-docs-private-package.json
           trap 'cp /tmp/hiai-docs-private-package.json package.json' EXIT
           cp package.public.json package.json
+          rm -rf dist
+          cp -R packages/sdk/dist dist
           npm pack --ignore-scripts --pack-destination /tmp/hiai-docs-pack
       - name: Install from tarball in a clean consumer
         run: |
@@ -515,6 +517,11 @@ jobs:
             pkg.version = '${CLEAN_VERSION}';
             fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2));
           "
+
+      - name: Stage public package artifacts
+        run: |
+          rm -rf dist
+          cp -R packages/sdk/dist dist
 
       - name: Publish to npm
         run: |

@@ -325,7 +325,7 @@ function close() {
 							class:enabled={editorPreferences.showVisualMode}
 							aria-checked={editorPreferences.showVisualMode}
 							aria-label="Show visual editor"
-							disabled={!editorPreferences.showMarkdownMode && !editorPreferences.showJsonMode}
+							disabled={!editorPreferences.showMarkdownMode}
 							onclick={() => editorPreferences.update({ showVisualMode: !editorPreferences.showVisualMode })}
 						><span></span></button>
 					</div>
@@ -339,22 +339,8 @@ function close() {
 							class:enabled={editorPreferences.showMarkdownMode}
 							aria-checked={editorPreferences.showMarkdownMode}
 							aria-label="Show Raw Markdown"
-							disabled={!editorPreferences.showVisualMode && !editorPreferences.showJsonMode}
+							disabled={!editorPreferences.showVisualMode}
 							onclick={() => editorPreferences.update({ showMarkdownMode: !editorPreferences.showMarkdownMode })}
-						><span></span></button>
-					</div>
-					<div class="flex items-center justify-between gap-4 rounded-md border p-3">
-						<span>
-							<span class="block text-sm font-medium">Raw JSON</span>
-							<span class="block text-xs text-muted-foreground">Show the structured document source button.</span>
-						</span>
-						<button
-							type="button" role="switch" class="preference-switch"
-							class:enabled={editorPreferences.showJsonMode}
-							aria-checked={editorPreferences.showJsonMode}
-							aria-label="Show Raw JSON"
-							disabled={!editorPreferences.showVisualMode && !editorPreferences.showMarkdownMode}
-							onclick={() => editorPreferences.update({ showJsonMode: !editorPreferences.showJsonMode })}
 						><span></span></button>
 					</div>
 					<div class="flex items-center justify-between gap-4 rounded-md border p-3">

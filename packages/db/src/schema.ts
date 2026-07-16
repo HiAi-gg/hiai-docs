@@ -56,6 +56,17 @@ export const pipelineStatusEnum = pgEnum("pipeline_status", [
   "skipped",
   "cancelled",
 ]);
+export const lifecycleOperationKindEnum = pgEnum("lifecycle_operation_kind", [
+  "export",
+  "purge",
+]);
+export const lifecycleOperationStatusEnum = pgEnum("lifecycle_operation_status", [
+  "pending",
+  "running",
+  "retryable",
+  "completed",
+  "rejected",
+]);
 
 // ============================================
 // users — managed by Better Auth
@@ -678,6 +689,36 @@ export const auditLog = pgTable(
     index("idx_audit_log_resource").on(table.resourceType, table.resourceId),
     index("idx_audit_log_created").on(table.createdAt),
   ]
+);
+
+// Durable, server-only lifecycle saga state. This table records only safe
+// metadata and counts; raw fence tokens, documents, secrets, and provider
+// errors are intentionally excluded from the schema.
+export const lifecycleOperations = pgTable(
+  "lifecycle_operations",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    actorUserId: uuid("actor_user_id").notNull().references(() => users.id, { onDelete: "restrict" }),
+    idempotencyKey: text("idempotency_key").notNull(),
+    operationKind: lifecycleOperationKindEnum("operation_kind").notNull(),
+    status: lifecycleOperationStatusEnum("status").notNull().default("pending"),
+    leaseOwner: text("lease_owner"),
+    leaseExpiresAt: timestamp("lease_expires_at"),
+    fenceTokenHash: text("fence_token_hash"),
+    completedSteps: jsonb("completed_steps").notNull().default("[]"),
+    terminalResult: jsonb("terminal_result"),
+    safeErrorCode: text("safe_error_code"),
+    attemptCount: integer("attempt_count").notNull().default(0),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+    completedAt: timestamp("completed_at"),
+  },
+  (table) => [
+    uniqueIndex("lifecycle_operations_actor_idempotency_idx").on(table.actorUserId, table.idempotencyKey),
+    index("lifecycle_operations_status_lease_idx").on(table.status, table.leaseExpiresAt),
+    index("lifecycle_operations_actor_idx").on(table.actorUserId),
+    index("lifecycle_operations_retryable_idx").on(table.status).where(sql`${table.status} = 'retryable'`),
+  ],
 );
 
 export const versionRelations = relations(versions, ({ one }) => ({

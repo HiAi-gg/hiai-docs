@@ -42,9 +42,6 @@ export const editorPreferences = {
 	get showVisualMode(): boolean {
 		return preferences.showVisualMode;
 	},
-	get showJsonMode(): boolean {
-		return preferences.showJsonMode;
-	},
 	get minimalToolbar(): boolean {
 		return preferences.minimalToolbar;
 	},

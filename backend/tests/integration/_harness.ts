@@ -246,8 +246,18 @@ function getRows(table: any): any[] {
 
 function evaluateCondition(row: any, cond: any): boolean {
   if (cond == null) return true;
-  if (cond[TAG_EQ]) return row[getColumnName(cond.col)] === cond.val;
-  if (cond[TAG_NE]) return row[getColumnName(cond.col)] !== cond.val;
+  if (cond[TAG_EQ]) {
+	const value = row[getColumnName(cond.col)];
+	return value instanceof Date && cond.val instanceof Date
+		? value.getTime() === cond.val.getTime()
+		: value === cond.val;
+  }
+  if (cond[TAG_NE]) {
+	const value = row[getColumnName(cond.col)];
+	return value instanceof Date && cond.val instanceof Date
+		? value.getTime() !== cond.val.getTime()
+		: value !== cond.val;
+  }
   if (cond[TAG_GT]) return row[getColumnName(cond.col)] > cond.val;
   if (cond[TAG_LT]) return row[getColumnName(cond.col)] < cond.val;
   if (cond[TAG_GTE]) return row[getColumnName(cond.col)] >= cond.val;
@@ -312,7 +322,7 @@ interface SelectCtx {
   where: any;
   limit: number | null;
   offset: number | null;
-  orderBy: any;
+  orderBy: any[];
   groupBy: any[] | null;
 }
 
@@ -353,8 +363,8 @@ function buildSelectProxy(ctx: SelectCtx): any {
           return buildSelectProxy(ctx);
         };
       if (prop === "orderBy")
-        return (col: any) => {
-          ctx.orderBy = col;
+        return (...cols: any[]) => {
+          ctx.orderBy = cols;
           return buildSelectProxy(ctx);
         };
       if (prop === "groupBy")
@@ -384,17 +394,20 @@ function executeSelect(ctx: SelectCtx): any[] {
   state.calls.push({ kind: "select", table: tableName });
   let rows = getRows(ctx.from);
   if (ctx.where) rows = rows.filter((r) => evaluateCondition(r, ctx.where));
-  if (ctx.orderBy) {
-    const isDesc = ctx.orderBy[TAG_DESC] === true;
-    const colName = getColumnName(ctx.orderBy.col ?? ctx.orderBy);
+  if (ctx.orderBy.length > 0) {
     rows = [...rows].sort((a, b) => {
-      const av = a[colName];
-      const bv = b[colName];
-      if (av === bv) return 0;
-      if (av == null) return 1;
-      if (bv == null) return -1;
-      const cmp = av < bv ? -1 : 1;
-      return isDesc ? -cmp : cmp;
+		for (const ordering of ctx.orderBy) {
+			const isDesc = ordering[TAG_DESC] === true;
+			const colName = getColumnName(ordering.col ?? ordering);
+			const av = a[colName];
+			const bv = b[colName];
+			if (av === bv) continue;
+			if (av == null) return 1;
+			if (bv == null) return -1;
+			const cmp = av < bv ? -1 : 1;
+			return isDesc ? -cmp : cmp;
+		}
+		return 0;
     });
   }
   if (ctx.groupBy && ctx.groupBy.length > 0) {
@@ -588,7 +601,7 @@ function buildMockDb() {
         where: null,
         limit: null,
         offset: null,
-        orderBy: null,
+        orderBy: [],
         groupBy: null,
       };
       return buildSelectProxy(ctx);

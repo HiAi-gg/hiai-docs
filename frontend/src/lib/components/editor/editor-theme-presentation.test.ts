@@ -22,15 +22,15 @@ describe("editor theme presentation", () => {
 		expect(editorSource).toContain("color: #fff");
 	});
 
-	test("raw Markdown is page-height, auto-growing, and has no fake resize handle", () => {
+	test("raw Markdown fills the canonical editor container and grows with its content", () => {
+		expect(markdownSource).toContain("height: 100%");
+		expect(markdownSource).toContain("min-height: 0");
+		expect(markdownSource).toContain("resize: vertical");
+		expect(markdownSource).toContain("textarea.scrollHeight");
+		expect(markdownSource).toContain('textarea.style.height = "auto"');
+		expect(markdownSource).toContain("display: block; flex: none");
 		expect(markdownSource).toContain(
-			"min-height: max(720px, calc(100vh - 180px))",
+			"position: relative; display: flex; flex: 1",
 		);
-		expect(markdownSource).toContain("resize: none");
-		expect(markdownSource).toContain("overflow-y: hidden");
-		expect(markdownSource).toMatch(
-			/textarea\.style\.height = `\$\{textarea\.scrollHeight\}px`/,
-		);
-		expect(markdownSource).not.toContain("max-height:");
 	});
 });

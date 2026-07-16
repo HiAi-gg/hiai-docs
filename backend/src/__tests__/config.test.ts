@@ -349,6 +349,43 @@ describe("production secret guards (real schema)", () => {
 			CSRF_SECRET: "real-csrf-secret-32-chars-long-bbbb",
 			WEBHOOK_SECRET: "real-webhook-secret-32-chars-long-cc",
 			HIAI_DOCS_API_KEY: "real-admin-api-key-generated-for-production",
+			STORAGE_PUBLIC_ENDPOINT_URL: "https://storage.example.test",
+		});
+		expect(result.success).toBe(true);
+	});
+
+	test("fails closed for missing, malformed, or non-HTTPS public storage endpoints in production", () => {
+		process.env.NODE_ENV = "production";
+		const production = {
+			NODE_ENV: "production",
+			OWNER_ID: "00000000-0000-4000-8000-000000000001",
+			API_KEY_ENCRYPTION_SECRET: "real-api-key-encryption-secret-32-chars",
+			BETTER_AUTH_SECRET: "real-better-auth-secret-32-chars-long",
+			CSRF_SECRET: "real-csrf-secret-32-chars-long-bbbb",
+			WEBHOOK_SECRET: "real-webhook-secret-32-chars-long-cc",
+			HIAI_DOCS_API_KEY: "real-admin-api-key-generated-for-production",
+		};
+		expect(realEnvSchema.safeParse(production).success).toBe(false);
+		expect(
+			realEnvSchema.safeParse({
+				...production,
+				STORAGE_PUBLIC_ENDPOINT_URL: "not-a-url",
+			}).success,
+		).toBe(false);
+		expect(
+			realEnvSchema.safeParse({
+				...production,
+				STORAGE_PUBLIC_ENDPOINT_URL: "http://storage.example.test",
+			}).success,
+		).toBe(false);
+	});
+
+	test("allows localhost HTTP storage only outside production", () => {
+		process.env.NODE_ENV = "development";
+		const result = realEnvSchema.safeParse({
+			NODE_ENV: "development",
+			STORAGE_INTERNAL_ENDPOINT_URL: "http://seaweedfs:8333",
+			STORAGE_PUBLIC_ENDPOINT_URL: "http://localhost:48883",
 		});
 		expect(result.success).toBe(true);
 	});

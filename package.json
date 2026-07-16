@@ -2,6 +2,10 @@
   "name": "@hiai-docs/workspace",
   "private": true,
   "type": "module",
+  "browser": {
+	"./packages/sdk/dist/lifecycle.js": false,
+	"./packages/sdk/dist/workspace.js": false
+  },
   "workspaces": [
     "backend",
     "frontend",
@@ -46,26 +50,29 @@
       "import": "./packages/sdk/dist/index.js",
       "types": "./packages/sdk/dist/index.d.ts"
     },
-    "./frontend": {
-      "import": "./frontend/src/lib/index.ts",
-      "types": "./frontend/src/lib/index.ts"
+    "./lifecycle": {
+      "browser": "./packages/sdk/dist/server-only-browser-entry.js",
+      "import": "./packages/sdk/dist/lifecycle.js",
+      "types": "./packages/sdk/dist/lifecycle.d.ts"
     },
-    "./frontend/shared-document": {
-      "import": "./frontend/src/lib/components/editor/shared-document.ts",
-      "types": "./frontend/src/lib/components/editor/shared-document.ts"
+    "./workspace": {
+      "browser": "./packages/sdk/dist/server-only-browser-entry.js",
+      "import": "./packages/sdk/dist/workspace.js",
+      "types": "./packages/sdk/dist/workspace.d.ts"
     },
-    "./frontend/extensions": {
-      "import": "./frontend/src/lib/extensions/types.ts",
-      "types": "./frontend/src/lib/extensions/types.ts"
-    },
-	"./frontend/hosts": {
-	  "import": "./frontend/src/lib/hosts/index.ts",
-	  "types": "./frontend/src/lib/hosts/index.ts"
-	},
-    "./frontend/legacy/doc-tab-registry": {
-      "import": "./frontend/src/lib/stores/doc-tab-registry.svelte.ts",
-      "types": "./frontend/src/lib/stores/doc-tab-registry.svelte.ts"
-    },
+    "./frontend/dashboard": { "import": "./packages/sdk/dist/frontend/dashboard.js", "types": "./packages/sdk/dist/frontend/dashboard.d.ts" },
+    "./frontend/search": { "import": "./packages/sdk/dist/frontend/search.js", "types": "./packages/sdk/dist/frontend/search.d.ts" },
+    "./frontend/shared-document": { "import": "./packages/sdk/dist/frontend/shared-document.js", "types": "./packages/sdk/dist/frontend/shared-document.d.ts" },
+    "./frontend/extension": { "import": "./packages/sdk/dist/frontend/extension.js", "types": "./packages/sdk/dist/frontend/extension.d.ts" },
+    "./frontend/api/categories": { "import": "./packages/sdk/dist/frontend/api/categories.js", "types": "./packages/sdk/dist/frontend/api/categories.d.ts" },
+    "./frontend/api/documents": { "import": "./packages/sdk/dist/frontend/api/documents.js", "types": "./packages/sdk/dist/frontend/api/documents.d.ts" },
+    "./frontend/api/folders": { "import": "./packages/sdk/dist/frontend/api/folders.js", "types": "./packages/sdk/dist/frontend/api/folders.d.ts" },
+    "./frontend/api/tags": { "import": "./packages/sdk/dist/frontend/api/tags.js", "types": "./packages/sdk/dist/frontend/api/tags.d.ts" },
+    "./frontend/api/settings": { "import": "./packages/sdk/dist/frontend/api/settings.js", "types": "./packages/sdk/dist/frontend/api/settings.d.ts" },
+    "./frontend/components/sidebar": { "import": "./packages/sdk/dist/frontend/components/sidebar.js", "types": "./packages/sdk/dist/frontend/components/sidebar.d.ts" },
+    "./frontend/components/settings": { "import": "./packages/sdk/dist/frontend/components/settings.js", "types": "./packages/sdk/dist/frontend/components/settings.d.ts" },
+    "./frontend/theme": { "import": "./packages/sdk/dist/frontend/theme.js", "types": "./packages/sdk/dist/frontend/theme.d.ts" },
+    "./frontend/i18n": { "import": "./packages/sdk/dist/frontend/i18n.js", "types": "./packages/sdk/dist/frontend/i18n.d.ts" },
     "./schema": {
       "import": "./packages/db/src/schema.ts",
       "types": "./packages/db/src/schema.ts"
@@ -139,6 +146,9 @@
     "start": "docker compose up -d",
     "stop": "docker compose down",
     "build:sdk": "cd packages/sdk && bun run build",
+	"test:package": "bun run build:sdk && bun run scripts/verify-packed-package.ts",
+	"test:lifecycle:integration": "bun test packages/db/scripts/lifecycle-operations.integration.test.ts",
+	"test:release": "bun run lint && bun run typecheck && bun run test && bun run test:package && git diff --check",
     "prepublishOnly": "cd packages/sdk && bun run build"
   },
   "dependencies": {
@@ -152,6 +162,7 @@
     "ioredis": "^5.4.0",
     "@aws-sdk/client-s3": "^3.0.0",
     "pino": "^10.0.0",
+    "@sveltejs/kit": "^2.68.0",
     "svelte": "^5.56.4"
   },
   "peerDependenciesMeta": {

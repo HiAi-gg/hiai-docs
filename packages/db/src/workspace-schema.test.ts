@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { documents, folders, shareLinks } from "./schema";
 
 const migration = readFileSync(
-	new URL("./migrations/0034_external_workspace_context.sql", import.meta.url),
+	new URL("./migrations/0035_external_workspace_context.sql", import.meta.url),
 	"utf8",
 );
 const journal = JSON.parse(
@@ -22,9 +22,9 @@ describe("external workspace persistence contract", () => {
 		expect(migration).toContain("workspace_id IS NULL");
 		expect(migration).toContain("workspace_id IS NOT NULL");
 		expect(migration).toContain("DROP POLICY IF EXISTS tenant_isolation ON public.share_links");
-		expect(journal.entries.at(-1)).toMatchObject({
-		idx: 34,
-		tag: "0034_external_workspace_context",
-	});
+		expect(journal.entries).toContainEqual(expect.objectContaining({
+			idx: 35,
+			tag: "0035_external_workspace_context",
+		}));
 	});
 });

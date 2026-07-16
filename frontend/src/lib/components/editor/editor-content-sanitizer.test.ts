@@ -5,7 +5,7 @@ import {
 } from "./editor-content-sanitizer";
 
 describe("editor content sanitizer", () => {
-	test("removes block images nested inside paragraphs", () => {
+	test("lifts block images out of paragraphs without dropping external images", () => {
 		const result = sanitizeEditorContent({
 			type: "doc",
 			content: [
@@ -13,7 +13,8 @@ describe("editor content sanitizer", () => {
 					type: "paragraph",
 					content: [
 						{ type: "text", text: "Before" },
-						{ type: "image", attrs: { src: "/api/attachments/missing/raw" } },
+						{ type: "image", attrs: { src: "https://example.com/image.png" } },
+						{ type: "text", text: "After" },
 					],
 				},
 			],
@@ -23,6 +24,8 @@ describe("editor content sanitizer", () => {
 			type: "doc",
 			content: [
 				{ type: "paragraph", content: [{ type: "text", text: "Before" }] },
+				{ type: "image", attrs: { src: "https://example.com/image.png" } },
+				{ type: "paragraph", content: [{ type: "text", text: "After" }] },
 			],
 		});
 	});

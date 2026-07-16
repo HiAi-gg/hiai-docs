@@ -170,6 +170,10 @@ describe("POST /api/documents/:id/attachments/presign", () => {
       expiresIn: number;
     };
     expect(typeof body.url).toBe("string");
+		expect(new URL(body.url).origin).toBe("http://storage.local");
+		expect(body.url).not.toContain("seaweedfs");
+		expect(new URL(body.url).username).toBe("");
+		expect(new URL(body.url).password).toBe("");
     expect(body.url).toContain(docId);
     expect(body.key.startsWith(`${OWNER_ID}/${docId}/`)).toBe(true);
     expect(body.maxSize).toBe(25 * 1024 * 1024);

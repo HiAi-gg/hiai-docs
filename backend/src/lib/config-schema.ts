@@ -140,6 +140,10 @@ export const envSchema = z
 			.optional()
 			.default("true")
 			.transform((v) => v === "true"),
+		/** Canonical server-to-server S3 endpoint; legacy host/port fields remain compatible. */
+		STORAGE_INTERNAL_ENDPOINT_URL: z.string().url().optional(),
+		/** Canonical browser-visible S3 endpoint used only while presigning. */
+		STORAGE_PUBLIC_ENDPOINT_URL: z.string().url().optional(),
 		BETTER_AUTH_SECRET: z
 			.string()
 			.min(1, "BETTER_AUTH_SECRET must not be empty")
@@ -460,6 +464,21 @@ export const envSchema = z
 			.default(1),
 	})
 	.superRefine((value, ctx) => {
+		if (value.NODE_ENV === "production") {
+			const publicEndpoint = value.STORAGE_PUBLIC_ENDPOINT_URL;
+			if (
+				!publicEndpoint ||
+				!URL.canParse(publicEndpoint) ||
+				new URL(publicEndpoint).protocol !== "https:"
+			) {
+				ctx.addIssue({
+					code: "custom",
+					path: ["STORAGE_PUBLIC_ENDPOINT_URL"],
+					message:
+						"STORAGE_PUBLIC_ENDPOINT_URL must be an HTTPS URL in production",
+				});
+			}
+		}
 		if (value.EXTERNAL_TENANT_ENABLED || value.DOCSMINT_WORKSPACE_ENABLED) {
 			if (!value.DOCSMINT_WORKSPACE_ISSUER && !value.EXTERNAL_TENANT_ISSUER) {
 				ctx.addIssue({

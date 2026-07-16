@@ -253,6 +253,13 @@
 			"when": 1785000000021,
 			"tag": "0035_external_workspace_context",
 			"breakpoints": true
+		},
+		{
+			"idx": 36,
+			"version": "7",
+			"when": 1785000000022,
+			"tag": "0036_lifecycle_operations",
+			"breakpoints": true
 		}
   ]
 }

@@ -31,13 +31,14 @@ describe("responsive editor and settings UI", () => {
 		expect(source).toContain("repeat(auto-fit,minmax(0,1fr))");
 	});
 
-	test("style settings expose source views and the minimal toolbar", () => {
+	test("style settings expose Markdown but no Raw JSON mode", () => {
 		const source = readFileSync(
 			resolve(import.meta.dir, "../SettingsDialog.svelte"),
 			"utf8",
 		);
 		expect(source).toContain("showMarkdownMode");
-		expect(source).toContain("showJsonMode");
+		expect(source).not.toContain("showJsonMode");
+		expect(source).not.toContain("Raw JSON");
 		expect(source).toContain("showVisualMode");
 		expect(source).toContain("minimalToolbar");
 	});

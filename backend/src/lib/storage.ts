@@ -12,22 +12,41 @@ import { createObjectStorageClient } from "./storage-factory";
 export type { ObjectStorageConfig } from "./storage-factory";
 export { createObjectStorageClient, ensureBucket } from "./storage-factory";
 
+function endpointConfig(url: string, fallbackPort: number) {
+	const parsed = new URL(url);
+	if (parsed.username || parsed.password) {
+		throw new Error("Storage endpoint URLs must not contain credentials");
+	}
+	return {
+		endpoint: parsed.hostname,
+		port: parsed.port ? Number(parsed.port) : fallbackPort,
+		useSSL: parsed.protocol === "https:",
+	};
+}
+
+const internalEndpoint = endpointConfig(
+	config.STORAGE_INTERNAL_ENDPOINT_URL ??
+		`http://${config.STORAGE_ENDPOINT}:${config.STORAGE_PORT}`,
+	config.STORAGE_PORT,
+);
+const publicEndpoint = endpointConfig(
+	config.STORAGE_PUBLIC_ENDPOINT_URL ??
+		`http://${config.STORAGE_PUBLIC_ENDPOINT}:${config.STORAGE_PUBLIC_PORT}`,
+	config.STORAGE_PUBLIC_PORT,
+);
+
 const internalConfig = {
-	endpoint: config.STORAGE_ENDPOINT,
-	port: config.STORAGE_PORT,
+	...internalEndpoint,
 	accessKey: config.STORAGE_ACCESS_KEY,
 	secretKey: config.STORAGE_SECRET_KEY,
-	useSSL: false,
 	region: config.STORAGE_REGION,
 	forcePathStyle: config.STORAGE_FORCE_PATH_STYLE,
 };
 
 const publicConfig = {
-	endpoint: config.STORAGE_PUBLIC_ENDPOINT,
-	port: config.STORAGE_PUBLIC_PORT,
+	...publicEndpoint,
 	accessKey: config.STORAGE_ACCESS_KEY,
 	secretKey: config.STORAGE_SECRET_KEY,
-	useSSL: false,
 	region: config.STORAGE_REGION,
 	forcePathStyle: config.STORAGE_FORCE_PATH_STYLE,
 };

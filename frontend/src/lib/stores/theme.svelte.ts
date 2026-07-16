@@ -29,6 +29,8 @@ function applyTheme(theme: Theme) {
 	if (!browser) return;
 	const isDark = resolveIsDark(theme);
 	document.documentElement.classList.toggle("dark", isDark);
+	const favicon = document.querySelector<HTMLLinkElement>("#app-favicon");
+	if (favicon) favicon.href = isDark ? "/favicon_white.ico" : "/favicon.ico";
 }
 
 function notify() {

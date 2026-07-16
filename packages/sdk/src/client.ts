@@ -22,6 +22,7 @@ import type {
 	DocsDocument,
 	DocsDocumentCreateInput,
 	DocsDocumentListResponse,
+	DocsDocumentCursorPage,
 	DocsDocumentPipeline,
 	DocsDocumentUpdateInput,
 	DocsFolder,
@@ -140,7 +141,7 @@ export class DocsClient {
 		this.config = {
 			baseUrl: config.baseUrl.replace(/\/+$/, ""),
 			apiKey: config.apiKey,
-			requestContext: config.requestContext,
+			requestContext: this.snapshotContext(config.requestContext),
 			fetch: config.fetch ?? fetch,
 			timeout: config.timeout ?? 10_000,
 			retries: config.retries ?? 3,
@@ -228,6 +229,23 @@ export class DocsClient {
 				tag: options?.tag,
 				page: options?.page,
 				limit: options?.limit,
+			}),
+		}, context);
+	}
+
+	/**
+	 * List documents through the bounded cursor API. Cursors are opaque and
+	 * bound by the server to the authenticated workspace and category scope.
+	 */
+	async listDocuments(
+		options: { categoryId?: string; cursor?: string; limit?: number } = {},
+		context?: DocsRequestContext,
+	): Promise<DocsDocumentCursorPage> {
+		return this.request<DocsDocumentCursorPage>("GET", "/api/documents/cursor", {
+			query: this.cleanQuery({
+				categoryId: options.categoryId,
+				cursor: options.cursor,
+				limit: options.limit,
 			}),
 		}, context);
 	}
@@ -1030,6 +1048,21 @@ export class DocsClient {
 					: {}),
 			},
 		};
+	}
+
+	/**
+	 * Capture transport defaults at the boundary. Hosts often reuse a mutable
+	 * request object for a whole incoming request; retaining its HeaderInit by
+	 * reference would let later mutations silently change this client's scope.
+	 */
+	private snapshotContext(
+		context?: DocsRequestContext,
+	): DocsRequestContext | undefined {
+		if (!context) return undefined;
+		const headers = Object.freeze(
+			Object.fromEntries(new Headers(context.headers).entries()),
+		);
+		return Object.freeze({ ...context, headers });
 	}
 
 	private toBlob(

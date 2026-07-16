@@ -9,7 +9,6 @@ describe("editor preferences", () => {
 		expect(DEFAULT_EDITOR_PREFERENCES).toEqual({
 			showVisualMode: true,
 			showMarkdownMode: true,
-			showJsonMode: false,
 			minimalToolbar: false,
 			showScrollToTop: true,
 		});
@@ -25,14 +24,13 @@ describe("editor preferences", () => {
 				showScrollToTop: false,
 			}),
 		).toEqual({
-			showVisualMode: false,
+			showVisualMode: true,
 			showMarkdownMode: false,
-			showJsonMode: true,
 			minimalToolbar: true,
 			showScrollToTop: false,
 		});
 
-		expect(normalizeEditorPreferences({ showJsonMode: "yes" })).toEqual(
+		expect(normalizeEditorPreferences({ showJsonMode: true })).toEqual(
 			DEFAULT_EDITOR_PREFERENCES,
 		);
 		expect(normalizeEditorPreferences(null)).toEqual(

@@ -10,6 +10,22 @@
  * additions only. To change tokens, edit packages/hiai-ui/src/styles/tokens.css. */
 @import "@hiai-gg/hiai-ui/styles/tokens.css";
 
+:root {
+	--layer-modal: 1000;
+	--layer-popover: 1100;
+}
+
+/* Persistent editor chrome must never cover a modal. The shared dialog
+ * primitive does not expose an overlay class, so target its direct dialog
+ * child and keep portalled Bits UI menus above the modal surface. */
+.fixed.inset-0:has(> [role="dialog"]) {
+	z-index: var(--layer-modal) !important;
+}
+
+[data-bits-floating-content-wrapper] {
+	z-index: var(--layer-popover) !important;
+}
+
 /* Tailwind v4 preflight resets `list-style: none` on `ol, ul, menu`, which
  * hides the default bullet/number markers everywhere on the page — including
  * the TipTap editor and the shared-document view. Restore them globally on

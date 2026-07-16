@@ -2,7 +2,7 @@
 <html lang="%lang%" dir="%dir%">
   <head>
     <meta charset="utf-8" />
-    <link rel="icon" type="image/png" href="%sveltekit.assets%/favicon.png" />
+    <link id="app-favicon" rel="icon" href="%sveltekit.assets%/favicon.ico" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="application-name" content="DocsMint" />
     <meta name="theme-color" content="#0f172a" />
@@ -23,6 +23,8 @@
           } else {
             document.documentElement.classList.remove("dark");
           }
+          var favicon = document.getElementById("app-favicon");
+          if (favicon) favicon.href = isDark ? "/favicon_white.ico" : "/favicon.ico";
         } catch (_) {
           /* no-op: localStorage may be unavailable (e.g. private mode) */
         }

@@ -1,20 +1,6 @@
 import type { PageLoad } from "./$types";
 
-type ShareData = {
-	type?: string;
-	data?: {
-		id?: string;
-		title?: string;
-		content?: string;
-		contentJson?: object | null;
-		name?: string;
-		parentId?: string | null;
-		folders?: Array<{ id: string; name: string }>;
-		documents?: Array<{ id: string; title: string }>;
-	};
-};
-
-export const load: PageLoad = async ({ params, fetch }) => {
+export const load: PageLoad = ({ params }) => {
 	const token = params.token;
 
 	// Token is the dynamic [token] route param — if it is missing or
@@ -30,45 +16,13 @@ export const load: PageLoad = async ({ params, fetch }) => {
 		};
 	}
 
-	try {
-		const res = await fetch(`/api/share/${token}`);
-		const data = (await res.json().catch(() => ({}))) as {
-			requiresPassword?: boolean;
-			error?: string;
-		} & ShareData;
-
-		// 401 with requiresPassword means the share exists but is
-		// protected — render the password form rather than an error.
-		if (res.status === 401) {
-			return {
-				token,
-				shareData: null,
-				requiresPassword: true,
-				shareError: null,
-			};
-		}
-
-		if (!res.ok) {
-			return {
-				token,
-				shareData: null,
-				requiresPassword: false,
-				shareError: data.error ?? "Failed to load share",
-			};
-		}
-
-		return {
-			token,
-			shareData: data,
-			requiresPassword: false,
-			shareError: null,
-		};
-	} catch (_e) {
-		return {
-			token,
-			shareData: null,
-			requiresPassword: false,
-			shareError: "Network error",
-		};
-	}
+	// Resolve public share data in the mounted page instead of blocking the
+	// initial navigation. This lets the route render a real progress state
+	// while slow storage/database work is still in flight.
+	return {
+		token,
+		shareData: null,
+		requiresPassword: false,
+		shareError: null,
+	};
 };

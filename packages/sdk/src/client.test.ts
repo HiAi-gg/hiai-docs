@@ -78,6 +78,86 @@ describe("DocsClient public contract", () => {
 		expect(seenHeaders?.get("x-request-id")).toBe("req-456");
 	});
 
+	it("snapshots default request context before callers can mutate it", async () => {
+		let seenHeaders: Headers | undefined;
+		const context = { headers: { "x-tenant": "before" } };
+		const docs = client(async (_input, init) => {
+			seenHeaders = new Headers(init?.headers);
+			return jsonResponse({ status: "ok", service: "hiai-docs", timestamp: "now" });
+		}, { requestContext: context });
+
+		context.headers["x-tenant"] = "after";
+		await docs.health();
+
+		expect(seenHeaders?.get("x-tenant")).toBe("before");
+	});
+
+	it("snapshots Headers instances and returns an isolated child client", async () => {
+		const seen: Headers[] = [];
+		const originalHeaders = new Headers({ "x-scope": "parent" });
+		const parent = client(
+			async (_input, init) => {
+				seen.push(new Headers(init?.headers));
+				return jsonResponse({ status: "ok", service: "hiai-docs", timestamp: "now" });
+			},
+			{ requestContext: { headers: originalHeaders, requestId: "parent-request" } },
+		);
+		const childInput = {
+			requestId: "child-request",
+			headers: { "x-scope": "child", "x-child": "before" },
+		};
+		const child = parent.withRequestContext(childInput);
+		expect(child).not.toBe(parent);
+
+		originalHeaders.set("x-scope", "mutated-parent-input");
+		childInput.headers["x-child"] = "mutated-child-input";
+		await parent.health();
+		await child.health();
+
+		expect(seen[0]?.get("x-scope")).toBe("parent");
+		expect(seen[0]?.get("x-request-id")).toBe("parent-request");
+		expect(seen[0]?.has("x-child")).toBe(false);
+		expect(seen[1]?.get("x-scope")).toBe("child");
+		expect(seen[1]?.get("x-child")).toBe("before");
+		expect(seen[1]?.get("x-request-id")).toBe("child-request");
+	});
+
+	it("rejects conflicting workspace assertions before network I/O", async () => {
+		let networkCalls = 0;
+		const docs = client(async () => {
+			networkCalls += 1;
+			return jsonResponse({});
+		});
+
+		await expect(
+			docs.health({
+				workspaceAssertion: "canonical",
+				externalTenantAssertion: "legacy",
+			}),
+		).rejects.toThrow("Conflicting workspace assertions");
+		expect(networkCalls).toBe(0);
+	});
+
+	it("does not include cookies or authorization secrets in transport errors", async () => {
+		const docs = client(
+			async () => {
+				throw new Error("connection reset");
+			},
+			{
+				requestContext: {
+					authorization: "Bearer top-secret-token",
+					cookie: "session=top-secret-cookie",
+					requestId: "safe-request-id",
+				},
+			},
+		);
+
+		const error = await docs.health().catch((caught) => caught as Error);
+		expect(String(error)).not.toContain("top-secret-token");
+		expect(String(error)).not.toContain("top-secret-cookie");
+		expect(String(error)).toContain("connection reset");
+	});
+
 	it("forwards a trusted external workspace assertion in the dedicated header", async () => {
 		let seenHeaders: Headers | undefined;
 		const docs = client(async (_input, init) => {
@@ -109,6 +189,25 @@ describe("DocsClient public contract", () => {
 		expect(seenUrl).toContain("graphHops=2");
 		expect(seenUrl).toContain("graphBoost=0.75");
 		expect(seenUrl).toContain("includeChunks=true");
+	});
+
+	it("uses the bounded cursor document-list contract", async () => {
+		let seenUrl = "";
+		const docs = client(async (input) => {
+			seenUrl = String(input);
+			return jsonResponse({ items: [], nextCursor: null });
+		});
+
+		await docs.listDocuments({
+			categoryId: "category-1",
+			cursor: "cursor-v1",
+			limit: 50,
+		});
+
+		expect(seenUrl).toContain("/api/documents/cursor?");
+		expect(seenUrl).toContain("categoryId=category-1");
+		expect(seenUrl).toContain("cursor=cursor-v1");
+		expect(seenUrl).toContain("limit=50");
 	});
 
 	it("supports commenter share links and graph metadata endpoints", async () => {

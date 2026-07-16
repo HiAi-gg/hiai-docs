@@ -195,6 +195,73 @@ describe("GET /api/documents", () => {
   });
 });
 
+describe("GET /api/documents/cursor", () => {
+	it("enforces the bounded limit contract and rejects malformed cursors", async () => {
+		const invalidLimit = await authedGet("/api/documents/cursor?limit=101");
+		expect(invalidLimit.status).toBe(400);
+
+		const malformed = await authedGet(
+			"/api/documents/cursor?cursor=not-base64url-json",
+		);
+		expect(malformed.status).toBe(400);
+		expect((malformed.body as any).error).toContain("Malformed cursor");
+	});
+
+	it("uses updatedAt DESC and id DESC and paginates timestamp ties without duplicates", async () => {
+		const updatedAt = new Date("2026-07-16T12:00:00.000Z");
+		const ids = [
+			"11111111-1111-4111-8111-111111111111",
+			"22222222-2222-4222-8222-222222222222",
+			"33333333-3333-4333-8333-333333333333",
+		];
+		for (const id of ids) seedDocument({ id, updatedAt });
+
+		const first = await authedGet("/api/documents/cursor?limit=2");
+		expect(first.status).toBe(200);
+		const firstBody = first.body as any;
+		expect(firstBody.items.map((item: any) => item.id)).toEqual([
+			ids[2],
+			ids[1],
+		]);
+		expect(typeof firstBody.nextCursor).toBe("string");
+
+		const second = await authedGet(
+			`/api/documents/cursor?limit=2&cursor=${encodeURIComponent(firstBody.nextCursor)}`,
+		);
+		expect(second.status).toBe(200);
+		const secondBody = second.body as any;
+		expect(secondBody.items.map((item: any) => item.id)).toEqual([ids[0]]);
+		expect(secondBody.nextCursor).toBeNull();
+	});
+
+	it("binds a cursor to the category scope", async () => {
+		const firstCategory = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+		const secondCategory = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+		for (let index = 0; index < 2; index += 1) {
+			seedDocument({
+				id: `${index + 1}0000000-0000-4000-8000-000000000000`,
+				categoryId: firstCategory,
+				updatedAt: new Date(1_700_000_000_000 - index),
+			});
+		}
+
+		const first = await authedGet(
+			`/api/documents/cursor?limit=1&categoryId=${firstCategory}`,
+		);
+		expect(first.status).toBe(200);
+		const cursor = (first.body as any).nextCursor;
+		expect(typeof cursor).toBe("string");
+
+		const crossScope = await authedGet(
+			`/api/documents/cursor?limit=1&categoryId=${secondCategory}&cursor=${encodeURIComponent(cursor)}`,
+		);
+		expect(crossScope.status).toBe(400);
+		expect((crossScope.body as any).error).toBe(
+			"Cursor does not match this listing scope",
+		);
+	});
+});
+
 describe("GET /api/documents/:id", () => {
   it("returns 404 for an unknown id", async () => {
     const res = await authedGet(

@@ -16,27 +16,37 @@ function isAttachmentImage(node: EditorNode): boolean {
 	);
 }
 
-function sanitizeNode(node: EditorNode): EditorNode | null {
-	if (!node.content) return node;
-	const children = node.content
-		.map((child) => sanitizeNode(child))
-		.filter((child): child is EditorNode => child !== null);
+function sanitizeNode(node: EditorNode): EditorNode[] {
+	if (!node.content) return [node];
+	const children = node.content.flatMap((child) => sanitizeNode(child));
 	if (node.type === "paragraph") {
-		// The editor's image extension is block-level. Imported documents can
-		// nevertheless contain block images inside paragraphs, which makes
-		// ProseMirror produce TransformError during the next edit. Drop those
-		// malformed children rather than allowing the whole editor to crash.
-		return {
-			...node,
-			content: children.filter((child) => child.type !== "image"),
+		// The editor's image extension is block-level. Preserve imported or
+		// externally hosted images by lifting them out of malformed paragraphs,
+		// splitting surrounding inline content into valid paragraph siblings.
+		const normalized: EditorNode[] = [];
+		let inline: EditorNode[] = [];
+		const flushInline = () => {
+			if (inline.length === 0) return;
+			normalized.push({ ...node, content: inline });
+			inline = [];
 		};
+		for (const child of children) {
+			if (child.type === "image") {
+				flushInline();
+				normalized.push(child);
+			} else {
+				inline.push(child);
+			}
+		}
+		flushInline();
+		return normalized.length > 0 ? normalized : [{ ...node, content: [] }];
 	}
-	return { ...node, content: children };
+	return [{ ...node, content: children }];
 }
 
 export function sanitizeEditorContent(value: object): EditorNode {
 	const result = sanitizeNode(value as EditorNode);
-	return result ?? { type: "doc", content: [{ type: "paragraph" }] };
+	return result[0] ?? { type: "doc", content: [{ type: "paragraph" }] };
 }
 
 export async function removeUnavailableAttachmentImages(

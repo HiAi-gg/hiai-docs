@@ -76,6 +76,12 @@ export interface DocsDocumentListResponse {
 	limit: number;
 }
 
+/** Opaque, scope-bound cursor returned by the bounded document listing API. */
+export interface DocsDocumentCursorPage {
+	items: DocsDocumentListItem[];
+	nextCursor: string | null;
+}
+
 // ---------------------------------------------------------------------------
 // Folders
 // ---------------------------------------------------------------------------

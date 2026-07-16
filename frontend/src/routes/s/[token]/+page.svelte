@@ -16,10 +16,11 @@ import {
 	FileText,
 	Folder,
 	FolderOpen,
+	Loader2,
 	Lock,
 	MoreHorizontal,
 } from "lucide-svelte";
-import { tick, untrack } from "svelte";
+import { onMount, tick } from "svelte";
 import {
 	createDocxImageFetcher,
 	createPlainTextDocxBlob,
@@ -49,7 +50,7 @@ const { data } = $props();
 let password = $state("");
 let requiresPassword = $state(false);
 let error = $state("");
-let loading = $state(false);
+let loading = $state(true);
 let shareData = $state<{
 	type?: string;
 	data?: {
@@ -82,40 +83,6 @@ let viewedDoc = $state<{
 	contentJson?: object | null;
 } | null>(null);
 let breadcrumbs = $state<Array<{ id: string; name: string }>>([]);
-
-$effect(() => {
-	const sd = data.shareData;
-	const reqPass = data.requiresPassword;
-	const shareErr = data.shareError;
-
-	untrack(() => {
-		shareData = sd ?? null;
-		requiresPassword = reqPass ?? false;
-		error = shareErr ?? "";
-		password = "";
-		verifiedPassword = "";
-
-		if (sd && sd.type === "folder" && sd.data) {
-			folderData = {
-				id: sd.data.id || "",
-				name: sd.data.name || "",
-				parentId: sd.data.parentId || null,
-				folders: sd.data.folders || [],
-				documents: sd.data.documents || [],
-			};
-			breadcrumbs = [{ id: "root", name: sd.data.name || "" }];
-			currentView = "folder";
-		} else if (sd && sd.type === "document" && sd.data) {
-			currentView = "document";
-			viewedDoc = {
-				id: sd.data.id || "",
-				title: sd.data.title || "",
-				content: sd.data.content || "",
-				contentJson: sd.data.contentJson,
-			};
-		}
-	});
-});
 
 async function fetchShare() {
 	// Guard: the load function already short-circuits for a missing token
@@ -186,6 +153,15 @@ async function fetchShare() {
 		loading = false;
 	}
 }
+
+onMount(() => {
+	if (!data.token) {
+		loading = false;
+		error = data.shareError ?? m.share_missing_token();
+		return;
+	}
+	void fetchShare();
+});
 
 async function copyUrl() {
 	await copyToClipboard(window.location.href);
@@ -552,7 +528,10 @@ $effect(() => {
 
 <div class="flex min-h-screen items-center justify-center bg-background p-4">
   {#if loading}
-    <div class="text-muted-foreground">{m.action_loading()}</div>
+    <div class="share-loading" role="status" aria-live="polite">
+      <Loader2 class="share-loading-spinner size-5" />
+      <span>{m.action_loading()}</span>
+    </div>
   {:else if shareData}
     <div class="w-full max-w-3xl space-y-6">
       <div class="flex items-center justify-between gap-3">
@@ -788,6 +767,25 @@ $effect(() => {
 <ScrollToTop />
 
 <style>
+  .share-loading {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.625rem;
+    color: var(--muted-foreground);
+  }
+
+  :global(.share-loading-spinner) {
+    animation: share-loading-spin 0.8s linear infinite;
+  }
+
+  @keyframes share-loading-spin {
+    to { transform: rotate(360deg); }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    :global(.share-loading-spinner) { animation: none; }
+  }
+
   /* Shared document body — minimal styles for the markdown/JSON HTML output
      rendered via {@html}. The `prose` class from @tailwindcss/typography
      is not installed in this project, so we provide the essentials. */

@@ -14,8 +14,7 @@ cp "$repo_root/package.public.json" "$tmp_root/package.json"
 # package.public.json ships the SDK's built output. Build it before staging
 # because dist is intentionally ignored by git.
 (cd "$repo_root/packages/sdk" && bun run build)
-mkdir -p "$tmp_root/packages/sdk"
-cp -R "$repo_root/packages/sdk/dist" "$tmp_root/packages/sdk/dist"
+cp -R "$repo_root/packages/sdk/dist" "$tmp_root/dist"
 
 npm_cache="$tmp_root/npm-cache"
 tarball=$(cd "$tmp_root" && NPM_CONFIG_CACHE="$npm_cache" npm pack --ignore-scripts --json | node -e '
