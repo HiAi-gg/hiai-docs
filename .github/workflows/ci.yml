@@ -241,6 +241,9 @@ jobs:
         with:
           context: .
           file: frontend/Dockerfile
+          build-args: |
+            PUBLIC_APP_ID=docsmint
+            PUBLIC_DEPLOYMENT_ID=ci-${{ github.sha }}
           tags: hiai-docs/web:ci-${{ github.sha }}
           labels: |
             org.opencontainers.image.title=hiai-docs-web
@@ -418,6 +421,9 @@ jobs:
         with:
           context: .
           file: frontend/Dockerfile
+          build-args: |
+            PUBLIC_APP_ID=docsmint
+            PUBLIC_DEPLOYMENT_ID=${{ github.ref_name }}
           push: true
           tags: |
             ghcr.io/hiai-gg/docsmint-web:${{ github.ref_name }}
