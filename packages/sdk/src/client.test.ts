@@ -78,6 +78,17 @@ describe("DocsClient public contract", () => {
 		expect(seenHeaders?.get("x-request-id")).toBe("req-456");
 	});
 
+	it("forwards a trusted external workspace assertion in the dedicated header", async () => {
+		let seenHeaders: Headers | undefined;
+		const docs = client(async (_input, init) => {
+			seenHeaders = new Headers(init?.headers);
+			return jsonResponse({ status: "ok", service: "hiai-docs", timestamp: "now" });
+		});
+
+		await docs.health({ externalTenantAssertion: "signed.assertion" });
+		expect(seenHeaders?.get("x-hiai-tenant-context")).toBe("signed.assertion");
+	});
+
 	it("encodes search filters and returns the response contract", async () => {
 		let seenUrl = "";
 		const docs = client(async (input) => {

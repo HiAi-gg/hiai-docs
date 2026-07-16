@@ -16,6 +16,7 @@ export interface PrepareWorkerDependencies {
 	loadDocument(input: {
 		documentId: string;
 		ownerId: string;
+		workspaceId?: string;
 	}): Promise<{ title: string; content: string; revision: string } | null>;
 	prepareRun(input: {
 		job: PrepareJob;
@@ -79,7 +80,7 @@ export async function processPrepareJob(
 			{ ...job, stage: "graph" },
 			{
 				...DEFAULT_JOB_OPTIONS,
-				jobId: JOB_IDS.graph(job.generationId),
+				jobId: JOB_IDS.graph(job.generationId, job.workspaceId),
 				priority: SOURCE_PRIORITY[job.source],
 			},
 		);
@@ -90,7 +91,11 @@ export async function processPrepareJob(
 		initial.map((data) =>
 			deps.enqueueEmbed(data, {
 				...DEFAULT_JOB_OPTIONS,
-				jobId: JOB_IDS.embed(job.generationId, data.batchIndex),
+				jobId: JOB_IDS.embed(
+					job.generationId,
+					data.batchIndex,
+					data.workspaceId,
+				),
 				priority: SOURCE_PRIORITY[job.source],
 			}),
 		),

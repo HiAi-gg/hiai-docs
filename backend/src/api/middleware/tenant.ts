@@ -34,6 +34,12 @@
 
 import { getSessionUserId } from "../../lib/auth-helpers";
 import { config } from "../../lib/config";
+import {
+	EXTERNAL_TENANT_CONTEXT_HEADER,
+	type ExternalTenantContext,
+	ExternalTenantContextError,
+	verifyExternalTenantAssertion,
+} from "../../lib/external-tenant-context";
 import type { TenantContext } from "../../lib/with-tenant";
 import {
 	adminTenantContext,
@@ -75,6 +81,37 @@ export {
 export async function buildTenantContext(
 	request: Request,
 ): Promise<TenantContext> {
+	const externalAssertion = request.headers.get(EXTERNAL_TENANT_CONTEXT_HEADER);
+	if (externalAssertion) {
+		if (
+			!config.EXTERNAL_TENANT_ENABLED ||
+			!config.EXTERNAL_TENANT_SECRET ||
+			!config.EXTERNAL_TENANT_ISSUER
+		) {
+			throw new ExternalTenantContextError(
+				"External tenant context is not enabled",
+			);
+		}
+		let external: ExternalTenantContext;
+		try {
+			external = await verifyExternalTenantAssertion(externalAssertion, {
+				secret: config.EXTERNAL_TENANT_SECRET,
+				issuer: config.EXTERNAL_TENANT_ISSUER,
+				clockSkewSeconds: config.EXTERNAL_TENANT_CLOCK_SKEW_SECONDS,
+			});
+		} catch (error) {
+			throw new ExternalTenantContextError("Invalid external tenant context", {
+				cause: error,
+			});
+		}
+		return {
+			userId: external.actorUserId,
+			role: external.actorRole === "viewer" ? "user" : "user",
+			workspaceId: external.workspaceId,
+			source: "external",
+			actorRole: external.actorRole,
+		};
+	}
 	const userId = await getSessionUserId(request.headers);
 	const authHeader = request.headers.get("authorization");
 	const isApiKey =
@@ -89,5 +126,6 @@ export async function buildTenantContext(
 	return {
 		userId: userId ?? ZERO_UUID,
 		role,
+		source: "personal",
 	};
 }

@@ -15,6 +15,9 @@ describe("database schema", () => {
 		expect(schema.guestAccess).toBeDefined();
 		expect(schema.attachments).toBeDefined();
 		expect(schema.versions).toBeDefined();
+		expect(schema.documents.workspaceId).toBeDefined();
+		expect(schema.folders.workspaceId).toBeDefined();
+		expect(schema.documentPipelineRuns.workspaceId).toBeDefined();
 	});
 
 	test("schema exports relations", async () => {

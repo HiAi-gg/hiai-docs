@@ -51,6 +51,17 @@ new DocsClient({
 });
 ```
 
+Trusted hosts can attach a short-lived server-generated external workspace
+assertion to every request. The SDK sends it as `X-Hiai-Tenant-Context`; the
+signing secret must never be exposed to a browser.
+
+```ts
+const workspaceClient = client.withRequestContext({
+  externalTenantAssertion: signedAssertion,
+});
+await workspaceClient.listDocs();
+```
+
 ## API surface
 
 ### Documents

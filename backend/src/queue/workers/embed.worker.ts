@@ -16,6 +16,7 @@ export interface EmbedWorkerDependencies {
 		documentId: string;
 		ownerId: string;
 		generationId: string;
+		workspaceId?: string;
 	}): Promise<{
 		title: string;
 		content: string;
@@ -132,7 +133,11 @@ export async function processEmbedJob(
 			next.map((data) =>
 				deps.enqueueEmbed(data, {
 					...DEFAULT_JOB_OPTIONS,
-					jobId: JOB_IDS.embed(job.generationId, data.batchIndex),
+					jobId: JOB_IDS.embed(
+						job.generationId,
+						data.batchIndex,
+						job.workspaceId,
+					),
 					priority: SOURCE_PRIORITY[job.source],
 				}),
 			),
@@ -149,7 +154,7 @@ export async function processEmbedJob(
 		{ ...job, stage: "graph" },
 		{
 			...DEFAULT_JOB_OPTIONS,
-			jobId: JOB_IDS.graph(job.generationId),
+			jobId: JOB_IDS.graph(job.generationId, job.workspaceId),
 			priority: SOURCE_PRIORITY[job.source],
 		},
 	);

@@ -68,15 +68,15 @@ export interface RecoveryQueueWriter {
 function jobId(job: PipelineJob): string {
 	switch (job.stage) {
 		case "prepare":
-			return JOB_IDS.prepare(job.documentId, job.generationId);
+			return JOB_IDS.prepare(job.documentId, job.generationId, job.workspaceId);
 		case "embed":
-			return JOB_IDS.embed(job.generationId, job.batchIndex);
+			return JOB_IDS.embed(job.generationId, job.batchIndex, job.workspaceId);
 		case "graph":
-			return JOB_IDS.graph(job.generationId);
+			return JOB_IDS.graph(job.generationId, job.workspaceId);
 		case "summarize":
-			return JOB_IDS.summarize(job.generationId);
+			return JOB_IDS.summarize(job.generationId, job.workspaceId);
 		case "finalize":
-			return JOB_IDS.finalize(job.generationId);
+			return JOB_IDS.finalize(job.generationId, job.workspaceId);
 	}
 }
 
@@ -173,6 +173,7 @@ export const postgresRecoveryStore: RecoveryStore = {
 					schemaVersion: 1 as const,
 					documentId: run.documentId,
 					ownerId: run.ownerId,
+					workspaceId: run.workspaceId ?? undefined,
 					generationId: run.generationId,
 					revision: run.revision,
 					requestedAt: run.requestedAt.toISOString(),

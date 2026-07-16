@@ -79,6 +79,17 @@ describe("versioned queue contracts", () => {
 		).toBe(false);
 	});
 
+	test("accepts an optional workspace context for durable jobs", () => {
+		const parsed = enqueueDocumentPipelineSchema.safeParse({
+			documentId,
+			ownerId,
+			workspaceId: "workspace-a",
+			revision: "rev-1",
+			source: "interactive",
+		});
+		expect(parsed.success).toBe(true);
+	});
+
 	test("bounds embed batch indexes and chunk counts", () => {
 		const schema = createEmbedBatchJobSchema(2);
 		const base = {

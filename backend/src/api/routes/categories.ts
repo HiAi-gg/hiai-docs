@@ -5,6 +5,8 @@ import { z } from "zod";
 import {
 	canAccessContent,
 	resolveContentAccess,
+	tenantOwnerCondition,
+	tenantOwnerSql,
 } from "../../lib/content-access";
 import { logger } from "../../lib/logger";
 import { reembedDocsInCategory } from "../../lib/reembed";
@@ -140,7 +142,9 @@ export const categoryRoutes = new Elysia({ prefix: "/api" })
 		const userId = ctx.userId;
 		try {
 			const rows = await withTenant(ctx, async (tx) => {
-				const conditions = [eq(categories.ownerId, userId)];
+				const conditions = [
+					tenantOwnerCondition(categories.ownerId, categories.workspaceId, ctx),
+				];
 				if (access.restricted) {
 					if (!access.categoryId) return [];
 					conditions.push(eq(categories.id, access.categoryId));
@@ -158,7 +162,7 @@ export const categoryRoutes = new Elysia({ prefix: "/api" })
 						updatedAt: categories.updatedAt,
 						documentCount: sql<number>`(
 							WITH RECURSIVE cat_folders AS (
-								SELECT id FROM ${folders} WHERE category_id = "categories"."id" AND owner_id = ${userId}
+								SELECT id FROM ${folders} WHERE category_id = "categories"."id" AND ${tenantOwnerSql("folders", ctx)}
 								UNION ALL
 								SELECT f.id FROM ${folders} f
 								JOIN cat_folders cf ON f.parent_id = cf.id
@@ -172,7 +176,7 @@ export const categoryRoutes = new Elysia({ prefix: "/api" })
 						)`,
 						folderCount: sql<number>`(
 							WITH RECURSIVE cat_folders AS (
-								SELECT id FROM ${folders} WHERE category_id = "categories"."id" AND owner_id = ${userId}
+								SELECT id FROM ${folders} WHERE category_id = "categories"."id" AND ${tenantOwnerSql("folders", ctx)}
 								UNION ALL
 								SELECT f.id FROM ${folders} f
 								JOIN cat_folders cf ON f.parent_id = cf.id
@@ -235,7 +239,11 @@ export const categoryRoutes = new Elysia({ prefix: "/api" })
 					.from(categories)
 					.where(
 						and(
-							eq(categories.ownerId, userId),
+							tenantOwnerCondition(
+								categories.ownerId,
+								categories.workspaceId,
+								ctx,
+							),
 							eq(categories.name, parsed.data.name),
 						),
 					)
@@ -323,7 +331,14 @@ export const categoryRoutes = new Elysia({ prefix: "/api" })
 						.select({ id: categories.id })
 						.from(categories)
 						.where(
-							and(eq(categories.ownerId, userId), eq(categories.name, newName)),
+							and(
+								tenantOwnerCondition(
+									categories.ownerId,
+									categories.workspaceId,
+									ctx,
+								),
+								eq(categories.name, newName),
+							),
 						)
 						.limit(1);
 					if (existing.length > 0 && existing[0]?.id !== params.id) {
@@ -348,7 +363,14 @@ export const categoryRoutes = new Elysia({ prefix: "/api" })
 						updatedAt: new Date(),
 					})
 					.where(
-						and(eq(categories.id, params.id), eq(categories.ownerId, userId)),
+						and(
+							eq(categories.id, params.id),
+							tenantOwnerCondition(
+								categories.ownerId,
+								categories.workspaceId,
+								ctx,
+							),
+						),
 					)
 					.returning();
 				return { row: row ?? null };
@@ -367,11 +389,12 @@ export const categoryRoutes = new Elysia({ prefix: "/api" })
 			// name is part of the embedding preamble, so a rename leaves the
 			// existing vectors stale until the worker refreshes them.
 			if (parsed.data.name !== undefined) {
-				reembedDocsInCategory(params.id, userId).catch((err: unknown) =>
-					logger.warn(
-						{ err, categoryId: params.id },
-						"Failed to re-embed documents after category rename",
-					),
+				reembedDocsInCategory(params.id, userId, ctx.workspaceId).catch(
+					(err: unknown) =>
+						logger.warn(
+							{ err, categoryId: params.id },
+							"Failed to re-embed documents after category rename",
+						),
 				);
 			}
 
@@ -408,7 +431,14 @@ export const categoryRoutes = new Elysia({ prefix: "/api" })
 				const [row] = await tx
 					.delete(categories)
 					.where(
-						and(eq(categories.id, params.id), eq(categories.ownerId, userId)),
+						and(
+							eq(categories.id, params.id),
+							tenantOwnerCondition(
+								categories.ownerId,
+								categories.workspaceId,
+								ctx,
+							),
+						),
 					)
 					.returning({ id: categories.id });
 				return row ?? null;
@@ -421,11 +451,12 @@ export const categoryRoutes = new Elysia({ prefix: "/api" })
 			// automatically detaches the category from any owned folders/docs.
 			// We re-embed those docs/folders so their preamble no longer mentions
 			// the (now-gone) category name.
-			reembedDocsInCategory(params.id, userId).catch((err: unknown) =>
-				logger.warn(
-					{ err, categoryId: params.id },
-					"Failed to re-embed documents after category delete",
-				),
+			reembedDocsInCategory(params.id, userId, ctx.workspaceId).catch(
+				(err: unknown) =>
+					logger.warn(
+						{ err, categoryId: params.id },
+						"Failed to re-embed documents after category delete",
+					),
 			);
 			return { success: true };
 		} catch (err) {

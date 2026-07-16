@@ -7,6 +7,8 @@ import {
 	isAuthorizedCategory,
 	resolveContentAccess,
 	resolveFolderEffectiveCategory,
+	tenantOwnerCondition,
+	tenantOwnerSql,
 } from "../../lib/content-access";
 import { invalidateDocListCache } from "../../lib/doc-cache";
 import { nextAvailableFolderName } from "../../lib/folder-name";
@@ -67,7 +69,7 @@ export const folderRoutes = new Elysia({ prefix: "/api/folders" })
 						updatedAt: folders.updatedAt,
 						documentCount: sql<number>`(
 							WITH RECURSIVE sub_folders AS (
-								SELECT id FROM folders f2 WHERE f2.id = "folders"."id" AND f2.owner_id = ${userId}
+								SELECT id FROM folders f2 WHERE f2.id = "folders"."id" AND ${tenantOwnerSql("f2", ctx)}
 								UNION ALL
 								SELECT f.id FROM folders f
 								JOIN sub_folders sf ON f.parent_id = sf.id
@@ -75,11 +77,11 @@ export const folderRoutes = new Elysia({ prefix: "/api/folders" })
 							SELECT COUNT(*)::int
 							FROM documents d
 							WHERE d.folder_id IN (SELECT id FROM sub_folders)
-								AND d.owner_id = ${userId}
+								AND ${tenantOwnerSql("d", ctx)}
 						)`,
 						subfolderCount: sql<number>`(
 							WITH RECURSIVE sub_folders AS (
-								SELECT id FROM folders f2 WHERE f2.parent_id = "folders"."id" AND f2.owner_id = ${userId}
+								SELECT id FROM folders f2 WHERE f2.parent_id = "folders"."id" AND ${tenantOwnerSql("f2", ctx)}
 								UNION ALL
 								SELECT f.id FROM folders f
 								JOIN sub_folders sf ON f.parent_id = sf.id
@@ -88,7 +90,12 @@ export const folderRoutes = new Elysia({ prefix: "/api/folders" })
 						)`,
 					})
 					.from(folders)
-					.where(and(eq(folders.id, params.id), eq(folders.ownerId, userId)))
+					.where(
+						and(
+							eq(folders.id, params.id),
+							tenantOwnerCondition(folders.ownerId, folders.workspaceId, ctx),
+						),
+					)
 					.limit(1);
 				if (!row) {
 					return null;
@@ -106,7 +113,7 @@ export const folderRoutes = new Elysia({ prefix: "/api/folders" })
 						updatedAt: folders.updatedAt,
 						documentCount: sql<number>`(
 							WITH RECURSIVE sub_folders AS (
-								SELECT id FROM folders f2 WHERE f2.id = "folders"."id" AND f2.owner_id = ${userId}
+								SELECT id FROM folders f2 WHERE f2.id = "folders"."id" AND ${tenantOwnerSql("f2", ctx)}
 								UNION ALL
 								SELECT f.id FROM folders f
 								JOIN sub_folders sf ON f.parent_id = sf.id
@@ -114,11 +121,11 @@ export const folderRoutes = new Elysia({ prefix: "/api/folders" })
 							SELECT COUNT(*)::int
 							FROM documents d
 							WHERE d.folder_id IN (SELECT id FROM sub_folders)
-								AND d.owner_id = ${userId}
+								AND ${tenantOwnerSql("d", ctx)}
 						)`,
 						subfolderCount: sql<number>`(
 							WITH RECURSIVE sub_folders AS (
-								SELECT id FROM folders f2 WHERE f2.parent_id = "folders"."id" AND f2.owner_id = ${userId}
+								SELECT id FROM folders f2 WHERE f2.parent_id = "folders"."id" AND ${tenantOwnerSql("f2", ctx)}
 								UNION ALL
 								SELECT f.id FROM folders f
 								JOIN sub_folders sf ON f.parent_id = sf.id
@@ -128,7 +135,10 @@ export const folderRoutes = new Elysia({ prefix: "/api/folders" })
 					})
 					.from(folders)
 					.where(
-						and(eq(folders.parentId, params.id), eq(folders.ownerId, userId)),
+						and(
+							eq(folders.parentId, params.id),
+							tenantOwnerCondition(folders.ownerId, folders.workspaceId, ctx),
+						),
 					)
 					.orderBy(folders.order, folders.name);
 				const childDocRows = await tx
@@ -146,7 +156,11 @@ export const folderRoutes = new Elysia({ prefix: "/api/folders" })
 					.where(
 						and(
 							eq(documents.folderId, params.id),
-							eq(documents.ownerId, userId),
+							tenantOwnerCondition(
+								documents.ownerId,
+								documents.workspaceId,
+								ctx,
+							),
 						),
 					)
 					.orderBy(documents.updatedAt);
@@ -189,7 +203,9 @@ export const folderRoutes = new Elysia({ prefix: "/api/folders" })
 					return [];
 				}
 			}
-			const conditions = [eq(folders.ownerId, userId)];
+			const conditions = [
+				tenantOwnerCondition(folders.ownerId, folders.workspaceId, ctx),
+			];
 			if (query.all === "true") {
 				// Don't filter by parentId, get all folders flat!
 			} else if (query.parentId) {
@@ -210,7 +226,7 @@ export const folderRoutes = new Elysia({ prefix: "/api/folders" })
 						updatedAt: folders.updatedAt,
 						documentCount: sql<number>`(
 							WITH RECURSIVE sub_folders AS (
-								SELECT id FROM folders f2 WHERE f2.id = "folders"."id" AND f2.owner_id = ${userId}
+								SELECT id FROM folders f2 WHERE f2.id = "folders"."id" AND ${tenantOwnerSql("f2", ctx)}
 								UNION ALL
 								SELECT f.id FROM folders f
 								JOIN sub_folders sf ON f.parent_id = sf.id
@@ -218,11 +234,11 @@ export const folderRoutes = new Elysia({ prefix: "/api/folders" })
 							SELECT COUNT(*)::int
 							FROM documents d
 							WHERE d.folder_id IN (SELECT id FROM sub_folders)
-								AND d.owner_id = ${userId}
+								AND ${tenantOwnerSql("d", ctx)}
 						)`,
 						subfolderCount: sql<number>`(
 							WITH RECURSIVE sub_folders AS (
-								SELECT id FROM folders f2 WHERE f2.parent_id = "folders"."id" AND f2.owner_id = ${userId}
+								SELECT id FROM folders f2 WHERE f2.parent_id = "folders"."id" AND ${tenantOwnerSql("f2", ctx)}
 								UNION ALL
 								SELECT f.id FROM folders f
 								JOIN sub_folders sf ON f.parent_id = sf.id
@@ -297,7 +313,7 @@ export const folderRoutes = new Elysia({ prefix: "/api/folders" })
 						.where(
 							and(
 								eq(folders.id, parsed.data.parentId),
-								eq(folders.ownerId, userId),
+								tenantOwnerCondition(folders.ownerId, folders.workspaceId, ctx),
 							),
 						)
 						.limit(1);
@@ -312,7 +328,11 @@ export const folderRoutes = new Elysia({ prefix: "/api/folders" })
 						.where(
 							and(
 								eq(categories.id, categoryId),
-								eq(categories.ownerId, userId),
+								tenantOwnerCondition(
+									categories.ownerId,
+									categories.workspaceId,
+									ctx,
+								),
 							),
 						)
 						.limit(1);
@@ -330,7 +350,9 @@ export const folderRoutes = new Elysia({ prefix: "/api/folders" })
 				await tx.execute(
 					sql`SELECT pg_advisory_xact_lock(hashtextextended(${scopeKey}, 0))`,
 				);
-				const scopeConditions = [eq(folders.ownerId, userId)];
+				const scopeConditions = [
+					tenantOwnerCondition(folders.ownerId, folders.workspaceId, ctx),
+				];
 				if (parentId) {
 					scopeConditions.push(eq(folders.parentId, parentId));
 				} else {
@@ -423,7 +445,12 @@ export const folderRoutes = new Elysia({ prefix: "/api/folders" })
 				const [current] = await tx
 					.select({ id: folders.id })
 					.from(folders)
-					.where(and(eq(folders.id, params.id), eq(folders.ownerId, userId)))
+					.where(
+						and(
+							eq(folders.id, params.id),
+							tenantOwnerCondition(folders.ownerId, folders.workspaceId, ctx),
+						),
+					)
 					.limit(1);
 				if (!current) {
 					return { notFound: true as const };
@@ -463,7 +490,7 @@ export const folderRoutes = new Elysia({ prefix: "/api/folders" })
 						.where(
 							and(
 								eq(folders.id, parsed.data.parentId),
-								eq(folders.ownerId, userId),
+								tenantOwnerCondition(folders.ownerId, folders.workspaceId, ctx),
 							),
 						)
 						.limit(1);
@@ -476,7 +503,9 @@ export const folderRoutes = new Elysia({ prefix: "/api/folders" })
 					const ownedFolders = await tx
 						.select({ id: folders.id, parentId: folders.parentId })
 						.from(folders)
-						.where(eq(folders.ownerId, userId));
+						.where(
+							tenantOwnerCondition(folders.ownerId, folders.workspaceId, ctx),
+						);
 					const parentById = new Map(
 						ownedFolders.map((folder) => [folder.id, folder.parentId]),
 					);
@@ -497,7 +526,11 @@ export const folderRoutes = new Elysia({ prefix: "/api/folders" })
 						.where(
 							and(
 								eq(categories.id, parsed.data.categoryId),
-								eq(categories.ownerId, userId),
+								tenantOwnerCondition(
+									categories.ownerId,
+									categories.workspaceId,
+									ctx,
+								),
 							),
 						)
 						.limit(1);
@@ -522,7 +555,12 @@ export const folderRoutes = new Elysia({ prefix: "/api/folders" })
 						}),
 						updatedAt: new Date(),
 					})
-					.where(and(eq(folders.id, params.id), eq(folders.ownerId, userId)))
+					.where(
+						and(
+							eq(folders.id, params.id),
+							tenantOwnerCondition(folders.ownerId, folders.workspaceId, ctx),
+						),
+					)
 					.returning();
 				if (!updated) {
 					return { notFound: true as const };
@@ -560,11 +598,12 @@ export const folderRoutes = new Elysia({ prefix: "/api/folders" })
 			// to bound the cost spike from a rename. Subsequent batches can
 			// be flushed by an explicit reindex job or a follow-up edit.
 			if (parsed.data.name !== undefined) {
-				reembedDocsInFolder(params.id, userId).catch((err: unknown) =>
-					logger.warn(
-						{ err, folderId: params.id },
-						"Failed to enqueue re-embedding for folder rename",
-					),
+				reembedDocsInFolder(params.id, userId, ctx.workspaceId).catch(
+					(err: unknown) =>
+						logger.warn(
+							{ err, folderId: params.id },
+							"Failed to enqueue re-embedding for folder rename",
+						),
 				);
 				invalidateDocListCache(userId);
 			}
@@ -610,14 +649,24 @@ export const folderRoutes = new Elysia({ prefix: "/api/folders" })
 				const existing = await tx
 					.select({ id: folders.id })
 					.from(folders)
-					.where(and(eq(folders.id, params.id), eq(folders.ownerId, userId)))
+					.where(
+						and(
+							eq(folders.id, params.id),
+							tenantOwnerCondition(folders.ownerId, folders.workspaceId, ctx),
+						),
+					)
 					.limit(1);
 				if (existing.length === 0) {
 					return false;
 				}
 				await tx
 					.delete(folders)
-					.where(and(eq(folders.id, params.id), eq(folders.ownerId, userId)));
+					.where(
+						and(
+							eq(folders.id, params.id),
+							tenantOwnerCondition(folders.ownerId, folders.workspaceId, ctx),
+						),
+					);
 				return true;
 			});
 			if (deleted === "forbidden") {
@@ -632,11 +681,12 @@ export const folderRoutes = new Elysia({ prefix: "/api/folders" })
 			// FK ON DELETE SET NULL on documents.folder_id detaches the folder.
 			// Re-embed affected docs so the "Folder: <old-name>" preamble
 			// stops appearing in their embedding context.
-			reembedDocsInFolder(params.id, userId).catch((err: unknown) =>
-				logger.warn(
-					{ err, folderId: params.id },
-					"Failed to re-embed documents after folder delete",
-				),
+			reembedDocsInFolder(params.id, userId, ctx.workspaceId).catch(
+				(err: unknown) =>
+					logger.warn(
+						{ err, folderId: params.id },
+						"Failed to re-embed documents after folder delete",
+					),
 			);
 			return { success: true };
 		} catch (err) {

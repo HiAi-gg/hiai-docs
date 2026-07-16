@@ -7,6 +7,7 @@ import {
 	effectiveDocumentCategory,
 	isAuthorizedCategory,
 	resolveContentAccess,
+	tenantOwnerCondition,
 } from "../../lib/content-access";
 import { invalidateDocCache } from "../../lib/doc-cache";
 import { logger } from "../../lib/logger";
@@ -36,7 +37,7 @@ export const tagRoutes = new Elysia({ prefix: "/api" })
 			set.status = 401;
 			return { error: "Unauthorized" };
 		}
-		const userId = ctx.userId;
+		const _userId = ctx.userId;
 		try {
 			const rows = await withTenant(ctx, async (tx) => {
 				return tx
@@ -49,7 +50,7 @@ export const tagRoutes = new Elysia({ prefix: "/api" })
 					})
 					.from(tags)
 					.leftJoin(documentTags, eq(tags.id, documentTags.tagId))
-					.where(eq(tags.ownerId, userId))
+					.where(tenantOwnerCondition(tags.ownerId, tags.workspaceId, ctx))
 					.groupBy(tags.id, tags.name, tags.color, tags.createdAt)
 					.orderBy(tags.name);
 			});
@@ -86,7 +87,12 @@ export const tagRoutes = new Elysia({ prefix: "/api" })
 				const existing = await tx
 					.select({ id: tags.id })
 					.from(tags)
-					.where(and(eq(tags.ownerId, userId), eq(tags.name, body.data.name)))
+					.where(
+						and(
+							tenantOwnerCondition(tags.ownerId, tags.workspaceId, ctx),
+							eq(tags.name, body.data.name),
+						),
+					)
 					.limit(1);
 				if (existing.length > 0) {
 					return { conflict: true as const };
@@ -142,7 +148,12 @@ export const tagRoutes = new Elysia({ prefix: "/api" })
 						...(body.data.name !== undefined && { name: body.data.name }),
 						...(body.data.color !== undefined && { color: body.data.color }),
 					})
-					.where(and(eq(tags.id, params.id), eq(tags.ownerId, userId)))
+					.where(
+						and(
+							eq(tags.id, params.id),
+							tenantOwnerCondition(tags.ownerId, tags.workspaceId, ctx),
+						),
+					)
 					.returning();
 				return row ?? null;
 			});
@@ -154,11 +165,12 @@ export const tagRoutes = new Elysia({ prefix: "/api" })
 			// Re-embed every document linked to this tag if its name changed
 			// (the tag name is part of the embedding preamble).
 			if (body.data.name !== undefined) {
-				reembedDocsByTag(params.id, userId).catch((err: unknown) =>
-					logger.warn(
-						{ err, tagId: params.id },
-						"Failed to re-embed documents after tag rename",
-					),
+				reembedDocsByTag(params.id, userId, ctx.workspaceId).catch(
+					(err: unknown) =>
+						logger.warn(
+							{ err, tagId: params.id },
+							"Failed to re-embed documents after tag rename",
+						),
 				);
 			}
 
@@ -184,7 +196,7 @@ export const tagRoutes = new Elysia({ prefix: "/api" })
 			set.status = 401;
 			return { error: "Unauthorized" };
 		}
-		const userId = ctx.userId;
+		const _userId = ctx.userId;
 		try {
 			const result = await withTenant(ctx, async (tx) => {
 				// Resolve affected doc ids BEFORE the tag is deleted. We re-embed
@@ -197,7 +209,12 @@ export const tagRoutes = new Elysia({ prefix: "/api" })
 
 				await tx
 					.delete(tags)
-					.where(and(eq(tags.id, params.id), eq(tags.ownerId, userId)));
+					.where(
+						and(
+							eq(tags.id, params.id),
+							tenantOwnerCondition(tags.ownerId, tags.workspaceId, ctx),
+						),
+					);
 
 				return { affectedDocs };
 			});
@@ -206,7 +223,7 @@ export const tagRoutes = new Elysia({ prefix: "/api" })
 				const ids = Array.from(
 					new Set(result.affectedDocs.map((r) => r.documentId)),
 				);
-				const enqueued = await enqueueReembed(ids);
+				const enqueued = await enqueueReembed(ids, ctx.workspaceId);
 				if (enqueued > 0) {
 					logger.info(
 						{ tagId: params.id, enqueued },
@@ -242,7 +259,7 @@ export const tagRoutes = new Elysia({ prefix: "/api" })
 			set.status = 403;
 			return { error: "Forbidden" };
 		}
-		const userId = ctx.userId;
+		const _userId = ctx.userId;
 		const body = addTagToDocSchema.safeParse(await request.json());
 		if (!body.success) {
 			set.status = 400;
@@ -259,7 +276,14 @@ export const tagRoutes = new Elysia({ prefix: "/api" })
 					.from(documents)
 					.leftJoin(folders, eq(folders.id, documents.folderId))
 					.where(
-						and(eq(documents.id, params.id), eq(documents.ownerId, userId)),
+						and(
+							eq(documents.id, params.id),
+							tenantOwnerCondition(
+								documents.ownerId,
+								documents.workspaceId,
+								ctx,
+							),
+						),
 					)
 					.limit(1);
 				if (
@@ -282,7 +306,7 @@ export const tagRoutes = new Elysia({ prefix: "/api" })
 			// Re-embed so the new tag name appears in the embedding preamble.
 			// enqueueReembed gives us per-doc Redis SET-NX dedup shared
 			// with the rest of the metadata-driven re-embed triggers.
-			enqueueReembed([params.id]);
+			enqueueReembed([params.id], ctx.workspaceId);
 			invalidateDocCache(params.id);
 			set.status = 201;
 			return { success: true };
@@ -312,7 +336,7 @@ export const tagRoutes = new Elysia({ prefix: "/api" })
 			set.status = 403;
 			return { error: "Forbidden" };
 		}
-		const userId = ctx.userId;
+		const _userId = ctx.userId;
 		try {
 			const ok = await withTenant(ctx, async (tx) => {
 				const [doc] = await tx
@@ -324,7 +348,14 @@ export const tagRoutes = new Elysia({ prefix: "/api" })
 					.from(documents)
 					.leftJoin(folders, eq(folders.id, documents.folderId))
 					.where(
-						and(eq(documents.id, params.id), eq(documents.ownerId, userId)),
+						and(
+							eq(documents.id, params.id),
+							tenantOwnerCondition(
+								documents.ownerId,
+								documents.workspaceId,
+								ctx,
+							),
+						),
 					)
 					.limit(1);
 				if (
@@ -350,7 +381,7 @@ export const tagRoutes = new Elysia({ prefix: "/api" })
 			}
 			// Re-embed so the removed tag is no longer in the preamble.
 			// enqueueReembed gives us per-doc Redis SET-NX dedup.
-			enqueueReembed([params.id]);
+			enqueueReembed([params.id], ctx.workspaceId);
 			invalidateDocCache(params.id);
 			return { success: true };
 		} catch (err) {

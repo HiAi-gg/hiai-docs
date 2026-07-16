@@ -16,6 +16,7 @@ import {
 	isAuthorizedCategory,
 	resolveContentAccess,
 	resolveFolderEffectiveCategory,
+	tenantOwnerCondition,
 } from "../../lib/content-access";
 import { logger } from "../../lib/logger";
 import { redis } from "../../lib/redis";
@@ -246,7 +247,14 @@ export const shareRoutes = new Elysia({ prefix: "/api/share" })
 					.from(documents)
 					.leftJoin(folders, eq(folders.id, documents.folderId))
 					.where(
-						and(eq(documents.id, documentId), eq(documents.ownerId, userId)),
+						and(
+							eq(documents.id, documentId),
+							tenantOwnerCondition(
+								documents.ownerId,
+								documents.workspaceId,
+								ctx,
+							),
+						),
 					)
 					.limit(1);
 				if (!doc) {
@@ -261,7 +269,12 @@ export const shareRoutes = new Elysia({ prefix: "/api/share" })
 				const [folder] = await tx
 					.select({ id: folders.id })
 					.from(folders)
-					.where(and(eq(folders.id, folderId), eq(folders.ownerId, userId)))
+					.where(
+						and(
+							eq(folders.id, folderId),
+							tenantOwnerCondition(folders.ownerId, folders.workspaceId, ctx),
+						),
+					)
 					.limit(1);
 				if (!folder) {
 					return { notFound: "folder" as const };

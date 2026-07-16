@@ -246,6 +246,13 @@
 			"when": 1785000000020,
 			"tag": "0034_share_categories",
 			"breakpoints": true
-    }
+		},
+		{
+			"idx": 35,
+			"version": "7",
+			"when": 1785000000021,
+			"tag": "0035_external_workspace_context",
+			"breakpoints": true
+		}
   ]
 }

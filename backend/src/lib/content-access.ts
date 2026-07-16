@@ -1,7 +1,12 @@
 import { folders } from "@hiai-docs/db/schema";
-import { type SQL, sql } from "drizzle-orm";
+import { type AnyColumn, and, eq, isNull, type SQL, sql } from "drizzle-orm";
+import { buildTenantContext } from "../api/middleware/tenant";
 import type { ApiKeyScope, CategoryApiPermission } from "./api-keys";
 import { type AuthPrincipal, resolveAuthPrincipal } from "./auth-principal";
+import {
+	EXTERNAL_TENANT_CONTEXT_HEADER,
+	ExternalTenantContextError,
+} from "./external-tenant-context";
 import type { TenantContext } from "./with-tenant";
 import { ZERO_UUID } from "./with-tenant";
 
@@ -14,7 +19,37 @@ export type ContentAccess = {
 	categoryId: string | null;
 	permissions: ReadonlySet<CategoryApiPermission>;
 	restricted: boolean;
+	externalRole?: "owner" | "admin" | "editor" | "viewer";
 };
+
+/**
+ * Build an explicit owner/workspace predicate for route queries. RLS remains
+ * the final enforcement layer, but this predicate prevents a route from
+ * accidentally narrowing an external workspace request to the actor's
+ * personal owner rows.
+ */
+export function tenantOwnerCondition(
+	ownerColumn: AnyColumn,
+	workspaceColumn: AnyColumn,
+	ctx: TenantContext,
+): SQL {
+	if (ctx.source === "external" && ctx.workspaceId) {
+		return eq(workspaceColumn, ctx.workspaceId);
+	}
+	return (
+		and(isNull(workspaceColumn), eq(ownerColumn, ctx.userId)) ?? sql`false`
+	);
+}
+
+/** SQL-template equivalent for the few recursive/raw retrieval queries. */
+export function tenantOwnerSql(alias: string, ctx: TenantContext): SQL {
+	const ownerColumn = sql.raw(`${alias}.owner_id`);
+	const workspaceColumn = sql.raw(`${alias}.workspace_id`);
+	if (ctx.source === "external" && ctx.workspaceId) {
+		return sql`${workspaceColumn} = ${ctx.workspaceId}`;
+	}
+	return sql`${workspaceColumn} IS NULL AND ${ownerColumn} = ${ctx.userId}`;
+}
 
 function categoryGrant(scopes: readonly ApiKeyScope[]): {
 	categoryId: string;
@@ -36,8 +71,45 @@ function categoryGrant(scopes: readonly ApiKeyScope[]): {
 export async function resolveContentAccess(
 	request: Request,
 ): Promise<ContentAccess> {
+	if (request.headers.has(EXTERNAL_TENANT_CONTEXT_HEADER)) {
+		const ctx = await buildTenantContext(request);
+		if (ctx.source !== "external" || !ctx.workspaceId) {
+			throw new ExternalTenantContextError("Invalid external tenant context");
+		}
+		return contentAccessForExternalContext({
+			...ctx,
+			source: "external",
+			workspaceId: ctx.workspaceId,
+			actorRole: ctx.actorRole ?? "viewer",
+		});
+	}
 	const principal = await resolveAuthPrincipal(request.headers);
 	return contentAccessForPrincipal(principal);
+}
+
+export function contentAccessForExternalContext(
+	ctx: TenantContext & {
+		source: "external";
+		workspaceId: string;
+		actorRole: "owner" | "admin" | "editor" | "viewer";
+	},
+): ContentAccess {
+	const permissions = new Set<CategoryApiPermission>(["read"]);
+	if (ctx.actorRole === "owner" || ctx.actorRole === "admin") {
+		permissions.add("edit");
+		permissions.add("write");
+	} else if (ctx.actorRole === "editor") {
+		permissions.add("edit");
+	}
+	return {
+		principal: { kind: "session", userId: ctx.userId },
+		ctx,
+		userId: ctx.userId,
+		categoryId: null,
+		permissions,
+		restricted: true,
+		externalRole: ctx.actorRole,
+	};
 }
 
 /** Pure constructor used by route policy tests and non-HTTP adapters. */
@@ -82,6 +154,7 @@ export function canAccessContent(
 	access: ContentAccess,
 	action: ContentAction,
 ): boolean {
+	if (access.externalRole) return access.permissions.has(action);
 	return !access.restricted || access.permissions.has(action);
 }
 
@@ -96,6 +169,7 @@ export function isAuthorizedCategory(
 	access: ContentAccess,
 	categoryId: string | null,
 ): boolean {
+	if (access.externalRole) return true;
 	return (
 		!access.restricted || (!!categoryId && categoryId === access.categoryId)
 	);

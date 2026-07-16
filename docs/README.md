@@ -21,6 +21,7 @@ run. The pages below are the maintained reference set.
 - [Extension points](EXTENDING.md) — editor toolbar and document-tab APIs
 - [PWA hosting](PWA_HOSTING.md) — installable PWA, offline read, explicit drafts,
   service-worker and host integration contract
+- [External workspace context](EXTERNAL_WORKSPACE.md) — signed generic tenancy contract for trusted hosts
 - [SDK guide](../packages/sdk/README.md)
 - [CLI guide](../packages/cli/README.md)
 - [MCP server guide](../packages/mcp-server/README.md)

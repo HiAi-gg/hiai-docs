@@ -135,6 +135,7 @@ export const folders = pgTable(
     ownerId: uuid("owner_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
+    workspaceId: text("workspace_id"),
     parentId: uuid("parent_id").references((): AnyPgColumn => folders.id, {
       onDelete: "set null",
     }),
@@ -179,6 +180,7 @@ export const documents = pgTable(
     ownerId: uuid("owner_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
+    workspaceId: text("workspace_id"),
     folderId: uuid("folder_id").references(() => folders.id, {
       onDelete: "set null",
     }),
@@ -259,6 +261,7 @@ export const documentPipelineRuns = pgTable(
     ownerId: uuid("owner_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
+    workspaceId: text("workspace_id"),
     generationId: uuid("generation_id").notNull(),
     revision: text("revision").notNull(),
     source: text("source").notNull(),
@@ -301,6 +304,7 @@ export const documentPipelineBatches = pgTable(
   "document_pipeline_batches",
   {
     id: uuid("id").primaryKey().defaultRandom(),
+    workspaceId: text("workspace_id"),
     documentId: uuid("document_id")
       .notNull()
       .references(() => documents.id, { onDelete: "cascade" }),
@@ -344,6 +348,7 @@ export const tags = pgTable(
     ownerId: uuid("owner_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
+    workspaceId: text("workspace_id"),
     name: text("name").notNull(),
     color: text("color"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -368,6 +373,7 @@ export const categories = pgTable(
     ownerId: uuid("owner_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
+    workspaceId: text("workspace_id"),
     name: text("name").notNull(),
     order: integer("order").notNull().default(0),
     apiMode: text("api_mode").notNull().default("unavailable"),
@@ -395,6 +401,7 @@ export const categoryRelations = relations(categories, ({ one, many }) => ({
 export const documentTags = pgTable(
   "document_tags",
   {
+    workspaceId: text("workspace_id"),
     documentId: uuid("document_id")
       .notNull()
       .references(() => documents.id, { onDelete: "cascade" }),
@@ -438,6 +445,7 @@ export const shareLinks = pgTable(
     createdBy: uuid("created_by")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
+    workspaceId: text("workspace_id"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
   (table) => [
@@ -482,6 +490,7 @@ export const guestAccess = pgTable(
     shareLinkId: uuid("share_link_id")
       .notNull()
       .references(() => shareLinks.id, { onDelete: "cascade" }),
+    workspaceId: text("workspace_id"),
     guestEmail: text("guest_email").notNull(),
     grantedAt: timestamp("granted_at").defaultNow().notNull(),
   },
@@ -505,6 +514,7 @@ export const attachments = pgTable(
     documentId: uuid("document_id")
       .notNull()
       .references(() => documents.id, { onDelete: "cascade" }),
+    workspaceId: text("workspace_id"),
     filename: text("filename").notNull(),
     mimeType: text("mime_type").notNull(),
     size: bigint("size", { mode: "number" }).notNull(),
@@ -531,6 +541,7 @@ export const versions = pgTable(
     documentId: uuid("document_id")
       .notNull()
       .references(() => documents.id, { onDelete: "cascade" }),
+    workspaceId: text("workspace_id"),
     content: text("content").notNull(),
     contentJson: jsonb("content_json"),
     createdBy: uuid("created_by")
@@ -559,6 +570,7 @@ export const documentEmbeddings = pgTable(
     documentId: uuid("document_id")
       .notNull()
       .references(() => documents.id, { onDelete: "cascade" }),
+    workspaceId: text("workspace_id"),
     chunkIndex: bigint("chunk_index", { mode: "number" }).notNull(),
     chunkText: text("chunk_text").notNull(),
     chunkHash: text("chunk_hash"),
@@ -624,6 +636,7 @@ export const apiKeys = pgTable(
     ownerId: uuid("owner_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
+    workspaceId: text("workspace_id"),
     name: text("name").notNull(),
     keyHash: text("key_hash").notNull().unique(),
     prefix: text("prefix").notNull(),
@@ -651,6 +664,7 @@ export const auditLog = pgTable(
   {
     id: uuid("id").primaryKey().defaultRandom(),
     actorId: uuid("actor_id").notNull(),
+    workspaceId: text("workspace_id"),
     action: text("action").notNull(),
     resourceType: text("resource_type").notNull(),
     resourceId: uuid("resource_id"),

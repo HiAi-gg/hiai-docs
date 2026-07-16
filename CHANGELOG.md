@@ -64,6 +64,11 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
   `@hiai-gg/docsmint` and pull `ghcr.io/hiai-gg/docsmint-*` images.
 - The project is licensed under Apache-2.0. Existing `hiai-docs` CLI aliases
   remain available throughout the `0.3.x` series.
+### Added
+- Generic signed external workspace context with transaction-local workspace
+  RLS, workspace-scoped cache/object-storage/pipeline identifiers, SDK header
+  propagation, migration `0035_external_workspace_context`, and self-hosted
+  personal-mode compatibility.
 
 ## [0.2.9] - 2026-07-12
 

@@ -17,6 +17,8 @@ import {
 	isAuthorizedCategory,
 	resolveContentAccess,
 	resolveFolderEffectiveCategory,
+	tenantOwnerCondition,
+	tenantOwnerSql,
 } from "../../lib/content-access";
 import { contentHash } from "../../lib/content-hash";
 import {
@@ -254,12 +256,12 @@ async function resolveFolderCategory(
 			WITH RECURSIVE ancestors AS (
 				SELECT id, parent_id, category_id
 				FROM folders
-				WHERE id = ${folderId} AND owner_id = ${ctx.userId}
+				WHERE id = ${folderId} AND ${tenantOwnerSql("folders", ctx)}
 				UNION ALL
 				SELECT f.id, f.parent_id, f.category_id
 				FROM folders f
 				JOIN ancestors a ON f.id = a.parent_id
-				WHERE f.owner_id = ${ctx.userId}
+				WHERE ${tenantOwnerSql("f", ctx)}
 			)
 			SELECT category_id FROM ancestors
 			WHERE category_id IS NOT NULL
@@ -303,10 +305,12 @@ export const documentRoutes = new Elysia({ prefix: "/api" })
 		}
 		const { folderId, tag, page, limit } = parsed.data;
 		const offset = (page - 1) * limit;
-		const cacheKey = `${docListKey(userId, folderId, tag, page, limit)}:scope:${access.categoryId ?? "all"}`;
+		const cacheKey = `${docListKey(userId, folderId, tag, page, limit, ctx.workspaceId)}:scope:${access.categoryId ?? "all"}`;
 		try {
 			return await cacheGetOrSet(cacheKey, 30, async () => {
-				const conditions = [eq(documents.ownerId, userId)];
+				const conditions = [
+					tenantOwnerCondition(documents.ownerId, documents.workspaceId, ctx),
+				];
 				if (access.restricted && access.categoryId) {
 					conditions.push(eq(documents.categoryId, access.categoryId));
 				}
@@ -477,6 +481,7 @@ export const documentRoutes = new Elysia({ prefix: "/api" })
 			void enqueueDocumentPipeline({
 				documentId: created.id,
 				ownerId: userId,
+				workspaceId: ctx.workspaceId,
 				revision: contentHash(created.title, created.content ?? ""),
 				source: "interactive",
 			}).catch((err) =>
@@ -613,7 +618,7 @@ export const documentRoutes = new Elysia({ prefix: "/api" })
 		const userId = ctx.userId;
 		try {
 			return await cacheGetOrSet(
-				`${docSingleKey(params.id, userId)}:scope:${access.categoryId ?? "all"}`,
+				`${docSingleKey(params.id, userId, ctx.workspaceId)}:scope:${access.categoryId ?? "all"}`,
 				60,
 				async () => {
 					const result = await withTenant(ctx, async (tx) => {
@@ -637,7 +642,11 @@ export const documentRoutes = new Elysia({ prefix: "/api" })
 							.where(
 								and(
 									eq(documents.id, params.id),
-									eq(documents.ownerId, userId),
+									tenantOwnerCondition(
+										documents.ownerId,
+										documents.workspaceId,
+										ctx,
+									),
 									...(access.restricted && access.categoryId
 										? [eq(documents.categoryId, access.categoryId)]
 										: []),
@@ -755,7 +764,14 @@ export const documentRoutes = new Elysia({ prefix: "/api" })
 					})
 					.from(documents)
 					.where(
-						and(eq(documents.id, params.id), eq(documents.ownerId, userId)),
+						and(
+							eq(documents.id, params.id),
+							tenantOwnerCondition(
+								documents.ownerId,
+								documents.workspaceId,
+								ctx,
+							),
+						),
 					)
 					.for("update")
 					.limit(1);
@@ -866,7 +882,14 @@ export const documentRoutes = new Elysia({ prefix: "/api" })
 						updatedAt: new Date(),
 					})
 					.where(
-						and(eq(documents.id, params.id), eq(documents.ownerId, userId)),
+						and(
+							eq(documents.id, params.id),
+							tenantOwnerCondition(
+								documents.ownerId,
+								documents.workspaceId,
+								ctx,
+							),
+						),
 					)
 					.returning();
 
@@ -931,7 +954,7 @@ export const documentRoutes = new Elysia({ prefix: "/api" })
 				// Use enqueueReembed for Redis SET-NX dedup so rapid PATCHes on the same doc
 				// (auto-save) coalesce into a single worker tick. Direct enqueueEmbedding
 				// would queue the same doc id once per PATCH.
-				enqueueReembed([params.id]);
+				enqueueReembed([params.id], ctx.workspaceId);
 			}
 			// Preserve read-after-write consistency for placement changes. A
 			// fire-and-forget invalidation allowed the sidebar's immediate list
@@ -999,7 +1022,11 @@ export const documentRoutes = new Elysia({ prefix: "/api" })
 					.where(
 						and(
 							eq(documents.id, params.id),
-							eq(documents.ownerId, userId),
+							tenantOwnerCondition(
+								documents.ownerId,
+								documents.workspaceId,
+								ctx,
+							),
 							...(access.restricted && access.categoryId
 								? [eq(documents.categoryId, access.categoryId)]
 								: []),
@@ -1026,6 +1053,8 @@ export const documentRoutes = new Elysia({ prefix: "/api" })
 				sourceBundle.sourceAttachments,
 				userId,
 				copyId,
+				undefined,
+				ctx.workspaceId,
 			);
 			for (const plan of attachmentPlans) {
 				await storage.send(
@@ -1093,6 +1122,7 @@ export const documentRoutes = new Elysia({ prefix: "/api" })
 			void enqueueDocumentPipeline({
 				documentId: copy.id,
 				ownerId: userId,
+				workspaceId: ctx.workspaceId,
 				revision: contentHash(copy.title, copy.content ?? ""),
 				source: "interactive",
 			}).catch((err) =>
@@ -1146,7 +1176,11 @@ export const documentRoutes = new Elysia({ prefix: "/api" })
 					.where(
 						and(
 							eq(documents.id, params.id),
-							eq(documents.ownerId, userId),
+							tenantOwnerCondition(
+								documents.ownerId,
+								documents.workspaceId,
+								ctx,
+							),
 							...(access.restricted && access.categoryId
 								? [eq(documents.categoryId, access.categoryId)]
 								: []),
@@ -1159,7 +1193,14 @@ export const documentRoutes = new Elysia({ prefix: "/api" })
 				await tx
 					.delete(documents)
 					.where(
-						and(eq(documents.id, params.id), eq(documents.ownerId, userId)),
+						and(
+							eq(documents.id, params.id),
+							tenantOwnerCondition(
+								documents.ownerId,
+								documents.workspaceId,
+								ctx,
+							),
+						),
 					);
 				return true;
 			});
@@ -1204,7 +1245,7 @@ export const documentRoutes = new Elysia({ prefix: "/api" })
 			set.status = 403;
 			return { error: "Forbidden" };
 		}
-		const userId = ctx.userId;
+		const _userId = ctx.userId;
 		try {
 			const doc = await withTenant(ctx, async (tx) => {
 				const rows = await tx
@@ -1217,7 +1258,11 @@ export const documentRoutes = new Elysia({ prefix: "/api" })
 					.where(
 						and(
 							eq(documents.id, params.id),
-							eq(documents.ownerId, userId),
+							tenantOwnerCondition(
+								documents.ownerId,
+								documents.workspaceId,
+								ctx,
+							),
 							...(access.restricted && access.categoryId
 								? [eq(documents.categoryId, access.categoryId)]
 								: []),
@@ -1454,6 +1499,7 @@ export const documentRoutes = new Elysia({ prefix: "/api" })
 				void enqueueDocumentPipeline({
 					documentId: row.id,
 					ownerId: userId,
+					workspaceId: ctx.workspaceId,
 					revision: row.revision,
 					source: "import",
 				}).catch((err) =>

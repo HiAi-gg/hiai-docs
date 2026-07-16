@@ -256,8 +256,11 @@ function evaluateCondition(row: any, cond: any): boolean {
     return cond.values.every((c: any) => evaluateCondition(row, c));
   if (cond[TAG_OR])
     return cond.values.some((c: any) => evaluateCondition(row, c));
-  if (cond[TAG_IS_NULL]) return row[getColumnName(cond.col)] === null;
-  if (cond[TAG_IS_NOT_NULL]) return row[getColumnName(cond.col)] !== null;
+  // PostgreSQL defaults nullable columns to NULL. Older fixtures omit newly
+  // added nullable columns, so treat an absent property as the same value in
+  // this in-memory harness.
+  if (cond[TAG_IS_NULL]) return row[getColumnName(cond.col)] == null;
+  if (cond[TAG_IS_NOT_NULL]) return row[getColumnName(cond.col)] != null;
   if (cond[TAG_IN_ARRAY])
     return cond.vals.includes(row[getColumnName(cond.col)]);
   if (cond[TAG_LIKE]) {

@@ -822,6 +822,11 @@ export class DocsClient {
 		if (requestContext?.cookie) headers.set("Cookie", requestContext.cookie);
 		if (requestContext?.requestId)
 			headers.set("X-Request-Id", requestContext.requestId);
+		if (requestContext?.externalTenantAssertion)
+			headers.set(
+				"X-Hiai-Tenant-Context",
+				requestContext.externalTenantAssertion,
+			);
 
 		let body: BodyInit | undefined;
 		if (options?.body !== undefined) {

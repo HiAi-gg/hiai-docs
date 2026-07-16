@@ -7,6 +7,7 @@ import {
 	effectiveDocumentCategory,
 	isAuthorizedCategory,
 	resolveContentAccess,
+	tenantOwnerCondition,
 } from "../../lib/content-access";
 import { logger } from "../../lib/logger";
 import { enqueueReembed } from "../../lib/reembed";
@@ -32,7 +33,14 @@ async function authorizeVersionDocument(
 			.from(documents)
 			.leftJoin(folders, eq(folders.id, documents.folderId))
 			.where(
-				and(eq(documents.id, documentId), eq(documents.ownerId, access.userId)),
+				and(
+					eq(documents.id, documentId),
+					tenantOwnerCondition(
+						documents.ownerId,
+						documents.workspaceId,
+						access.ctx,
+					),
+				),
 			)
 			.limit(1);
 		return document ?? null;
@@ -226,7 +234,7 @@ export const versionRoutes = new Elysia({
 			set.status = authorization.row ? 403 : 404;
 			return { error: authorization.row ? "Forbidden" : "Document not found" };
 		}
-		const userId = ctx.userId;
+		const _userId = ctx.userId;
 
 		const parsed = listQuerySchema.safeParse(query);
 		if (!parsed.success) {
@@ -241,7 +249,14 @@ export const versionRoutes = new Elysia({
 					.select({ id: documents.id })
 					.from(documents)
 					.where(
-						and(eq(documents.id, params.id), eq(documents.ownerId, userId)),
+						and(
+							eq(documents.id, params.id),
+							tenantOwnerCondition(
+								documents.ownerId,
+								documents.workspaceId,
+								ctx,
+							),
+						),
 					)
 					.limit(1);
 
@@ -332,7 +347,14 @@ export const versionRoutes = new Elysia({
 					})
 					.from(documents)
 					.where(
-						and(eq(documents.id, params.id), eq(documents.ownerId, userId)),
+						and(
+							eq(documents.id, params.id),
+							tenantOwnerCondition(
+								documents.ownerId,
+								documents.workspaceId,
+								ctx,
+							),
+						),
 					)
 					.limit(1);
 
@@ -385,14 +407,21 @@ export const versionRoutes = new Elysia({
 			set.status = authorization.row ? 403 : 404;
 			return { error: authorization.row ? "Forbidden" : "Document not found" };
 		}
-		const userId = ctx.userId;
+		const _userId = ctx.userId;
 		try {
 			const result = await withTenant(ctx, async (tx) => {
 				const doc = await tx
 					.select({ id: documents.id })
 					.from(documents)
 					.where(
-						and(eq(documents.id, params.id), eq(documents.ownerId, userId)),
+						and(
+							eq(documents.id, params.id),
+							tenantOwnerCondition(
+								documents.ownerId,
+								documents.workspaceId,
+								ctx,
+							),
+						),
 					)
 					.limit(1);
 
@@ -482,7 +511,14 @@ export const versionRoutes = new Elysia({
 					})
 					.from(documents)
 					.where(
-						and(eq(documents.id, params.id), eq(documents.ownerId, userId)),
+						and(
+							eq(documents.id, params.id),
+							tenantOwnerCondition(
+								documents.ownerId,
+								documents.workspaceId,
+								ctx,
+							),
+						),
 					)
 					.limit(1);
 
@@ -533,7 +569,16 @@ export const versionRoutes = new Elysia({
 						contentJson: target.contentJson,
 						updatedAt: new Date(),
 					})
-					.where(and(eq(documents.id, docId), eq(documents.ownerId, userId)))
+					.where(
+						and(
+							eq(documents.id, docId),
+							tenantOwnerCondition(
+								documents.ownerId,
+								documents.workspaceId,
+								ctx,
+							),
+						),
+					)
 					.returning();
 
 				await tx.insert(versions).values({
@@ -551,7 +596,7 @@ export const versionRoutes = new Elysia({
 				set.status = 404;
 				return { error: "Document not found" };
 			}
-			void enqueueReembed([params.id]).catch((err) =>
+			void enqueueReembed([params.id], ctx.workspaceId).catch((err) =>
 				logger.warn({ err, documentId: params.id }, "Pipeline enqueue failed"),
 			);
 			return updated;
@@ -591,7 +636,7 @@ export const versionRoutes = new Elysia({
 			set.status = authorization.row ? 403 : 404;
 			return { error: authorization.row ? "Forbidden" : "Document not found" };
 		}
-		const userId = ctx.userId;
+		const _userId = ctx.userId;
 		const fromId = query.from;
 		const toId = query.to;
 		if (typeof fromId !== "string" || typeof toId !== "string") {
@@ -604,7 +649,14 @@ export const versionRoutes = new Elysia({
 					.select({ id: documents.id })
 					.from(documents)
 					.where(
-						and(eq(documents.id, params.id), eq(documents.ownerId, userId)),
+						and(
+							eq(documents.id, params.id),
+							tenantOwnerCondition(
+								documents.ownerId,
+								documents.workspaceId,
+								ctx,
+							),
+						),
 					)
 					.limit(1);
 

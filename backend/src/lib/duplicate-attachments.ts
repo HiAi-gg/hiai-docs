@@ -21,6 +21,7 @@ export function planDuplicateAttachments(
 	ownerId: string,
 	documentId: string,
 	idFactory: () => string = () => crypto.randomUUID(),
+	workspaceId?: string,
 ): DuplicateAttachmentPlan[] {
 	return sources.map((source) => {
 		const id = idFactory();
@@ -29,7 +30,7 @@ export function planDuplicateAttachments(
 			id,
 			sourceId: source.id,
 			sourceStorageKey: source.storageKey,
-			storageKey: `${ownerId}/${documentId}/${id}.${fileExtension(source.filename)}`,
+			storageKey: `${workspaceId ? `${workspaceId}/` : ""}${ownerId}/${documentId}/${id}.${fileExtension(source.filename)}`,
 		};
 	});
 }

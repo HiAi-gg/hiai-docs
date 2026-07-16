@@ -41,4 +41,25 @@ describe("document attachment duplication", () => {
 			"docs/user/doc/my%20image.png",
 		);
 	});
+
+	test("namespaces duplicated objects by external workspace", () => {
+		const [plan] = planDuplicateAttachments(
+			[
+				{
+					id: "old-id",
+					filename: "image.png",
+					mimeType: "image/png",
+					size: 42,
+					storageKey: "workspace-a/user/source/original.png",
+				},
+			],
+			"user-a",
+			"doc-copy",
+			() => "attachment-a",
+			"workspace-a",
+		);
+		expect(plan?.storageKey).toBe(
+			"workspace-a/user-a/doc-copy/attachment-a.png",
+		);
+	});
 });
