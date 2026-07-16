@@ -30,8 +30,7 @@ Hosts should set:
   (local QA: `local`)
 
 Vite-prefixed names remain a local compatibility fallback. The standalone host
-is owner-scoped; tenant/workspace resolution is an integration contract for a
-SaaS host, not a claim that the standalone app has multi-tenant server
+is owner-scoped; PWA cache namespaces do not imply multi-tenant server
 isolation.
 
 ## Service-worker privacy contract

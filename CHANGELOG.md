@@ -55,8 +55,8 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 - `PUBLIC_APP_ID` and `PUBLIC_DEPLOYMENT_ID` define the PWA host/deployment
   boundary; keep them stable per deployment strategy.
 - Offline schema upgrades discard legacy mutation-queue rows without replay.
-- Standalone HiAi-Docs remains owner-scoped. Workspace lifecycle, membership,
-  billing, and tenant provisioning belong to the SaaS host contract.
+- Standalone HiAi-Docs remains owner-scoped. External workspace context is an
+  optional server-to-server integration contract.
 
 ### Breaking changes
 

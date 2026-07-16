@@ -1,8 +1,8 @@
 # Docsmint workspace context
 
-Docsmint can be mounted by a trusted host that owns workspace membership and
-lifecycle. HiAi-Docs stores only an opaque `workspace_id`; it does not manage
-workspaces, members, invitations, billing, or workspace UI.
+Docsmint supports an optional trusted server-side workspace context. HiAi-Docs
+stores only an opaque `workspace_id`; standalone personal rows continue to use
+owner-scoped access.
 
 ## Configuration
 

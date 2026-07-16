@@ -172,7 +172,7 @@ API-key issuance, listing, category-secret disclosure, and revocation deliberate
 
 hiai-docs does not publish outbound document webhooks. The deprecated signed storage webhook is a no-op compatibility endpoint, not a synchronization mechanism. Consumers should use REST/SDK/MCP and query the durable document pipeline endpoint when they need processing readiness.
 
-Trusted hosts may opt into the generic external workspace contract described in
-[External workspace context](EXTERNAL_WORKSPACE.md). HiAi-Docs verifies a
-short-lived signed assertion and stores only the opaque workspace dimension;
-the host remains responsible for membership, lifecycle, billing, and UI.
+Trusted server-side integrations may opt into the generic external workspace
+contract described in [External workspace context](EXTERNAL_WORKSPACE.md).
+HiAi-Docs verifies a short-lived signed assertion and stores only the opaque
+workspace dimension.

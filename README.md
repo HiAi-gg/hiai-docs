@@ -3,9 +3,8 @@
 **A self-hosted, AI-native knowledge workspace for people, applications, and agents.**
 
 HiAi-Docs is the open-source module and repository. **DocsMint** is the current
-host/product branding used by the standalone installable web application. The
-same workspace can be embedded by a SaaS host through the typed frontend host
-and extension contracts.
+product branding used by the standalone installable web application. Typed
+frontend hosts and extension contracts support self-hosted customization.
 
 HiAi-Docs stores documents in a structured JSON editor model first. Markdown is
 the convenient second format for editing, importing, and exporting content.
@@ -51,10 +50,8 @@ server.
   never silently replays mutations.
 - **Explicit local drafts** with local autosave, review/apply, optimistic
   concurrency (`expectedUpdatedAt`), and actionable conflict handling.
-- **Workspace-ready host integration** with typed dashboard/search hosts,
-  extension slots, and a boundary suitable for a SaaS shell. Standalone
-  HiAi-Docs remains owner-scoped; workspace lifecycle and billing belong to the
-  host product.
+- **Composable host integration** with typed dashboard/search hosts and
+  extension slots. Standalone HiAi-Docs remains owner-scoped.
 - **Mobile-first editor polish** including a single responsive sidebar, safe
   PWA updates, raw Markdown auto-height, and accessible narrow-screen controls.
 
@@ -62,9 +59,8 @@ Search terms: installable self-hosted PWA knowledge base, offline document
 reading, local drafts, semantic multilingual search, GraphRAG, MCP, TypeScript
 SDK, CLI, and frontend extension hosts.
 
-For host integration, see [PWA hosting](docs/PWA_HOSTING.md) and
-[extension points](docs/EXTENDING.md). The workspace contract is released with
-the SaaS integration branch, not implied by standalone owner-scoped mode.
+For self-hosted customization, see [PWA hosting](docs/PWA_HOSTING.md) and
+[extension points](docs/EXTENDING.md).
 
 ## Fastest installation: give this prompt to your agent
 
