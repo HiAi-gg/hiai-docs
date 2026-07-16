@@ -19,6 +19,12 @@ export function createFrontendExtensions(
 		documentMenuActions: [...(initial.documentMenuActions ?? [])],
 		settingsSections: [...(initial.settingsSections ?? [])],
 		commandPaletteActions: [...(initial.commandPaletteActions ?? [])],
+		sharedDocumentHeaderActions: [
+			...(initial.sharedDocumentHeaderActions ?? []),
+		],
+		sharedDocumentTabs: [...(initial.sharedDocumentTabs ?? [])],
+		sharedDocumentNotesModes: [...(initial.sharedDocumentNotesModes ?? [])],
+		sharedDocumentEditorModes: [...(initial.sharedDocumentEditorModes ?? [])],
 	};
 }
 

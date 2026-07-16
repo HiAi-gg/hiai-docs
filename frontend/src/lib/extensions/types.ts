@@ -146,12 +146,38 @@ export interface CommandPaletteActionExtension {
 	run: CommandPaletteAction;
 }
 
+/** Safe capability hints for a public shared-document extension. */
+export interface SharedDocumentExtensionContext {
+	shareToken: string;
+	documentId: string;
+	title: string;
+	content: string;
+	contentJson?: object;
+	role: "viewer" | "commenter" | "editor";
+	permissions: {
+		read: true;
+		annotate: boolean;
+		edit: boolean;
+		export: boolean;
+	};
+}
+
+export interface SharedDocumentExtension {
+	id: string;
+	label: string;
+	icon?: ExtensionIcon;
+	order?: number;
+	permission: "annotate" | "edit";
+	visible?: (context: SharedDocumentExtensionContext) => boolean;
+	component: Component<{ context: SharedDocumentExtensionContext }>;
+}
+
 /**
  * Complete frontend extension manifest consumed by hiai-docs app-shell and
  * page components. Arrays are readonly to keep registration request-scoped
  * and to prevent extensions mutating one another during SSR.
  */
-export interface HiaiDocsFrontendExtensions {
+export interface DocsmintFrontendExtensions {
 	navigation: readonly NavigationExtension[];
 	dashboardWidgets: readonly DashboardWidgetExtension[];
 	searchWidgets: readonly SearchWidgetExtension[];
@@ -160,10 +186,17 @@ export interface HiaiDocsFrontendExtensions {
 	documentMenuActions: readonly DocumentMenuActionExtension[];
 	settingsSections: readonly SettingsSectionExtension[];
 	commandPaletteActions: readonly CommandPaletteActionExtension[];
+	sharedDocumentHeaderActions: readonly SharedDocumentExtension[];
+	sharedDocumentTabs: readonly SharedDocumentExtension[];
+	sharedDocumentNotesModes: readonly SharedDocumentExtension[];
+	sharedDocumentEditorModes: readonly SharedDocumentExtension[];
 }
 
+/** @deprecated Use DocsmintFrontendExtensions. */
+export type HiaiDocsFrontendExtensions = DocsmintFrontendExtensions;
+
 /** Backwards-compatible, concise name for consumers defining a manifest. */
-export type FrontendExtensions = HiaiDocsFrontendExtensions;
+export type FrontendExtensions = DocsmintFrontendExtensions;
 
 /** Props used by a document tab component in extension manifests. */
 export type { DocTabDefinition, DocTabPanelProps };

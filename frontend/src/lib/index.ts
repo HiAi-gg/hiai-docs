@@ -51,4 +51,15 @@ export type {
 	SearchWidgetProps,
 	SettingsSectionExtension,
 	SettingsSectionProps,
+	SharedDocumentExtension,
+	SharedDocumentExtensionContext,
 } from "./extensions/types";
+export {
+	DocsmintDashboardHost,
+	DocsmintExtensionProvider,
+	DocsmintSearchHost,
+	DocsmintSharedDocumentHost,
+	HiaiDocsDashboardHost,
+	HiaiDocsExtensionProvider,
+	HiaiDocsSearchHost,
+} from "./hosts";
