@@ -97,6 +97,26 @@ describe("createDocxImageFetcher", () => {
 		});
 	});
 
+	test("does not request an expired S3 presigned image URL", async () => {
+		let called = false;
+		const fetcher = createDocxImageFetcher({
+			documentId: "doc-1",
+			fetchImpl: async () => {
+				called = true;
+				return new Response(Uint8Array.from([1]), {
+					headers: { "content-type": "image/png" },
+				});
+			},
+		});
+		const expired =
+			"http://localhost:9020/hiai-docs/image.png?X-Amz-Date=20200101T000000Z&X-Amz-Expires=60";
+
+		await expect(fetcher.getImageBuffer(expired)).rejects.toThrow(
+			"presigned image URL has expired",
+		);
+		expect(called).toBe(false);
+	});
+
 	test("decodes inline image data without a network request", async () => {
 		let called = false;
 		const fetcher = createDocxImageFetcher({
@@ -128,6 +148,41 @@ describe("createDocxImageFetcher", () => {
 		await expect(
 			fetcher.getImageBuffer("/api/attachments/1/raw"),
 		).rejects.toThrow("size limit");
+	});
+});
+
+describe("DOCX image failure isolation", () => {
+	test("keeps serializing the document when a referenced image is unavailable", async () => {
+		const schema = getSchema(editorExtensions);
+		const docNode = Node.fromJSON(schema, {
+			type: "doc",
+			content: [
+				{ type: "paragraph", content: [{ type: "text", text: "Before" }] },
+				{
+					type: "image",
+					attrs: { src: "https://images.example.test/missing.png" },
+				},
+				{ type: "paragraph", content: [{ type: "text", text: "After" }] },
+			],
+		});
+
+		const options = {
+			getImageBuffer: async () => {
+				throw new Error("Image request failed with status 422");
+			},
+			getImageType: async () => {
+				throw new Error("Image request failed with status 422");
+			},
+			sections: [{ properties: {} }],
+		} as Parameters<typeof customSerializerAsync.serializeAsync>[1] & {
+			getImageType: (src: string) => Promise<string>;
+		};
+		const wordDoc = await customSerializerAsync.serializeAsync(
+			docNode,
+			options,
+		);
+
+		expect((await Packer.toBlob(wordDoc)).size).toBeGreaterThan(0);
 	});
 });
 

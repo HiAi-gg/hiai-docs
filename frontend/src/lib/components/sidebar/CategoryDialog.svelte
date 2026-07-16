@@ -492,7 +492,7 @@ function handleDialogOpenChange(next: boolean) {
 		<p class="text-xs text-destructive" role="alert">{error}</p>
 	{/if}
 
-	<DialogFooter>
+	<DialogFooter class="gap-2 max-sm:flex-col max-sm:items-stretch">
 		{#if !createdCategoryName && !deletedCategoryName}
 			<Button variant="outline" type="button" onclick={close} disabled={busy}>
 				{m.action_cancel()}

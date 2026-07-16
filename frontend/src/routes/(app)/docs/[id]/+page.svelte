@@ -8,11 +8,9 @@ import {
 	DropdownMenuSeparator,
 	DropdownMenuTrigger,
 } from "@hiai-gg/hiai-ui/components/ui/dropdown-menu";
-import { getSchema } from "@tiptap/core";
-import { Node } from "@tiptap/pm/model";
-import { Packer } from "docx";
 import {
 	Bookmark,
+	Braces,
 	Check,
 	ChevronRight,
 	Code,
@@ -20,6 +18,7 @@ import {
 	Download,
 	FileText,
 	Folder,
+	FolderOpen,
 	History,
 	Loader2,
 	MoreHorizontal,
@@ -29,7 +28,6 @@ import {
 	Trash2,
 	X,
 } from "lucide-svelte";
-import { marked } from "marked";
 import { onDestroy, onMount } from "svelte";
 import { goto } from "$app/navigation";
 import { ApiError, apiFetch } from "$lib/api/client";
@@ -46,29 +44,20 @@ import {
 	newFolderPlacement,
 	placementForFolder,
 } from "$lib/components/editor/document-placement";
-import {
-	createDocxImageFetcher,
-	normalizeDocxDocumentJson,
-} from "$lib/components/editor/docx-export";
-import { customSerializerAsync } from "$lib/components/editor/docx-serializer";
-import { editorExtensions } from "$lib/components/editor/editorExtensions";
 import type { EditorOutput } from "$lib/components/editor/HiAiEditor.svelte";
-import HiAiEditor from "$lib/components/editor/HiAiEditor.svelte";
-import MarkdownToggle from "$lib/components/editor/MarkdownToggle.svelte";
-import { markdownToJson } from "$lib/components/editor/markdown";
 import { serializeMarkdownExport } from "$lib/components/editor/markdown-export";
 import { createPlacementMutationQueue } from "$lib/components/editor/placement-mutation-queue";
 import { markMarkdownTaskItems } from "$lib/components/editor/shared-document";
 import FolderDialog from "$lib/components/FolderDialog.svelte";
-import FolderTreeSelector from "$lib/components/FolderTreeSelector.svelte";
 import SaveAsDialog from "$lib/components/SaveAsDialog.svelte";
 import ShareDialog from "$lib/components/ShareDialog.svelte";
 import TagCreateDialog from "$lib/components/TagCreateDialog.svelte";
-import VersionHistory from "$lib/components/VersionHistory.svelte";
 import { getFrontendExtensions } from "$lib/extensions/context";
 import { resolveExtensions } from "$lib/extensions/resolve";
 import * as m from "$lib/paraglide/messages.js";
 import { docTabRegistry } from "$lib/stores/doc-tab-registry.svelte";
+import { editorPreferences } from "$lib/stores/editor-preferences.svelte";
+import { pwaDirtyState } from "$lib/stores/pwa-dirty-state.svelte";
 import {
 	acknowledgeDocumentPlacement,
 	publishDocumentPlacement,
@@ -81,8 +70,15 @@ const { data } = $props();
 let title = $state("");
 let content = $state("");
 let contentJson = $state<object | undefined>(undefined);
-let mode = $state<"wysiwyg" | "markdown">("wysiwyg");
+let mode = $state<"wysiwyg" | "markdown" | "json">("wysiwyg");
 let saveStatus = $state<"saved" | "saving" | "unsaved">("saved");
+$effect(() => {
+	pwaDirtyState.mark(
+		saveStatus !== "saved",
+		saveStatus === "saving" ? "Saving changes…" : "Unsaved document changes",
+	);
+});
+onDestroy(() => pwaDirtyState.mark(false));
 let showMenu = $state(false);
 // "editor" is always the default/built-in tab; extension tabs are appended
 // by registerDocTab() calls in the consuming project's layout.
@@ -109,6 +105,79 @@ let showCreateTagDialog = $state(false);
 let showDeleteDialog = $state(false);
 let showSaveAsDialog = $state(false);
 let showVersionPanel = $state(false);
+type EditorComponentType =
+	typeof import("$lib/components/editor/HiAiEditor.svelte").default;
+type MarkdownComponentType =
+	typeof import("$lib/components/editor/MarkdownToggle.svelte").default;
+type JsonComponentType =
+	typeof import("$lib/components/editor/JsonToggle.svelte").default;
+type VersionHistoryComponentType =
+	typeof import("$lib/components/VersionHistory.svelte").default;
+
+let EditorComponent = $state<EditorComponentType | null>(null);
+let MarkdownComponent = $state<MarkdownComponentType | null>(null);
+let JsonComponent = $state<JsonComponentType | null>(null);
+let VersionHistoryComponent = $state<VersionHistoryComponentType | null>(null);
+let editorLoading = $state(false);
+
+async function activateEditor() {
+	if (EditorComponent || editorLoading) return;
+	editorLoading = true;
+	try {
+		EditorComponent = (await import("$lib/components/editor/HiAiEditor.svelte"))
+			.default;
+	} catch (cause) {
+		setError(cause instanceof Error ? cause.message : "Unable to load editor");
+	} finally {
+		editorLoading = false;
+	}
+}
+
+async function activateMarkdownEditor() {
+	if (MarkdownComponent) return;
+	MarkdownComponent = (
+		await import("$lib/components/editor/MarkdownToggle.svelte")
+	).default;
+}
+
+async function activateJsonEditor() {
+	if (JsonComponent) return;
+	JsonComponent = (await import("$lib/components/editor/JsonToggle.svelte"))
+		.default;
+}
+
+$effect(() => {
+	const modeIsVisible =
+		(mode === "wysiwyg" && editorPreferences.showVisualMode) ||
+		(mode === "markdown" && editorPreferences.showMarkdownMode) ||
+		(mode === "json" && editorPreferences.showJsonMode);
+	if (modeIsVisible) return;
+	if (editorPreferences.showMarkdownMode) {
+		mode = "markdown";
+		void activateMarkdownEditor();
+	} else if (editorPreferences.showJsonMode) {
+		mode = "json";
+		void activateJsonEditor();
+	} else {
+		mode = "wysiwyg";
+		void activateEditor();
+	}
+});
+
+const visibleEditorModeCount = $derived(
+	Number(editorPreferences.showVisualMode) +
+		Number(editorPreferences.showMarkdownMode) +
+		Number(editorPreferences.showJsonMode),
+);
+
+async function openVersionHistory() {
+	showVersionPanel = true;
+	if (!VersionHistoryComponent) {
+		VersionHistoryComponent = (
+			await import("$lib/components/VersionHistory.svelte")
+		).default;
+	}
+}
 let deleteBusy = $state(false);
 
 // Tag management
@@ -259,11 +328,24 @@ function setError(msg: string | null) {
 
 // Initialize after mount
 onMount(async () => {
+	editorPreferences.init();
 	title = data.document.title;
 	content = data.document.content;
 	contentJson =
 		(data.document.contentJson as object | null | undefined) ?? undefined;
 	loading = false;
+	// The route itself remains editor-free until it is interactive. This
+	// creates a real async boundary for TipTap/ProseMirror rather than merely
+	// moving them into a manually named vendor chunk.
+	if (editorPreferences.showVisualMode) {
+		void activateEditor();
+	} else if (editorPreferences.showMarkdownMode) {
+		mode = "markdown";
+		void activateMarkdownEditor();
+	} else {
+		mode = "json";
+		void activateJsonEditor();
+	}
 	await Promise.all([loadCategories(), loadFolders()]);
 });
 
@@ -426,6 +508,23 @@ function handleExport() {
 async function handleExportDocx() {
 	showMenu = false;
 	try {
+		const [
+			{ getSchema },
+			{ Node },
+			{ Packer },
+			{ createDocxImageFetcher, normalizeDocxDocumentJson },
+			{ customSerializerAsync },
+			{ editorExtensions },
+			{ markdownToJson },
+		] = await Promise.all([
+			import("@tiptap/core"),
+			import("@tiptap/pm/model"),
+			import("docx"),
+			import("$lib/components/editor/docx-export"),
+			import("$lib/components/editor/docx-serializer"),
+			import("$lib/components/editor/editorExtensions"),
+			import("$lib/components/editor/markdown"),
+		]);
 		let json = contentJson;
 		if (!json) {
 			json = markdownToJson(content || "");
@@ -439,8 +538,6 @@ async function handleExportDocx() {
 			getImageBuffer: imageFetcher.getImageBuffer,
 			getImageType: imageFetcher.getImageType,
 			sections: [{ properties: {} }],
-		} as Parameters<typeof customSerializerAsync.serializeAsync>[1] & {
-			getImageType: typeof imageFetcher.getImageType;
 		};
 		const wordDoc = await customSerializerAsync.serializeAsync(
 			docNode,
@@ -455,10 +552,11 @@ async function handleExportDocx() {
 		URL.revokeObjectURL(url);
 	} catch (err) {
 		console.error("Failed to export to DOCX:", err);
-		fallbackHtmlDocx();
+		await fallbackHtmlDocx();
 	}
 
-	function fallbackHtmlDocx() {
+	async function fallbackHtmlDocx() {
+		const { marked } = await import("marked");
 		const htmlContent = marked.parse(content || "", { async: false }) as string;
 		const docHtml = `
 <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
@@ -487,8 +585,9 @@ ${htmlContent}
 	}
 }
 
-function handleExportPdf() {
+async function handleExportPdf() {
 	showMenu = false;
+	const { marked } = await import("marked");
 	const htmlContent = markMarkdownTaskItems(
 		marked.parse(content || "", { async: false }) as string,
 	);
@@ -768,8 +867,10 @@ async function handleCreateFolder(name: string) {
 // component, but the actual side effects — flipping `mode` and running
 // the export — live here in the page so the editor stays reusable.
 
-function handleToggleMarkdownEvent() {
+async function handleToggleMarkdownEvent() {
+	if (!editorPreferences.showMarkdownMode) return;
 	mode = mode === "wysiwyg" ? "markdown" : "wysiwyg";
+	if (mode === "markdown") await activateMarkdownEditor();
 }
 
 function handleExportEvent() {
@@ -826,7 +927,7 @@ $effect(() => {
       <div class="editor-actions">
         <!-- Save status -->
         <span
-          class="save-status"
+          class="save-status desktop-save-status"
           class:saved={saveStatus === "saved"}
           class:saving={saveStatus === "saving"}
           class:unsaved={saveStatus === "unsaved"}
@@ -841,34 +942,56 @@ $effect(() => {
         </span>
 
         <!-- Mode toggle -->
+        {#if visibleEditorModeCount > 1}
         <div class="mode-toggle" role="radiogroup" aria-label={m.editor_mode_label()}>
-          <button
+          {#if editorPreferences.showVisualMode}<button
             class="mode-btn"
             class:active={mode === "wysiwyg"}
-            onclick={() => (mode = "wysiwyg")}
+            onclick={() => {
+              mode = "wysiwyg";
+              void activateEditor();
+            }}
             title={m.editor_wysiwyg_title()}
             aria-label={m.editor_wysiwyg_mode_label()}
             role="radio"
             aria-checked={mode === "wysiwyg"}
           >
             <FileText size={16} />
-          </button>
-          <button
+          </button>{/if}
+          {#if editorPreferences.showMarkdownMode}<button
             class="mode-btn"
             class:active={mode === "markdown"}
-            onclick={() => (mode = "markdown")}
+            onclick={() => {
+              mode = "markdown";
+              void activateMarkdownEditor();
+            }}
             title={m.editor_markdown_title()}
             aria-label={m.editor_markdown_mode_label()}
             role="radio"
             aria-checked={mode === "markdown"}
           >
             <Code size={16} />
-          </button>
+          </button>{/if}
+          {#if editorPreferences.showJsonMode}<button
+            class="mode-btn"
+            class:active={mode === "json"}
+            onclick={() => {
+              mode = "json";
+              void activateJsonEditor();
+            }}
+            title="Raw JSON"
+            aria-label="JSON mode"
+            role="radio"
+            aria-checked={mode === "json"}
+          >
+            <Braces size={16} />
+          </button>{/if}
         </div>
+        {/if}
 
         <!-- Share -->
         <button
-          class="action-btn"
+          class="action-btn desktop-only-action"
           title={m.action_copy_link()}
           aria-label={m.editor_share_label()}
           onclick={handleShare}
@@ -878,10 +1001,13 @@ $effect(() => {
 
         <!-- History -->
         <button
-          class="action-btn"
+          class="action-btn desktop-only-action"
           title={m.version_history_title()}
           aria-label={m.version_history_title()}
-          onclick={() => (showVersionPanel = !showVersionPanel)}
+          onclick={() => {
+            if (showVersionPanel) showVersionPanel = false;
+            else void openVersionHistory();
+          }}
           aria-pressed={showVersionPanel}
         >
           <History size={16} />
@@ -899,6 +1025,29 @@ $effect(() => {
           </button>
           {#if showMenu}
             <div class="dropdown" role="menu">
+              <button
+                class="dropdown-item"
+                role="menuitem"
+                onclick={() => { showMenu = false; void goto("/docs/new"); }}
+              >
+                <Plus size={14} /> {m.dashboard_new_document()}
+              </button>
+              <div class="dropdown-divider"></div>
+              <button
+                class="dropdown-item mobile-menu-item"
+                role="menuitem"
+                onclick={() => { handleShare(); showMenu = false; }}
+              >
+                <Share2 size={14} /> {m.editor_share_label()}
+              </button>
+              <button
+                class="dropdown-item mobile-menu-item"
+                role="menuitem"
+                onclick={() => { showVersionPanel = true; showMenu = false; }}
+              >
+                <History size={14} /> {m.version_history_title()}
+              </button>
+              <div class="dropdown-divider mobile-menu-divider"></div>
               <button
                 class="dropdown-item"
                 role="menuitem"
@@ -940,6 +1089,25 @@ $effect(() => {
         </div>
       </div>
     </header>
+
+    <!-- On narrow screens the save state is a compact status strip below the
+         header, keeping the action row focused on navigation and editing. -->
+    <div
+      class="mobile-save-status"
+      class:saved={saveStatus === "saved"}
+      class:saving={saveStatus === "saving"}
+      class:unsaved={saveStatus === "unsaved"}
+      role="status"
+      aria-live="polite"
+    >
+      {#if saveStatus === "saved"}
+        <Check size={13} /> {m.editor_status_saved()}
+      {:else if saveStatus === "saving"}
+        <Loader2 size={13} class="animate-spin" /> {m.editor_status_saving()}
+      {:else}
+        <Pencil size={13} /> {m.editor_status_unsaved()}
+      {/if}
+    </div>
 
     <!-- Error banner -->
     {#if error}
@@ -1050,11 +1218,18 @@ $effect(() => {
             {#if foldersLoading}
               <div class="tag-empty">{m.action_loading()}</div>
             {:else}
-              <FolderTreeSelector
-                folders={filteredFoldersForCategory}
-                selectedId={currentFolderId}
-                onSelect={moveToFolder}
-              />
+              <DropdownMenuItem onSelect={() => moveToFolder(null)}>
+                <FolderOpen size={14} />
+                No folder (Root)
+                {#if currentFolderId === null}<Check size={12} />{/if}
+              </DropdownMenuItem>
+              {#each filteredFoldersForCategory as folder (folder.id)}
+                <DropdownMenuItem onSelect={() => moveToFolder(folder.id)}>
+                  <Folder size={14} />
+                  <span class="folder-option-name">{folder.name}</span>
+                  {#if currentFolderId === folder.id}<Check size={12} />{/if}
+                </DropdownMenuItem>
+              {/each}
             {/if}
             <DropdownMenuSeparator />
             <DropdownMenuItem onSelect={() => { showCreateFolderDialog = true; }}>
@@ -1136,21 +1311,45 @@ $effect(() => {
       <div class="editor-container">
         {#if activeTab === "editor"}
           {#if mode === "wysiwyg"}
-            <HiAiEditor
-              {content}
-              {contentJson}
-              onUpdate={debounceContentSave}
-              editable={true}
-              documentId={data.document.id}
-              {editorActions}
-              editorActionContext={{
-                documentId: data.document.id,
-                content,
-                contentJson,
-              }}
-            />
+            {#if EditorComponent}
+              <EditorComponent
+                {content}
+                {contentJson}
+                onUpdate={debounceContentSave}
+                editable={true}
+				 documentId={data.document.id}
+				 documentUpdatedAt={data.document.updatedAt}
+                {editorActions}
+                minimalToolbar={editorPreferences.minimalToolbar}
+                editorActionContext={{
+                  documentId: data.document.id,
+                  content,
+                  contentJson,
+                }}
+              />
+			{:else}
+			  <div class="editor-loading" aria-live="polite">
+				<div class="editor-loading-card">
+				  <Loader2 size={20} class="editor-loading-spinner" />
+				  <div>
+					<strong>Loading editor…</strong>
+					<span>Preparing editing tools</span>
+				  </div>
+				</div>
+			  </div>
+            {/if}
+          {:else if mode === "markdown"}
+            {#if MarkdownComponent}
+              <MarkdownComponent {content} onUpdate={debounceContentSave} />
+            {:else}
+              <div class="editor-loading" aria-live="polite">Loading Markdown editor…</div>
+            {/if}
           {:else}
-            <MarkdownToggle {content} onUpdate={debounceContentSave} />
+            {#if JsonComponent}
+              <JsonComponent {contentJson} onUpdate={debounceContentSave} />
+            {:else}
+              <div class="editor-loading" aria-live="polite">Loading JSON editor…</div>
+            {/if}
           {/if}
         {:else}
           <!-- Extension tab panels registered by external projects -->
@@ -1182,13 +1381,17 @@ $effect(() => {
           </button>
         </div>
         <div class="version-panel-body">
-          <VersionHistory
-            documentId={data.document.id}
-            onRestored={() => {
-              showVersionPanel = false;
-              window.location.reload();
-            }}
-          />
+          {#if VersionHistoryComponent}
+            <VersionHistoryComponent
+              documentId={data.document.id}
+              onRestored={() => {
+                showVersionPanel = false;
+                window.location.reload();
+              }}
+            />
+          {:else}
+            <div class="editor-loading" aria-live="polite">Loading version history…</div>
+          {/if}
         </div>
       </aside>
     {/if}
@@ -1301,7 +1504,7 @@ $effect(() => {
     flex-wrap: wrap;
     position: sticky;
     top: 0;
-    z-index: 20;
+    z-index: 100;
   }
 
   .breadcrumb {
@@ -1331,10 +1534,19 @@ $effect(() => {
     max-width: 200px;
   }
 
+  /* Keep the breadcrumb clear of the fixed mobile sidebar toggle. */
+  @media (max-width: 767px) {
+    .breadcrumb {
+      padding-left: 56px;
+      max-width: calc(100% - 56px);
+    }
+  }
+
   .editor-actions {
     display: flex;
     align-items: center;
     gap: 8px;
+    margin-left: auto;
     flex-shrink: 0;
   }
 
@@ -1358,6 +1570,10 @@ $effect(() => {
 
   .save-status.unsaved {
     color: var(--destructive);
+  }
+
+  .mobile-save-status {
+    display: none;
   }
 
   @keyframes spin {
@@ -1432,7 +1648,14 @@ $effect(() => {
     background: var(--card);
     box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
     padding: 4px;
-    z-index: 50;
+    z-index: 200;
+  }
+
+  .folder-option-name {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .dropdown-item {
@@ -1466,6 +1689,11 @@ $effect(() => {
     height: 1px;
     background: var(--border);
     margin: 4px 0;
+  }
+
+  .mobile-menu-divider,
+  .mobile-menu-item {
+    display: none;
   }
 
   /* Error banner */
@@ -1728,6 +1956,57 @@ $effect(() => {
     background: var(--card);
   }
 
+  .editor-loading {
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    flex: 1;
+    min-height: 320px;
+    padding: clamp(28px, 7vw, 72px) 20px;
+  }
+
+  .editor-loading-card {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: min(100%, 360px);
+    padding: 16px 18px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: color-mix(in srgb, var(--card) 92%, var(--muted));
+    box-shadow: 0 8px 24px color-mix(in srgb, var(--foreground) 7%, transparent);
+    color: var(--foreground);
+  }
+
+  .editor-loading-card > div {
+    display: grid;
+    gap: 2px;
+  }
+
+  .editor-loading-card strong {
+    font-size: 0.875rem;
+    font-weight: 600;
+  }
+
+  .editor-loading-card span {
+    color: var(--muted-foreground);
+    font-size: 0.75rem;
+  }
+
+  .editor-loading-spinner {
+    flex: 0 0 auto;
+    color: var(--primary);
+    animation: editor-loading-spin 0.8s linear infinite;
+  }
+
+  @keyframes editor-loading-spin {
+    to { transform: rotate(360deg); }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .editor-loading-spinner { animation: none; }
+  }
+
   /* Mobile responsive */
   @media (max-width: 1024px) {
     .version-panel {
@@ -1748,6 +2027,40 @@ $effect(() => {
 
     .breadcrumb {
       display: none;
+    }
+
+    .desktop-save-status,
+    .desktop-only-action {
+      display: none;
+    }
+
+    .mobile-menu-divider,
+    .mobile-menu-item {
+      display: flex;
+    }
+
+    .mobile-save-status {
+      display: inline-flex;
+      align-items: center;
+      align-self: flex-end;
+      gap: 5px;
+      margin: 6px 16px 0 0;
+      padding: 4px 8px;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      background: color-mix(in srgb, var(--card) 92%, var(--muted));
+      color: var(--muted-foreground);
+      font-size: 11px;
+      line-height: 1.2;
+      box-shadow: 0 2px 8px color-mix(in srgb, var(--foreground) 8%, transparent);
+    }
+
+    .mobile-save-status.saving {
+      color: var(--ring);
+    }
+
+    .mobile-save-status.unsaved {
+      color: var(--destructive);
     }
 
     .editor-main-inner {

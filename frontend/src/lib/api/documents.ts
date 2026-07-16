@@ -203,15 +203,22 @@ export function createDocument(
 	);
 }
 
+/** Input shape for `updateDocument`. `expectedUpdatedAt` is an optional
+ *  optimistic-concurrency token: when supplied, the backend rejects the
+ *  PATCH with 409 if the document changed since that timestamp (used by
+ *  the explicit offline draft apply flow). */
+export interface UpdateDocumentInput {
+	title?: string;
+	content?: string;
+	folderId?: string | null;
+	categoryId?: string | null;
+	contentJson?: unknown;
+	expectedUpdatedAt?: string;
+}
+
 export function updateDocument(
 	id: string,
-	data: {
-		title?: string;
-		content?: string;
-		folderId?: string | null;
-		categoryId?: string | null;
-		contentJson?: unknown;
-	},
+	data: UpdateDocumentInput,
 ): Promise<Document> {
 	clearDocumentsCache();
 	return apiFetch(`/api/documents/${id}`, {

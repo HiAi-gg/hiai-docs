@@ -365,17 +365,17 @@ jobs:
           cd /tmp/hiai-docs-consumer
           npm init -y >/dev/null
           npm install /tmp/hiai-docs-pack/*.tgz --ignore-scripts
-          node --input-type=module -e "import('@hiai-gg/hiai-docs').then(() => console.log('SDK import: ok'))"
-          npx --no-install hiai-docs --help >/tmp/hiai-docs-cli-help.txt
+          node --input-type=module -e "import('@hiai-gg/docsmint').then(() => console.log('SDK import: ok'))"
+          npx --no-install docsmint --help >/tmp/docsmint-cli-help.txt
           set +e
-          timeout 5s npx --no-install hiai-docs-mcp </dev/null >/tmp/hiai-docs-mcp.log 2>&1
+          timeout 5s npx --no-install docsmint-mcp </dev/null >/tmp/docsmint-mcp.log 2>&1
           code=$?
           set -e
           if [ "$code" -ne 0 ] && [ "$code" -ne 124 ]; then
-            cat /tmp/hiai-docs-mcp.log
+            cat /tmp/docsmint-mcp.log
             exit "$code"
           fi
-          ! grep -Eq "ERR_MODULE_NOT_FOUND|Cannot find module" /tmp/hiai-docs-mcp.log
+          ! grep -Eq "ERR_MODULE_NOT_FOUND|Cannot find module" /tmp/docsmint-mcp.log
 
   # ---------------------------------------------------------------------------
   # 6. Publish Docker — runs only after every verification job passes
@@ -387,13 +387,15 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      packages: write
     steps:
       - uses: actions/checkout@v4
-      - name: Log in to Docker Hub
+      - name: Log in to GHCR
         uses: docker/login-action@v3
         with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
       - uses: docker/setup-buildx-action@v3
       - name: Rebuild and push API image
         uses: docker/build-push-action@v6
@@ -401,25 +403,25 @@ jobs:
           context: .
           file: Dockerfile.backend
           push: true
-          tags: vgalibov/hiai-docs:api-${{ github.ref_name }}
+          tags: ghcr.io/hiai-gg/docsmint-api:${{ github.ref_name }}
       - name: Rebuild and push Web image
         uses: docker/build-push-action@v6
         with:
           context: .
           file: frontend/Dockerfile
           push: true
-          tags: vgalibov/hiai-docs:web-${{ github.ref_name }}
+          tags: ghcr.io/hiai-gg/docsmint-web:${{ github.ref_name }}
       - name: Rebuild and push Caddy image
         uses: docker/build-push-action@v6
         with:
           context: .
           file: Dockerfile.caddy
           push: true
-          tags: vgalibov/hiai-docs:caddy-${{ github.ref_name }}
+          tags: ghcr.io/hiai-gg/docsmint-caddy:${{ github.ref_name }}
 
 
   # ---------------------------------------------------------------------------
-  # 7. Publish NPM — publish package `@hiai-gg/hiai-docs` to NPM (Tokenless OIDC)
+  # 7. Publish NPM — publish package `@hiai-gg/docsmint` to NPM (Tokenless OIDC)
   # ---------------------------------------------------------------------------
   publish-npm:
     name: Publish NPM Package
@@ -486,7 +488,7 @@ jobs:
           bun -e "
             const fs = require('fs');
             const pkg = JSON.parse(fs.readFileSync('package.public.json', 'utf8'));
-            pkg.name = '@hiai-gg/hiai-docs';
+            pkg.name = '@hiai-gg/docsmint';
             pkg.version = '${CLEAN_VERSION}';
             fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2));
           "
@@ -494,8 +496,8 @@ jobs:
       - name: Publish to npm
         run: |
           version=$(node -p "require('./package.json').version")
-          if npm view "@hiai-gg/hiai-docs@${version}" version >/dev/null 2>&1; then
-            echo "::notice::@hiai-gg/hiai-docs@${version} already on npm — skipping."
+          if npm view "@hiai-gg/docsmint@${version}" version >/dev/null 2>&1; then
+            echo "::notice::@hiai-gg/docsmint@${version} already on npm — skipping."
           else
             npm publish --access public --provenance --ignore-scripts
           fi
@@ -524,10 +526,10 @@ jobs:
             echo "::notice::Release $GITHUB_REF_NAME already exists — updating its title."
             gh release edit "$GITHUB_REF_NAME" \
               --repo "$GITHUB_REPOSITORY" \
-              --title "HiAi-Docs v${version}"
+              --title "DocsMint v${version}"
           else
             gh release create "$GITHUB_REF_NAME" \
               --repo "$GITHUB_REPOSITORY" \
-              --title "HiAi-Docs v${version}" \
+              --title "DocsMint v${version}" \
               --generate-notes
           fi

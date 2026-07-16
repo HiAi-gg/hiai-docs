@@ -96,6 +96,7 @@ services:
       - hiai-docs-net
 
   api:
+    image: docsmint-api:local
     build:
       context: .
       dockerfile: Dockerfile.backend
@@ -233,10 +234,14 @@ services:
           memory: 512M
 
   web:
+    image: docsmint-web:local
     build:
       context: .
       dockerfile: frontend/Dockerfile
       network: host
+      args:
+        PUBLIC_APP_ID: ${PUBLIC_APP_ID:-docsmint}
+        PUBLIC_DEPLOYMENT_ID: ${PUBLIC_DEPLOYMENT_ID:-local}
     restart: unless-stopped
     ports:
       # WEB_PORT selects only the published host port. The container contract
@@ -268,6 +273,7 @@ services:
           cpus: "1"
 
   caddy:
+    image: docsmint-caddy:local
     build:
       context: .
       dockerfile: Dockerfile.caddy

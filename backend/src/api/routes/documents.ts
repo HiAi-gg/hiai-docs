@@ -60,6 +60,11 @@ const updateDocumentSchema = z.object({
 	folderId: z.string().uuid().nullable().optional(),
 	categoryId: z.string().uuid().nullable().optional(),
 	visibility: z.enum(["private", "shared", "public"]).optional(),
+	// Optional optimistic-concurrency token sent by the offline mutation
+	// queue. When provided, the handler rejects with 409 if the document's
+	// current `updatedAt` differs from this value (i.e. it changed on the
+	// server after the client's edit was based on it).
+	expectedUpdatedAt: z.string().datetime({ offset: true }).optional(),
 });
 
 const listQuerySchema = z.object({
@@ -746,11 +751,13 @@ export const documentRoutes = new Elysia({ prefix: "/api" })
 						folderId: documents.folderId,
 						categoryId: documents.categoryId,
 						contentHash: documents.contentHash,
+						updatedAt: documents.updatedAt,
 					})
 					.from(documents)
 					.where(
 						and(eq(documents.id, params.id), eq(documents.ownerId, userId)),
 					)
+					.for("update")
 					.limit(1);
 				if (existingRows.length === 0) {
 					return null;
@@ -759,6 +766,38 @@ export const documentRoutes = new Elysia({ prefix: "/api" })
 				if (!existing || !isAuthorizedCategory(access, existing.categoryId)) {
 					return { forbidden: true as const };
 				}
+
+				// Offline-first conflict detection. If the client supplies the
+				// `updatedAt` it based its edit on, reject with 409 when the
+				// server document has since changed. This lets the offline
+				// mutation queue surface a conflict instead of silently
+				// overwriting another writer's changes. The re-embed
+				// invariant below is untouched for non-conflicting writes.
+				const expectedUpdatedAt = body.data.expectedUpdatedAt;
+				if (expectedUpdatedAt !== undefined && existing) {
+					const currentUpdatedAt =
+						existing.updatedAt instanceof Date
+							? existing.updatedAt.toISOString()
+							: String(existing.updatedAt);
+					if (
+						new Date(currentUpdatedAt).getTime() !==
+						new Date(expectedUpdatedAt).getTime()
+					) {
+						return {
+							error: "Document changed on the server",
+							code: "DOCUMENT_CONFLICT",
+							currentUpdatedAt,
+							serverVersion: {
+								id: existing.id,
+								title: existing.title,
+								content: existing.content,
+								contentJson: existing.contentJson,
+							},
+							conflict: true as const,
+						};
+					}
+				}
+
 				if (hasPlacementInput) {
 					let destinationCategory: string | null | undefined =
 						body.data.categoryId !== undefined
@@ -841,6 +880,15 @@ export const documentRoutes = new Elysia({ prefix: "/api" })
 			if ("forbidden" in result) {
 				set.status = 403;
 				return { error: "Forbidden" };
+			}
+			if ("conflict" in result && result.conflict) {
+				set.status = 409;
+				return {
+					error: result.error,
+					code: result.code,
+					currentUpdatedAt: result.currentUpdatedAt,
+					serverVersion: result.serverVersion,
+				};
 			}
 			const { updated, existing } = result;
 

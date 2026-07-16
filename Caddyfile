@@ -21,6 +21,16 @@
 		X-Frame-Options "DENY"
 		Referrer-Policy "strict-origin-when-cross-origin"
 	}
+
+	# PWA asset cache-control (service worker must always be re-fetched)
+	@sw path /sw.js
+	header @sw Cache-Control "no-cache, no-store, must-revalidate"
+	@manifest path /manifest.webmanifest
+	header @manifest Cache-Control "public, max-age=3600"
+	@immutable path /_app/immutable/*
+	header @immutable Cache-Control "public, max-age=31536000, immutable"
+	@images path /pwa-*.png /apple-touch-icon.png /maskable-icon.png
+	header @images Cache-Control "public, max-age=86400"
 }
 
 docs.{$DOMAIN:localhost} {
@@ -50,4 +60,14 @@ docs.{$DOMAIN:localhost} {
 		X-Frame-Options "DENY"
 		Referrer-Policy "strict-origin-when-cross-origin"
 	}
+
+	# PWA asset cache-control (service worker must always be re-fetched)
+	@sw path /sw.js
+	header @sw Cache-Control "no-cache, no-store, must-revalidate"
+	@manifest path /manifest.webmanifest
+	header @manifest Cache-Control "public, max-age=3600"
+	@immutable path /_app/immutable/*
+	header @immutable Cache-Control "public, max-age=31536000, immutable"
+	@images path /pwa-*.png /apple-touch-icon.png /maskable-icon.png
+	header @images Cache-Control "public, max-age=86400"
 }

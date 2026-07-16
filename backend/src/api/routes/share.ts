@@ -1,10 +1,11 @@
 import {
+	categories,
 	documents,
 	folders,
 	guestAccess,
 	shareLinks,
 } from "@hiai-docs/db/schema";
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, isNull, sql } from "drizzle-orm";
 import { Elysia } from "elysia";
 import { nanoid } from "nanoid";
 import { z } from "zod";
@@ -36,7 +37,8 @@ async function authorizeShareLink(request: Request, shareId: string) {
 				createdBy: shareLinks.createdBy,
 				documentId: shareLinks.documentId,
 				folderId: shareLinks.folderId,
-				categoryId: documents.categoryId,
+				shareCategoryId: shareLinks.categoryId,
+				documentCategoryId: documents.categoryId,
 				documentFolderCategoryId: folders.categoryId,
 			})
 			.from(shareLinks)
@@ -47,12 +49,12 @@ async function authorizeShareLink(request: Request, shareId: string) {
 		if (!row) return null;
 		const categoryId = row.documentId
 			? effectiveDocumentCategory({
-					categoryId: row.categoryId,
+					categoryId: row.documentCategoryId,
 					folderCategoryId: row.documentFolderCategoryId,
 				})
 			: row.folderId
 				? await resolveFolderEffectiveCategory(tx, access.userId, row.folderId)
-				: null;
+				: row.shareCategoryId;
 		return { ...row, effectiveCategoryId: categoryId ?? null };
 	});
 	return {
@@ -73,13 +75,19 @@ const createShareSchema = z
 	.object({
 		documentId: z.string().uuid().optional(),
 		folderId: z.string().uuid().optional(),
+		categoryId: z.string().uuid().optional(),
 		password: z.string().min(1).optional(),
 		expiresIn: z.enum(["1h", "1d", "7d", "30d", "never"]).default("never"),
 		role: z.enum(["viewer", "commenter", "editor"]).default("viewer"),
 	})
-	.refine((d) => d.documentId || d.folderId, {
-		message: "Either documentId or folderId must be provided",
-	});
+	.refine(
+		(d) =>
+			[d.documentId, d.folderId, d.categoryId].filter(Boolean).length === 1,
+		{
+			message:
+				"Exactly one of documentId, folderId, or categoryId must be provided",
+		},
+	);
 
 const addGuestSchema = z.object({
 	email: z.string().email("Invalid email address"),
@@ -158,6 +166,34 @@ function getClientIp(request: Request): string {
 	);
 }
 
+async function isDocumentInSharedCategory(
+	ctx: ReturnType<typeof shareGuestTenantContext>,
+	documentId: string,
+	categoryId: string,
+): Promise<boolean> {
+	return withTenant(ctx, async (tx) => {
+		const [document] = await tx
+			.select({
+				categoryId: documents.categoryId,
+				folderId: documents.folderId,
+			})
+			.from(documents)
+			.where(eq(documents.id, documentId))
+			.limit(1);
+		if (!document) return false;
+		const effectiveCategoryId =
+			document.categoryId ??
+			(document.folderId
+				? await resolveFolderEffectiveCategory(
+						tx,
+						ctx.userId,
+						document.folderId,
+					)
+				: null);
+		return effectiveCategoryId === categoryId;
+	});
+}
+
 // ============================================
 // Routes
 // ============================================
@@ -195,7 +231,8 @@ export const shareRoutes = new Elysia({ prefix: "/api/share" })
 			};
 		}
 
-		const { documentId, folderId, password, expiresIn, role } = parsed.data;
+		const { documentId, folderId, categoryId, password, expiresIn, role } =
+			parsed.data;
 
 		// Verify ownership of the target document or folder
 		const ownerCheck = await withTenant(ctx, async (tx) => {
@@ -238,6 +275,22 @@ export const shareRoutes = new Elysia({ prefix: "/api/share" })
 					return { forbidden: true as const };
 				}
 			}
+
+			if (categoryId) {
+				const [category] = await tx
+					.select({ id: categories.id })
+					.from(categories)
+					.where(
+						and(eq(categories.id, categoryId), eq(categories.ownerId, userId)),
+					)
+					.limit(1);
+				if (!category) {
+					return { notFound: "category" as const };
+				}
+				if (!isAuthorizedCategory(access, categoryId)) {
+					return { forbidden: true as const };
+				}
+			}
 			return null;
 		});
 		if (ownerCheck?.notFound === "document") {
@@ -247,6 +300,10 @@ export const shareRoutes = new Elysia({ prefix: "/api/share" })
 		if (ownerCheck?.notFound === "folder") {
 			set.status = 404;
 			return { error: "Folder not found" };
+		}
+		if (ownerCheck?.notFound === "category") {
+			set.status = 404;
+			return { error: "Category not found" };
 		}
 		if (ownerCheck && "forbidden" in ownerCheck) {
 			set.status = 403;
@@ -263,6 +320,7 @@ export const shareRoutes = new Elysia({ prefix: "/api/share" })
 				.values({
 					documentId: documentId ?? null,
 					folderId: folderId ?? null,
+					categoryId: categoryId ?? null,
 					token,
 					passwordHash,
 					expiresAt,
@@ -279,7 +337,7 @@ export const shareRoutes = new Elysia({ prefix: "/api/share" })
 		}
 
 		logger.info(
-			{ shareId: link.id, userId, documentId, folderId },
+			{ shareId: link.id, userId, documentId, folderId, categoryId },
 			"Share link created",
 		);
 
@@ -293,7 +351,7 @@ export const shareRoutes = new Elysia({ prefix: "/api/share" })
 			action: "share.create",
 			resourceType: "share",
 			resourceId: link.id,
-			details: { documentId, folderId, role },
+			details: { documentId, folderId, categoryId, role },
 			ipAddress,
 			userAgent,
 		}).catch(() => {});
@@ -303,6 +361,7 @@ export const shareRoutes = new Elysia({ prefix: "/api/share" })
 			token: link.token,
 			documentId: link.documentId,
 			folderId: link.folderId,
+			categoryId: link.categoryId,
 			role: link.role,
 			expiresAt: link.expiresAt?.toISOString() ?? null,
 			hasPassword: !!link.passwordHash,
@@ -331,16 +390,19 @@ export const shareRoutes = new Elysia({ prefix: "/api/share" })
 					token: shareLinks.token,
 					documentId: shareLinks.documentId,
 					folderId: shareLinks.folderId,
+					categoryId: shareLinks.categoryId,
 					role: shareLinks.role,
 					hasPassword: sql<boolean>`${shareLinks.passwordHash} IS NOT NULL`,
 					expiresAt: shareLinks.expiresAt,
 					createdAt: shareLinks.createdAt,
 					documentTitle: documents.title,
 					folderName: folders.name,
+					categoryName: categories.name,
 				})
 				.from(shareLinks)
 				.leftJoin(documents, eq(shareLinks.documentId, documents.id))
 				.leftJoin(folders, eq(shareLinks.folderId, folders.id))
+				.leftJoin(categories, eq(shareLinks.categoryId, categories.id))
 				.where(eq(shareLinks.createdBy, userId))
 				.orderBy(shareLinks.createdAt);
 			if (!access.restricted) return rows;
@@ -371,6 +433,8 @@ export const shareRoutes = new Elysia({ prefix: "/api/share" })
 						userId,
 						row.folderId,
 					);
+				} else if (row.categoryId) {
+					categoryId = row.categoryId;
 				}
 				if (isAuthorizedCategory(access, categoryId ?? null))
 					authorized.push(row);
@@ -384,12 +448,21 @@ export const shareRoutes = new Elysia({ prefix: "/api/share" })
 				token: link.token,
 				documentId: link.documentId,
 				folderId: link.folderId,
+				categoryId: link.categoryId,
 				role: link.role,
 				hasPassword: link.hasPassword,
 				expiresAt: link.expiresAt?.toISOString() ?? null,
 				createdAt: link.createdAt.toISOString(),
-				title: link.documentTitle ?? link.folderName ?? "Unknown",
-				type: link.documentId ? ("document" as const) : ("folder" as const),
+				title:
+					link.documentTitle ??
+					link.folderName ??
+					link.categoryName ??
+					"Unknown",
+				type: link.documentId
+					? ("document" as const)
+					: link.folderId
+						? ("folder" as const)
+						: ("category" as const),
 			})),
 		};
 	})
@@ -558,6 +631,84 @@ export const shareRoutes = new Elysia({ prefix: "/api/share" })
 			};
 		}
 
+		// Categories use the same navigable public payload as folders. Only
+		// category roots are listed here; descendant access is checked by the
+		// folder/document endpoints below before any content is returned.
+		if (link.categoryId) {
+			const categoryId = link.categoryId;
+			const category = await withTenant(ownerCtx, async (tx) => {
+				const [row] = await tx
+					.select({
+						id: categories.id,
+						name: categories.name,
+						createdAt: categories.createdAt,
+						updatedAt: categories.updatedAt,
+					})
+					.from(categories)
+					.where(eq(categories.id, categoryId))
+					.limit(1);
+				return row ?? null;
+			});
+
+			if (!category) {
+				set.status = 404;
+				return { error: "Shared category no longer exists" };
+			}
+
+			const rootFolders = await withTenant(ownerCtx, async (tx) =>
+				tx
+					.select({
+						id: folders.id,
+						name: folders.name,
+						createdAt: folders.createdAt,
+						updatedAt: folders.updatedAt,
+					})
+					.from(folders)
+					.where(
+						and(eq(folders.categoryId, categoryId), isNull(folders.parentId)),
+					)
+					.orderBy(folders.name),
+			);
+
+			const rootDocuments = await withTenant(ownerCtx, async (tx) =>
+				tx
+					.select({
+						id: documents.id,
+						title: documents.title,
+						createdAt: documents.createdAt,
+						updatedAt: documents.updatedAt,
+					})
+					.from(documents)
+					.where(
+						and(
+							eq(documents.categoryId, categoryId),
+							isNull(documents.folderId),
+						),
+					)
+					.orderBy(documents.title),
+			);
+
+			return {
+				type: "folder" as const,
+				data: {
+					id: category.id,
+					name: category.name,
+					createdAt: category.createdAt.toISOString(),
+					updatedAt: category.updatedAt.toISOString(),
+					folders: rootFolders.map((folder) => ({
+						...folder,
+						createdAt: folder.createdAt.toISOString(),
+						updatedAt: folder.updatedAt.toISOString(),
+					})),
+					documents: rootDocuments.map((document) => ({
+						...document,
+						createdAt: document.createdAt.toISOString(),
+						updatedAt: document.updatedAt.toISOString(),
+					})),
+				},
+			};
+		}
+
 		set.status = 500;
 		return { error: "Share link has no associated content" };
 	})
@@ -712,6 +863,7 @@ export const shareRoutes = new Elysia({ prefix: "/api/share" })
 			token: updated.token,
 			documentId: updated.documentId,
 			folderId: updated.folderId,
+			categoryId: updated.categoryId,
 			role: updated.role,
 			expiresAt: updated.expiresAt?.toISOString() ?? null,
 			hasPassword: !!updated.passwordHash,
@@ -911,18 +1063,22 @@ export const shareRoutes = new Elysia({ prefix: "/api/share" })
 			}
 		}
 
-		// 2. Verify target folder is under the shared root folder
-		if (!link.folderId) {
-			set.status = 403;
-			return { error: "Access denied" };
-		}
+		// 2. Verify target folder is under the shared folder or inherits the
+		// shared category.
 		const ownerCtx = shareGuestTenantContext(link.createdBy);
-		const isDescendant = await isFolderDescendant(
-			ownerCtx,
-			folderId,
-			link.folderId,
-		);
-		if (!isDescendant) {
+		const isAllowed = link.folderId
+			? await isFolderDescendant(ownerCtx, folderId, link.folderId)
+			: link.categoryId
+				? await withTenant(ownerCtx, async (tx) => {
+						const effectiveCategoryId = await resolveFolderEffectiveCategory(
+							tx,
+							link.createdBy,
+							folderId,
+						);
+						return effectiveCategoryId === link.categoryId;
+					})
+				: false;
+		if (!isAllowed) {
 			set.status = 403;
 			return { error: "Access denied" };
 		}
@@ -1039,6 +1195,12 @@ export const shareRoutes = new Elysia({ prefix: "/api/share" })
 			isAllowed = true;
 		} else if (link.folderId) {
 			isAllowed = await isDocumentDescendant(ownerCtx, docId, link.folderId);
+		} else if (link.categoryId) {
+			isAllowed = await isDocumentInSharedCategory(
+				ownerCtx,
+				docId,
+				link.categoryId,
+			);
 		}
 		if (!isAllowed) {
 			set.status = 403;

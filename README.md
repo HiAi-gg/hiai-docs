@@ -1,6 +1,11 @@
-# HiAi-Docs
+# HiAi-Docs / DocsMint
 
 **A self-hosted, AI-native knowledge workspace for people, applications, and agents.**
+
+HiAi-Docs is the open-source module and repository. **DocsMint** is the current
+host/product branding used by the standalone installable web application. The
+same workspace can be embedded by a SaaS host through the typed frontend host
+and extension contracts.
 
 HiAi-Docs stores documents in a structured JSON editor model first. Markdown is
 the convenient second format for editing, importing, and exporting content.
@@ -9,10 +14,10 @@ and GraphRAG make the same knowledge base useful to people, applications, and
 agents through the web application, REST API, TypeScript SDK, CLI, and MCP
 server.
 
-[![MIT License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
-[![Release](https://img.shields.io/github/v/release/hiai-gg/hiai-docs?sort=semver)](https://github.com/hiai-gg/hiai-docs/releases)
-[![Stars](https://img.shields.io/github/stars/hiai-gg/hiai-docs)](https://github.com/hiai-gg/hiai-docs/stargazers)
-[![CI](https://github.com/hiai-gg/hiai-docs/actions/workflows/ci.yml/badge.svg)](https://github.com/hiai-gg/hiai-docs/actions/workflows/ci.yml)
+[![Apache-2.0 License](https://img.shields.io/badge/License-Apache--2.0-green.svg)](LICENSE)
+[![Release](https://img.shields.io/github/v/release/hiai-gg/docsmint?sort=semver)](https://github.com/hiai-gg/docsmint/releases)
+[![Stars](https://img.shields.io/github/stars/hiai-gg/docsmint)](https://github.com/hiai-gg/docsmint/stargazers)
+[![CI](https://github.com/hiai-gg/docsmint/actions/workflows/ci.yml/badge.svg)](https://github.com/hiai-gg/docsmint/actions/workflows/ci.yml)
 [![Bun](https://img.shields.io/badge/Runtime-Bun_1.3-black?logo=bun&logoColor=white)](https://bun.sh)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org)
 [![Svelte](https://img.shields.io/badge/Svelte-5.x-FF3E00?logo=svelte&logoColor=white)](https://svelte.dev)
@@ -21,7 +26,7 @@ server.
 [![Drizzle_ORM](https://img.shields.io/badge/Drizzle_ORM-0.45-C5F74F?logo=drizzle&logoColor=black)](https://orm.drizzle.team)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 
-<img width="1920" height="974" alt="HiAi-Docs document workspace" src="https://github.com/user-attachments/assets/94701d01-a361-4ca1-b16d-de2a0c64d684" />
+<img width="1920" height="974" alt="DocsMint installable document workspace" src="https://github.com/user-attachments/assets/94701d01-a361-4ca1-b16d-de2a0c64d684" />
 
 ## Why HiAi-Docs?
 
@@ -36,6 +41,31 @@ server.
 - **Own the full stack**: application data, vectors, graph, queue, and files run
   on infrastructure you control.
 
+## What is new in the 0.3.0 release line?
+
+- **Installable Progressive Web App (PWA)** with a manifest, service worker,
+  responsive mobile shell, install prompt, update safety, and an offline
+  fallback shell.
+- **Offline document access** through identity-partitioned IndexedDB/Dexie
+  snapshots. Offline mode is cached read plus explicit local drafts; reconnect
+  never silently replays mutations.
+- **Explicit local drafts** with local autosave, review/apply, optimistic
+  concurrency (`expectedUpdatedAt`), and actionable conflict handling.
+- **Workspace-ready host integration** with typed dashboard/search hosts,
+  extension slots, and a boundary suitable for a SaaS shell. Standalone
+  HiAi-Docs remains owner-scoped; workspace lifecycle and billing belong to the
+  host product.
+- **Mobile-first editor polish** including a single responsive sidebar, safe
+  PWA updates, raw Markdown auto-height, and accessible narrow-screen controls.
+
+Search terms: installable self-hosted PWA knowledge base, offline document
+reading, local drafts, semantic multilingual search, GraphRAG, MCP, TypeScript
+SDK, CLI, and frontend extension hosts.
+
+For host integration, see [PWA hosting](docs/PWA_HOSTING.md) and
+[extension points](docs/EXTENDING.md). The workspace contract is released with
+the SaaS integration branch, not implied by standalone owner-scoped mode.
+
 ## Fastest installation: give this prompt to your agent
 
 If you are installing HiAi-Docs through an AI coding agent, use this path first.
@@ -43,7 +73,7 @@ It keeps the setup to Docker plus one provider choice and avoids unnecessary
 source-code changes.
 
 ```text
-Install HiAi-Docs from https://github.com/HiAi-gg/hiai-docs.
+Install HiAi-Docs from https://github.com/HiAi-gg/docsmint.
 Verify Docker and Docker Compose v2, clone the repository, and run
 `bash scripts/quickstart.sh`. Do not print or commit .env. Ask me to enter only
 an OpenRouter key or select Ollama, then run quickstart again. Verify
@@ -68,8 +98,8 @@ For manual installation, use the Docker quickstart below.
 ### Start with Docker
 
 ```bash
-git clone https://github.com/HiAi-gg/hiai-docs.git
-cd hiai-docs
+git clone https://github.com/HiAi-gg/docsmint.git
+cd docsmint
 bash scripts/quickstart.sh
 ```
 On its first run, the script creates an ignored root `.env`, generates the
@@ -127,14 +157,14 @@ The published package includes the CLI. It connects to an already running
 HiAi-Docs server; installing it does not deploy the server.
 
 ```bash
-bunx --package @hiai-gg/hiai-docs hiai-docs init \
+bunx --package @hiai-gg/docsmint docsmint init \
   --url http://localhost:50700 \
   --key 'your-global-or-category-key'
 
-bunx --package @hiai-gg/hiai-docs hiai-docs search "project architecture"
-bunx --package @hiai-gg/hiai-docs hiai-docs list
-bunx --package @hiai-gg/hiai-docs hiai-docs read <document-id>
-bunx --package @hiai-gg/hiai-docs hiai-docs create \
+bunx --package @hiai-gg/docsmint docsmint search "project architecture"
+bunx --package @hiai-gg/docsmint docsmint list
+bunx --package @hiai-gg/docsmint docsmint read <document-id>
+bunx --package @hiai-gg/docsmint docsmint create \
   --title "Release notes" --content "# Version 0.2.9"
 ```
 Credentials can also be supplied through `HIAI_DOCS_URL` and
@@ -149,9 +179,9 @@ snapshots, history, and export as MCP tools.
 ```json
 {
   "mcpServers": {
-    "hiai-docs": {
+    "docsmint": {
       "command": "bunx",
-      "args": ["--package", "@hiai-gg/hiai-docs", "hiai-docs-mcp"],
+      "args": ["--package", "@hiai-gg/docsmint", "docsmint-mcp"],
       "env": {
         "HIAI_DOCS_URL": "http://localhost:50700",
         "HIAI_DOCS_API_KEY": "your-global-or-category-key"
@@ -163,7 +193,7 @@ snapshots, history, and export as MCP tools.
 Run the server directly to verify the installation:
 
 ```bash
-bunx --package @hiai-gg/hiai-docs hiai-docs-mcp
+bunx --package @hiai-gg/docsmint docsmint-mcp
 ```
 The server uses stdio and works with MCP-capable clients such as Claude
 Desktop, Cursor, and coding agents that accept standard MCP configuration. See
@@ -181,10 +211,10 @@ the CLI, SDK, or REST API.
 ## TypeScript SDK
 
 ```bash
-bun add @hiai-gg/hiai-docs
+bun add @hiai-gg/docsmint
 ```
 ```ts
-import { DocsClient } from "@hiai-gg/hiai-docs";
+import { DocsClient } from "@hiai-gg/docsmint";
 
 const docs = new DocsClient({
   baseUrl: "http://localhost:50700",
@@ -317,6 +347,6 @@ report vulnerabilities through [SECURITY.md](SECURITY.md), not a public issue.
 
 ## License
 
-HiAi-Docs is released under the [MIT License](LICENSE).
+HiAi-Docs / DocsMint is released under the [Apache License 2.0](LICENSE).
 
 Part of the [HiAi](https://hiai.gg) open-source ecosystem.

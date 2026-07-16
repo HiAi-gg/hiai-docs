@@ -13,12 +13,16 @@ let {
 	documentTitle = "",
 	folderId = "",
 	folderName = "",
+	categoryId = "",
+	categoryName = "",
 }: {
 	open?: boolean;
 	documentId?: string;
 	documentTitle?: string;
 	folderId?: string;
 	folderName?: string;
+	categoryId?: string;
+	categoryName?: string;
 } = $props();
 
 let usePassword = $state(false);
@@ -73,6 +77,7 @@ async function createLink() {
 		const result = await createShareLink({
 			documentId: documentId || undefined,
 			folderId: folderId || undefined,
+			categoryId: categoryId || undefined,
 			password: usePassword ? password : undefined,
 			expiresIn,
 			guestEmails: guestEmails.length > 0 ? guestEmails : undefined,
@@ -112,7 +117,7 @@ function close() {
     <button onclick={close} class="absolute inset-0 bg-black/50" aria-label={m.action_close()}></button>
     <div class="relative z-10 w-full max-w-md rounded-lg border border-border bg-background p-6 shadow-lg">
       <div class="mb-4 flex items-center justify-between">
-        <h2 class="text-lg font-semibold">{m.share_create_title()} "{folderName || documentTitle}"</h2>
+        <h2 class="text-lg font-semibold">{m.share_create_title()} "{categoryName || folderName || documentTitle}"</h2>
         <button onclick={close} class="rounded-md p-1 text-muted-foreground hover:bg-accent hover:text-foreground" aria-label={m.action_close()}>&#10005;</button>
       </div>
 

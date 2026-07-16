@@ -438,10 +438,10 @@ export const adminRoutes = new Elysia({ prefix: "/api/admin" })
 			// SQL through. The cypher strings are hard-coded constants and
 			// never include user input, so this is safe.
 			const nodesResult = (await sql.unsafe(
-				"SELECT count(*) AS count FROM cypher('docs_graph', $$ MATCH (n) RETURN count(n) $$) AS (count agtype)",
+				"SELECT count::text AS count FROM cypher('docs_graph', $$ MATCH (n) RETURN count(n) $$) AS (count agtype)",
 			)) as Array<{ count: string }>;
 			const edgesResult = (await sql.unsafe(
-				"SELECT count(*) AS count FROM cypher('docs_graph', $$ MATCH ()-[r]->() RETURN count(r) $$) AS (count agtype)",
+				"SELECT count::text AS count FROM cypher('docs_graph', $$ MATCH ()-[r]->() RETURN count(r) $$) AS (count agtype)",
 			)) as Array<{ count: string }>;
 			const nodes = Number(nodesResult[0]?.count ?? 0);
 			const edges = Number(edgesResult[0]?.count ?? 0);

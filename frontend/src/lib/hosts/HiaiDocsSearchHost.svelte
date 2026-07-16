@@ -366,9 +366,9 @@ function goToPage(page: number) {
   <title>{data.query ? m.search_title_with_query({query: data.query}) : m.search_title()} - {m.app_name()}</title>
 </svelte:head>
 
-<div class="mx-auto max-w-6xl px-4 py-8">
+<div class="search-shell mx-auto max-w-6xl px-4 py-8">
   <!-- Search input -->
-  <form onsubmit={handleSubmit} class="relative mb-6">
+  <form onsubmit={handleSubmit} class="search-form relative mb-6">
     <Search
       class="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground"
     />
@@ -721,6 +721,20 @@ function goToPage(page: number) {
     </div>
   </div>
 {/snippet}
+
+<style>
+  @media (max-width: 767px) {
+    .search-form {
+      margin-left: 56px;
+    }
+  }
+
+  @media (max-width: 420px) {
+    .search-form {
+      margin-left: 52px;
+    }
+  }
+</style>
 
 <!-- Loading state -->
 {#snippet loadingState()}

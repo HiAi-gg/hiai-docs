@@ -266,7 +266,7 @@ $effect(() => {
     {/if}
   </form>
 
-  <DialogFooter>
+  <DialogFooter class="gap-2 max-sm:flex-col max-sm:items-stretch">
     <Button variant="outline" type="button" onclick={close} disabled={submitting}>
       {m.action_cancel()}
     </Button>

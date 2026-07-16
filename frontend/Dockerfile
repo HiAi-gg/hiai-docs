@@ -10,13 +10,13 @@ COPY packages/cli/package.json ./packages/cli/
 COPY packages/mcp-server/package.json ./packages/mcp-server/
 COPY packages/sdk/package.json ./packages/sdk/
 ENV BUN_INSTALL_CONCURRENCY=1
-RUN --mount=type=cache,target=/root/.bun/install/cache bun install --no-verify
+RUN --mount=type=cache,target=/root/.bun/install/cache bun install --frozen-lockfile
 
 # Production-only dependencies for the runtime image. Installs just
 # `dependencies` (no devDependencies) so the runtime image excludes the
 # build toolchain (vite, svelte, @sveltejs/kit, svelte-check, …).
 FROM base AS prod-deps
-COPY package.json ./
+COPY package.json bun.lock ./
 COPY frontend/package.json ./frontend/
 COPY backend/package.json ./backend/
 COPY packages/db/package.json ./packages/db/
@@ -24,17 +24,21 @@ COPY packages/cli/package.json ./packages/cli/
 COPY packages/mcp-server/package.json ./packages/mcp-server/
 COPY packages/sdk/package.json ./packages/sdk/
 ENV BUN_INSTALL_CONCURRENCY=1
-RUN --mount=type=cache,target=/root/.bun/install/cache bun install --production
+RUN --mount=type=cache,target=/root/.bun/install/cache bun install --production --frozen-lockfile
 
 # Build
 FROM base AS build
 COPY package.json tsconfig.json ./
 COPY --from=deps /app/node_modules ./node_modules
 COPY --from=deps /app/frontend/node_modules ./frontend/node_modules
-COPY --from=deps /app/backend/node_modules ./backend/node_modules
-COPY --from=deps /app/packages/db/node_modules ./packages/db/node_modules
 COPY frontend/ ./frontend/
 COPY packages/db/ ./packages/db/
+
+ARG PUBLIC_APP_ID
+ARG PUBLIC_DEPLOYMENT_ID
+RUN test -n "$PUBLIC_APP_ID" && test -n "$PUBLIC_DEPLOYMENT_ID"
+ENV PUBLIC_APP_ID=$PUBLIC_APP_ID
+ENV PUBLIC_DEPLOYMENT_ID=$PUBLIC_DEPLOYMENT_ID
 
 RUN cd frontend && bun run build
 

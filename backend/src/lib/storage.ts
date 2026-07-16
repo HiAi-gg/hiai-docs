@@ -3,7 +3,7 @@
  *
  * External consumers should NOT import this module — it pulls in
  * `./config` and crashes the process if any required env var is missing.
- * Use the npm export `@hiai-gg/hiai-docs/backend/lib/storage` instead,
+ * Use the npm export `@hiai-gg/docsmint/backend/lib/storage` instead,
  * which resolves to `./storage-factory.ts` (pure, side-effect-free).
  */
 import { config } from "./config";

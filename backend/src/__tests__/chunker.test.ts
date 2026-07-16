@@ -88,7 +88,9 @@ describe("chunkText", () => {
 		const input = "data:x".repeat(300_000);
 		const startedAt = performance.now();
 		expect(sanitizeEmbeddingText(input)).toBe(input);
-		expect(performance.now() - startedAt).toBeLessThan(1_000);
+		// Keep this generous enough for a full monorepo test run while still
+		// detecting accidental quadratic scans of the 1.8 MB input.
+		expect(performance.now() - startedAt).toBeLessThan(2_000);
 	});
 
 	it("preserves content across chunks", () => {

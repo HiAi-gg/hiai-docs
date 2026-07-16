@@ -1,8 +1,12 @@
 <script lang="ts">
 import "../app.css";
 import { onMount } from "svelte";
+import PwaInstallPrompt from "$lib/components/PwaInstallPrompt.svelte";
+import PwaUpdatePrompt from "$lib/components/PwaUpdatePrompt.svelte";
 import QuickSearch from "$lib/components/QuickSearch.svelte";
 import ShortcutHelp from "$lib/components/ShortcutHelp.svelte";
+import { networkStatus } from "$lib/offline/network-status.svelte";
+import OfflineIndicator from "$lib/offline/offline-indicator.svelte";
 import { getLocale } from "$lib/paraglide/runtime";
 import {
 	handleKeyEvent,
@@ -29,9 +33,27 @@ function handleGlobalKeydown(event: KeyboardEvent) {
 
 <svelte:head>
 	<meta name="description" content="Self-hosted AI-first documentation platform" />
-	<meta name="og:type" content="website" />
-	<meta name="og:title" content="HiAi-Docs" />
-	<meta name="og:description" content="AI-first documentation platform with semantic search" />
+	<meta property="og:type" content="website" />
+	<meta property="og:title" content="DocsMint" />
+	<meta property="og:description" content="Installable self-hosted knowledge workspace with offline reads and semantic search" />
+	<meta name="twitter:card" content="summary" />
+	{@html `
+		<script type="application/ld+json">
+			{
+				"@context": "https://schema.org",
+				"@type": "WebApplication",
+				"name": "DocsMint",
+				"description": "AI-native knowledge workspace with offline support",
+				"applicationCategory": "ProductivityApplication",
+				"operatingSystem": "Any",
+				"offers": {
+					"@type": "Offer",
+					"price": "0",
+					"priceCurrency": "USD"
+				}
+			}
+		</script>
+	`}
 </svelte:head>
 
 <svelte:window onkeydown={handleGlobalKeydown} />
@@ -43,3 +65,9 @@ function handleGlobalKeydown(event: KeyboardEvent) {
      runtime cost while they are closed. -->
 <QuickSearch />
 <ShortcutHelp />
+<OfflineIndicator />
+
+<!-- PWA install banner and update notification. Both render nothing until
+     their respective triggers fire, so there is no runtime cost otherwise. -->
+<PwaInstallPrompt />
+<PwaUpdatePrompt />

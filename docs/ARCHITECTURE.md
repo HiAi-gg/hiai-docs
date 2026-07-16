@@ -37,25 +37,25 @@ The `backend/src/lib/` directory uses a **factory pattern** that enables externa
 
 | File | Purpose | For external use? |
 |------|---------|-----------------|
-| `redis-factory.ts` | Pure `createRedis(cfg: RedisConfig)` — no `config.ts` import | ✅ Yes — `@hiai-gg/hiai-docs/backend/lib/redis` |
-| `storage-factory.ts` | Pure `createStorage(cfg: StorageConfig)` + `ensureBucket()` | ✅ Yes — `@hiai-gg/hiai-docs/backend/lib/storage` |
+| `redis-factory.ts` | Pure `createRedis(cfg: RedisConfig)` — no `config.ts` import | ✅ Yes — `@hiai-gg/docsmint/backend/lib/redis` |
+| `storage-factory.ts` | Pure `createStorage(cfg: StorageConfig)` + `ensureBucket()` | ✅ Yes — `@hiai-gg/docsmint/backend/lib/storage` |
 | `redis.ts` | Backwards-compatible singleton (calls factory with `config.REDIS_URL`) | Internal only |
 | `storage.ts` | Backwards-compatible singletons (`storage`, `storagePublic`) | Internal only |
-| `with-tenant.ts` | Thin re-export shim → `packages/db/src/with-tenant` | ✅ Yes — `@hiai-gg/hiai-docs/db/with-tenant` |
+| `with-tenant.ts` | Thin re-export shim → `packages/db/src/with-tenant` | ✅ Yes — `@hiai-gg/docsmint/db/with-tenant` |
 | `metrics.ts` | In-process embedding metrics registry | Internal only |
 
 **npm subpath exports** (see `package.public.json` exports field):
 
 ```ts
 // RLS-tenant-scoped queries (from shared package)
-import { withTenant, adminTenantContext } from "@hiai-gg/hiai-docs/db/with-tenant";
+import { withTenant, adminTenantContext } from "@hiai-gg/docsmint/db/with-tenant";
 
 // Pure factories — no hiai-docs config dependency
-import { createRedis } from "@hiai-gg/hiai-docs/backend/lib/redis";
-import { createStorage } from "@hiai-gg/hiai-docs/backend/lib/storage";
+import { createRedis } from "@hiai-gg/docsmint/backend/lib/redis";
+import { createStorage } from "@hiai-gg/docsmint/backend/lib/storage";
 
 // Schema access
-import { documents, folders } from "@hiai-gg/hiai-docs/schema";
+import { documents, folders } from "@hiai-gg/docsmint/schema";
 ```
 
 The RLS tenant context (`with-tenant.ts`) lives in `packages/db/` so it can be shared across both the backend API and any external consumer that imports hiai-docs tables directly.

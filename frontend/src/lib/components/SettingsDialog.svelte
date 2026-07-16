@@ -13,7 +13,9 @@ import { authClient, signOut } from "$lib/auth-client";
 import ApiAccessSettings from "$lib/components/settings/ApiAccessSettings.svelte";
 import { getFrontendExtensions } from "$lib/extensions/context";
 import { resolveExtensions } from "$lib/extensions/resolve";
+import { cleanupOfflineData } from "$lib/offline/cleanup";
 import * as m from "$lib/paraglide/messages.js";
+import { editorPreferences } from "$lib/stores/editor-preferences.svelte";
 import { type Theme, themeStore } from "$lib/stores/theme.svelte";
 
 let {
@@ -46,6 +48,7 @@ let passwordStatus = $state<"idle" | "saving" | "saved" | "error">("idle");
 let passwordError = $state("");
 
 onMount(async () => {
+	editorPreferences.init();
 	try {
 		const profile = await getProfile();
 		if (profile.name) name = profile.name;
@@ -141,6 +144,9 @@ let loggingOut = $state(false);
 async function handleLogout() {
 	loggingOut = true;
 	try {
+		// Wipe cached offline data before ending the session so a shared
+		// browser never leaks this user's documents to the next account.
+		await cleanupOfflineData();
 		await signOut();
 		open = false;
 		goto("/login");
@@ -163,7 +169,9 @@ function close() {
 	</Dialog.DialogHeader>
 
 	<Tabs.Tabs bind:value={activeTab} class="w-full">
-		<Tabs.TabsList class="flex w-full flex-wrap justify-start">
+		<Tabs.TabsList
+			class="grid w-full grid-cols-[repeat(auto-fit,minmax(0,1fr))] gap-1"
+		>
 			<Tabs.TabsTrigger
 				value="profile"
 				selected={activeTab === "profile"}
@@ -190,7 +198,7 @@ function close() {
 				selected={activeTab === "appearance"}
 				onclick={(v) => (activeTab = v)}
 			>
-				{m.settings_appearance()}
+				Style
 			</Tabs.TabsTrigger>
 			{#each settingsExtensions as section (section.id)}
 				<Tabs.TabsTrigger
@@ -220,7 +228,7 @@ function close() {
 				{#if profileError}
 					<p class="text-sm text-destructive">{profileError}</p>
 				{/if}
-				<Button type="submit" disabled={profileStatus === "saving"}>
+				<Button type="submit" disabled={profileStatus === "saving"} class="w-full sm:w-auto">
 					{#if profileStatus === "saving"}
 						<Loader2 class="mr-2 size-4 animate-spin" />
 					{:else}
@@ -266,7 +274,7 @@ function close() {
 				{#if passwordError}
 					<p class="text-sm text-destructive">{passwordError}</p>
 				{/if}
-				<Button type="submit" disabled={passwordStatus === "saving"}>
+				<Button type="submit" disabled={passwordStatus === "saving"} class="w-full sm:w-auto">
 					{#if passwordStatus === "saving"}
 						<Loader2 class="mr-2 size-4 animate-spin" />
 					{/if}
@@ -276,7 +284,7 @@ function close() {
 		</Tabs.TabsContent>
 
 		<Tabs.TabsContent value="appearance" currentValue={activeTab}>
-			<div class="space-y-4">
+			<div class="space-y-6">
 				<div class="space-y-2">
 					<Label>{m.settings_theme()}</Label>
 					<p class="text-xs text-muted-foreground">{m.settings_appearance()}</p>
@@ -297,6 +305,86 @@ function close() {
 						</button>
 					{/each}
 				</div>
+
+				<details class="editor-settings border-t pt-5">
+					<summary class="flex cursor-pointer items-center justify-between gap-3 rounded-md px-1 py-2">
+						<span>
+							<span class="block text-sm font-medium">Editor modes</span>
+							<span class="block text-xs text-muted-foreground">Source views and toolbar layout</span>
+						</span>
+						<span class="editor-settings-chevron" aria-hidden="true">⌄</span>
+					</summary>
+					<div class="mt-3 space-y-3">
+					<div class="flex items-center justify-between gap-4 rounded-md border p-3">
+						<span>
+							<span class="block text-sm font-medium">Visual editor</span>
+							<span class="block text-xs text-muted-foreground">Show the standard WYSIWYG editor mode.</span>
+						</span>
+						<button
+							type="button" role="switch" class="preference-switch"
+							class:enabled={editorPreferences.showVisualMode}
+							aria-checked={editorPreferences.showVisualMode}
+							aria-label="Show visual editor"
+							disabled={!editorPreferences.showMarkdownMode && !editorPreferences.showJsonMode}
+							onclick={() => editorPreferences.update({ showVisualMode: !editorPreferences.showVisualMode })}
+						><span></span></button>
+					</div>
+					<div class="flex items-center justify-between gap-4 rounded-md border p-3">
+						<span>
+							<span class="block text-sm font-medium">Raw Markdown</span>
+							<span class="block text-xs text-muted-foreground">Show the Markdown source button in documents.</span>
+						</span>
+						<button
+							type="button" role="switch" class="preference-switch"
+							class:enabled={editorPreferences.showMarkdownMode}
+							aria-checked={editorPreferences.showMarkdownMode}
+							aria-label="Show Raw Markdown"
+							disabled={!editorPreferences.showVisualMode && !editorPreferences.showJsonMode}
+							onclick={() => editorPreferences.update({ showMarkdownMode: !editorPreferences.showMarkdownMode })}
+						><span></span></button>
+					</div>
+					<div class="flex items-center justify-between gap-4 rounded-md border p-3">
+						<span>
+							<span class="block text-sm font-medium">Raw JSON</span>
+							<span class="block text-xs text-muted-foreground">Show the structured document source button.</span>
+						</span>
+						<button
+							type="button" role="switch" class="preference-switch"
+							class:enabled={editorPreferences.showJsonMode}
+							aria-checked={editorPreferences.showJsonMode}
+							aria-label="Show Raw JSON"
+							disabled={!editorPreferences.showVisualMode && !editorPreferences.showMarkdownMode}
+							onclick={() => editorPreferences.update({ showJsonMode: !editorPreferences.showJsonMode })}
+						><span></span></button>
+					</div>
+					<div class="flex items-center justify-between gap-4 rounded-md border p-3">
+						<span>
+							<span class="block text-sm font-medium">Minimal toolbar</span>
+							<span class="block text-xs text-muted-foreground">Bold, italic, underline, lists, highlight, and copy.</span>
+						</span>
+						<button
+							type="button" role="switch" class="preference-switch"
+							class:enabled={editorPreferences.minimalToolbar}
+							aria-checked={editorPreferences.minimalToolbar}
+							aria-label="Use minimal toolbar"
+							onclick={() => editorPreferences.update({ minimalToolbar: !editorPreferences.minimalToolbar })}
+						><span></span></button>
+					</div>
+					<div class="flex items-center justify-between gap-4 rounded-md border p-3">
+						<span>
+							<span class="block text-sm font-medium">Scroll to top</span>
+							<span class="block text-xs text-muted-foreground">Show the floating arrow after scrolling down.</span>
+						</span>
+						<button
+							type="button" role="switch" class="preference-switch"
+							class:enabled={editorPreferences.showScrollToTop}
+							aria-checked={editorPreferences.showScrollToTop}
+							aria-label="Show scroll to top"
+							onclick={() => editorPreferences.update({ showScrollToTop: !editorPreferences.showScrollToTop })}
+						><span></span></button>
+					</div>
+					</div>
+				</details>
 			</div>
 		</Tabs.TabsContent>
 
@@ -312,17 +400,40 @@ function close() {
 		{/each}
 	</Tabs.Tabs>
 
-	<Dialog.DialogFooter>
-		<Button
-			id="logout-button"
-			variant="ghost"
-			onclick={handleLogout}
-			disabled={loggingOut}
-			class="mr-auto text-muted-foreground hover:text-destructive"
-		>
-			<LogOut class="mr-2 size-4" />
-			{loggingOut ? "…" : m.auth_logout()}
-		</Button>
-		<Button variant="outline" onclick={close}>{m.action_close()}</Button>
+	<Dialog.DialogFooter class="settings-dialog-footer gap-4 max-sm:flex-col max-sm:items-stretch">
+		{#if activeTab === "profile"}
+			<Button
+				id="logout-button"
+				variant="ghost"
+				onclick={handleLogout}
+				disabled={loggingOut}
+				class="mr-auto text-muted-foreground hover:text-destructive max-sm:mr-0"
+			>
+				<LogOut class="mr-2 size-4" />
+				{loggingOut ? "…" : m.auth_logout()}
+			</Button>
+		{/if}
+		<Button variant="outline" onclick={close} class="w-full sm:w-auto">{m.action_close()}</Button>
 	</Dialog.DialogFooter>
 </Dialog.Dialog>
+
+<style>
+	.editor-settings summary { list-style: none; }
+	.editor-settings summary::-webkit-details-marker { display: none; }
+	.editor-settings-chevron { font-size: 20px; transition: transform 0.18s ease; }
+	.editor-settings[open] .editor-settings-chevron { transform: rotate(180deg); }
+	.preference-switch {
+		position: relative; flex: 0 0 auto; width: 42px; height: 24px; padding: 2px;
+		border: 1px solid var(--border); border-radius: 999px; background: var(--muted);
+		transition: background 0.18s ease, border-color 0.18s ease; cursor: pointer;
+	}
+	.preference-switch span {
+		display: block; width: 18px; height: 18px; border-radius: 999px;
+		background: var(--background); box-shadow: 0 1px 3px rgb(0 0 0 / 0.22);
+		transition: transform 0.18s ease;
+	}
+	.preference-switch.enabled { border-color: var(--primary); background: var(--primary); }
+	.preference-switch.enabled span { transform: translateX(18px); }
+	.preference-switch:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+	.preference-switch:disabled { cursor: not-allowed; opacity: 0.45; }
+</style>

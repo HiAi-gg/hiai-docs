@@ -10,6 +10,7 @@ import {
 } from "$lib/api/settings";
 import { signOut } from "$lib/auth-client";
 import ApiAccessSettings from "$lib/components/settings/ApiAccessSettings.svelte";
+import { cleanupOfflineData } from "$lib/offline/cleanup";
 import * as m from "$lib/paraglide/messages.js";
 import { themeStore } from "$lib/stores/theme.svelte";
 
@@ -18,6 +19,9 @@ let loggingOut = $state(false);
 async function handleLogout() {
 	loggingOut = true;
 	try {
+		// Wipe cached offline data before ending the session so a shared
+		// browser never leaks this user's documents to the next account.
+		await cleanupOfflineData();
 		await signOut();
 		goto("/login");
 	} catch {

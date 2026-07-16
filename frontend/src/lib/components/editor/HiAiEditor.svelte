@@ -16,8 +16,17 @@ import {
 	unregisterShortcut,
 } from "$lib/stores/keyboard.svelte";
 import EditorToolbar from "./EditorToolbar.svelte";
+import {
+	removeUnavailableAttachmentImages,
+	sanitizeEditorContent,
+} from "./editor-content-sanitizer";
 import { editorExtensions } from "./editorExtensions";
+import { shouldDeferMarkdownParsing } from "./large-markdown";
 import { markdownToJson } from "./markdown";
+import {
+	cacheParsedContent,
+	getCachedParsedContent,
+} from "./parsed-content-cache";
 
 export type EditorOutput = { markdown: string; json: object };
 
@@ -29,9 +38,11 @@ const {
 	editable = true,
 	collaboration = null,
 	documentId = "",
+	documentUpdatedAt = "",
 	toolbarExtensions = null,
 	editorActions = [],
 	editorActionContext,
+	minimalToolbar = false,
 }: {
 	content?: string;
 	contentJson?: object;
@@ -40,6 +51,7 @@ const {
 	editable?: boolean;
 	collaboration?: CollaborationSession | null;
 	documentId?: string;
+	documentUpdatedAt?: string;
 	/**
 	 * Optional snippet forwarded to EditorToolbar's extension zone.
 	 * Receives the live editor instance so custom buttons can call commands.
@@ -62,12 +74,14 @@ const {
 	 */
 	editorActions?: readonly EditorActionExtension[];
 	editorActionContext?: Omit<EditorActionContext, "selection" | "commands">;
+	minimalToolbar?: boolean;
 } = $props();
 
 let editorStore: ReturnType<typeof createEditor> | null = null;
 let editor = $state<Editor | null>(null);
 let ready = $state(false);
 let internalUpdate = false;
+let deferredContentLoading = $state(false);
 
 /**
  * Resolve the initial editor content. Prefer the persisted ProseMirror JSON
@@ -83,10 +97,15 @@ let internalUpdate = false;
  * than showing nothing.
  */
 function resolveInitialContent(): string | JSONContent {
-	if (contentJson) return contentJson as JSONContent;
+	if (contentJson) {
+		return sanitizeEditorContent(contentJson) as JSONContent;
+	}
 	if (content && content.trim().length > 0) {
+		if (shouldDeferMarkdownParsing(content)) {
+			return { type: "doc", content: [{ type: "paragraph" }] };
+		}
 		try {
-			return markdownToJson(content);
+			return sanitizeEditorContent(markdownToJson(content)) as JSONContent;
 		} catch (err) {
 			console.warn(
 				"HiAiEditor: markdownToJson failed, falling back to raw markdown",
@@ -99,6 +118,7 @@ function resolveInitialContent(): string | JSONContent {
 }
 
 onMount(() => {
+	deferredContentLoading = !contentJson && shouldDeferMarkdownParsing(content);
 	const extensions = [...editorExtensions];
 
 	if (collaboration?.doc) {
@@ -162,6 +182,60 @@ onMount(() => {
 		}
 	});
 
+	// Imported documents may reference attachments that were not copied with
+	// the import. Remove those image nodes after a guarded availability check;
+	// importantly, a 404 is handled as data, not as an exception that can bring
+	// down the ProseMirror transaction pipeline.
+	if (!collaboration?.doc && contentJson) {
+		void removeUnavailableAttachmentImages(contentJson).then(
+			({ content: clean }) => {
+				if (
+					editor &&
+					clean &&
+					JSON.stringify(editor.getJSON()) !== JSON.stringify(clean)
+				) {
+					editor.commands.setContent(clean, { emitUpdate: false });
+				}
+			},
+		);
+	}
+
+	if (
+		!collaboration?.doc &&
+		!contentJson &&
+		shouldDeferMarkdownParsing(content)
+	) {
+		const parse = async () => {
+			if (!editor) {
+				deferredContentLoading = false;
+				return;
+			}
+			try {
+				const cached =
+					documentId && documentUpdatedAt
+						? await getCachedParsedContent(documentId, documentUpdatedAt)
+						: null;
+				if (!editor) return;
+				const parsed =
+					cached ??
+					(sanitizeEditorContent(markdownToJson(content)) as JSONContent);
+				editor.commands.setContent(parsed, { emitUpdate: false });
+				if (!cached && documentId && documentUpdatedAt) {
+					void cacheParsedContent(documentId, documentUpdatedAt, parsed);
+				}
+			} catch (err) {
+				console.warn("HiAiEditor: deferred markdown parsing failed", err);
+			} finally {
+				deferredContentLoading = false;
+			}
+		};
+		if ("requestIdleCallback" in window) {
+			window.requestIdleCallback(() => void parse(), { timeout: 250 });
+		} else {
+			setTimeout(() => void parse(), 0);
+		}
+	}
+
 	// Editor-scoped shortcuts. `mod+shift+7` toggles the wysiwyg ↔
 	// markdown view; `mod+shift+e` exports the document. The handlers
 	// dispatch DOM CustomEvents that the doc page listens to (the page
@@ -206,10 +280,12 @@ $effect(() => {
 	// documents that were saved via the regular (non-TipTap) save path.
 	const hasDocJson = contentJson != null;
 	const nextSource: string | JSONContent = hasDocJson
-		? (contentJson as JSONContent)
-		: content && content.trim().length > 0
-			? markdownToJson(content)
-			: content;
+		? (sanitizeEditorContent(contentJson as object) as JSONContent)
+		: shouldDeferMarkdownParsing(content)
+			? ({ type: "doc", content: [{ type: "paragraph" }] } as JSONContent)
+			: content && content.trim().length > 0
+				? (sanitizeEditorContent(markdownToJson(content)) as JSONContent)
+				: content;
 	const nextSerialized = hasDocJson ? JSON.stringify(contentJson) : content;
 	if (internalUpdate) {
 		internalUpdate = false;
@@ -291,8 +367,27 @@ function handleWrapperClick(event: MouseEvent) {
       {toolbarExtensions}
       {editorActions}
       {editorActionContext}
+      minimal={minimalToolbar}
     />
-    <div class="editor-content">
+    <div
+      class="editor-content"
+      class:deferred-loading={deferredContentLoading}
+      aria-busy={deferredContentLoading}
+    >
+      {#if deferredContentLoading}
+        <div class="large-document-loader" role="status" aria-live="polite">
+          <div class="large-document-loader-heading">
+            <span class="large-document-spinner" aria-hidden="true"></span>
+            <span>Preparing large document…</span>
+          </div>
+          <div class="large-document-loader-lines" aria-hidden="true">
+            <span style="width: 72%"></span>
+            <span style="width: 94%"></span>
+            <span style="width: 83%"></span>
+            <span style="width: 61%"></span>
+          </div>
+        </div>
+      {/if}
       <EditorContent {editor} />
     </div>
   {:else}
@@ -322,9 +417,79 @@ function handleWrapperClick(event: MouseEvent) {
   }
 
   .editor-content {
+    position: relative;
     flex: 1;
     padding: 24px;
     overflow-y: auto;
+  }
+
+  .editor-content.deferred-loading {
+    min-height: 320px;
+  }
+
+  .large-document-loader {
+    position: absolute;
+    inset: 24px;
+    z-index: 2;
+    padding: 20px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: color-mix(in srgb, var(--background) 94%, transparent);
+    pointer-events: none;
+  }
+
+  .large-document-loader-heading {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: var(--muted-foreground);
+    font-size: 0.875rem;
+    font-weight: 500;
+  }
+
+  .large-document-spinner {
+    width: 18px;
+    height: 18px;
+    border: 2px solid var(--border);
+    border-top-color: var(--primary);
+    border-radius: 999px;
+    animation: large-document-spin 0.8s linear infinite;
+  }
+
+  .large-document-loader-lines {
+    display: grid;
+    gap: 12px;
+    margin-top: 28px;
+  }
+
+  .large-document-loader-lines span {
+    display: block;
+    height: 12px;
+    border-radius: 999px;
+    background: linear-gradient(
+      90deg,
+      var(--muted) 20%,
+      color-mix(in srgb, var(--muted) 55%, var(--background)) 50%,
+      var(--muted) 80%
+    );
+    background-size: 220% 100%;
+    animation: large-document-shimmer 1.35s ease-in-out infinite;
+  }
+
+  @keyframes large-document-spin {
+    to { transform: rotate(360deg); }
+  }
+
+  @keyframes large-document-shimmer {
+    from { background-position: 100% 0; }
+    to { background-position: -100% 0; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .large-document-spinner,
+    .large-document-loader-lines span {
+      animation: none;
+    }
   }
 
   .editor-content :global(.tiptap) {

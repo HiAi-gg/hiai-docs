@@ -133,12 +133,15 @@ const swaggerConfig = {
 	path: "/api/docs",
 	documentation: {
 		info: {
-			title: "hiai-docs API",
-			version: "0.2.9",
+			title: "DocsMint API",
+			version: "0.3.0",
 			description:
 				"Self-hosted AI-first documentation platform. Full-text + semantic search, version history, sharing, and folder organization.",
-			contact: { name: "hiai-gg", url: "https://github.com/hiai-gg/hiai-docs" },
-			license: { name: "MIT", url: "https://opensource.org/licenses/MIT" },
+			contact: { name: "HiAi-gg", url: "https://github.com/HiAi-gg/docsmint" },
+			license: {
+				name: "Apache-2.0",
+				url: "https://www.apache.org/licenses/LICENSE-2.0",
+			},
 		},
 		tags: [
 			{ name: "Auth", description: "Authentication endpoints" },

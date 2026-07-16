@@ -89,11 +89,11 @@ function copyToClipboard() {
 <style>
 	.markdown-toggle {
 		position: relative;
-		flex: 1;
+		flex: none;
 		display: flex;
 		flex-direction: column;
 		width: 100%;
-		min-height: 100%;
+		min-height: 500px;
 	}
 
 	.copy-btn {
@@ -129,16 +129,18 @@ function copyToClipboard() {
 	}
 
 	.markdown-textarea {
-		flex: 1;
+		flex: none;
 		width: 100%;
 		height: auto;
 		min-height: 500px;
-		max-height: calc(100vh - 220px);
+		max-height: none;
 		padding: 56px 24px 24px 24px;
 		border: none;
 		outline: none;
-		resize: vertical;
-		overflow-y: auto;
+		resize: none;
+		/* Grow with the document so the editor-main owns the single scroll
+		 * surface, matching the JSON/Tiptap editor view. */
+		overflow: hidden;
 		font-family: 'Fira Code', 'Consolas', 'Courier New', monospace;
 		font-size: 14px;
 		line-height: 1.7;

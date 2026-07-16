@@ -1,4 +1,10 @@
 <script lang="ts">
+import {
+	DropdownMenu,
+	DropdownMenuContent,
+	DropdownMenuItem,
+	DropdownMenuTrigger,
+} from "@hiai-gg/hiai-ui/components/ui/dropdown-menu";
 import { getSchema } from "@tiptap/core";
 import { Node } from "@tiptap/pm/model";
 import { Packer } from "docx";
@@ -11,6 +17,7 @@ import {
 	Folder,
 	FolderOpen,
 	Lock,
+	MoreHorizontal,
 } from "lucide-svelte";
 import { tick, untrack } from "svelte";
 import {
@@ -548,16 +555,18 @@ $effect(() => {
     <div class="text-muted-foreground">{m.action_loading()}</div>
   {:else if shareData}
     <div class="w-full max-w-3xl space-y-6">
-      <div class="flex items-center justify-between">
-        <div class="flex items-center gap-2 text-sm text-muted-foreground">
-          {#if shareData.type === "document"}
-            <FileText class="h-4 w-4" />
-          {:else}
-            <Folder class="h-4 w-4" />
-          {/if}
-          {m.share_via_label()}
-        </div>
-        <div class="flex items-center gap-2">
+      <div class="flex items-center justify-between gap-3">
+        <a
+          href="https://docsmint.com"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="flex min-w-0 items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-foreground"
+        >
+          <img src="/favicon.ico" alt="" class="size-5 shrink-0 object-contain dark:hidden" />
+          <img src="/favicon-dark.png" alt="" aria-hidden="true" class="hidden size-5 shrink-0 object-contain dark:block" />
+          <span class="truncate">{m.share_via_label()}</span>
+        </a>
+        <div class="hidden items-center gap-2 sm:flex">
           {#if (shareData.type === "document" || currentView === "document") && getCurrentDoc()?.content}
             <button
               onclick={copyText}
@@ -601,6 +610,35 @@ $effect(() => {
               <Copy class="h-3 w-3" /> {m.share_copy_link()}
             {/if}
           </button>
+        </div>
+        <div class="sm:hidden">
+          <DropdownMenu>
+            <DropdownMenuTrigger
+              class="inline-flex size-9 items-center justify-center rounded-md border border-border bg-background text-muted-foreground hover:bg-accent hover:text-foreground"
+              aria-label="Share actions"
+            >
+              <MoreHorizontal class="size-4" />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" class="min-w-44">
+              {#if (shareData.type === "document" || currentView === "document") && getCurrentDoc()?.content}
+                <DropdownMenuItem onSelect={() => void copyText()}>
+                  <Copy class="size-4" /> Copy Text
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={handleExportMd}>
+                  <Download class="size-4" /> Export .md
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => void handleExportDocx()}>
+                  <Download class="size-4" /> DOCX
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => void handleExportPdf()}>
+                  <Download class="size-4" /> PDF
+                </DropdownMenuItem>
+              {/if}
+              <DropdownMenuItem onSelect={() => void copyUrl()}>
+                <Copy class="size-4" /> {m.share_copy_link()}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
 

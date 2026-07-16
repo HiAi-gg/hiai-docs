@@ -239,6 +239,13 @@
 			"when": 1785000000019,
 			"tag": "0033_bound_document_search_vectors",
 			"breakpoints": true
+		},
+		{
+			"idx": 34,
+			"version": "7",
+			"when": 1785000000020,
+			"tag": "0034_share_categories",
+			"breakpoints": true
     }
   ]
 }

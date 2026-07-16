@@ -282,6 +282,8 @@ let shareDocumentId = $state("");
 let shareFolderId = $state("");
 let shareDocumentTitle = $state("");
 let shareFolderName = $state("");
+let shareCategoryId = $state("");
+let shareCategoryName = $state("");
 
 // Category CRUD dialog state.
 type CategoryDialogMode = "create" | "edit" | "delete";
@@ -1359,16 +1361,30 @@ function startDelete(kind: EntityKind, id: string, name: string) {
 function openShareDialogForDocument(id: string, title: string) {
 	shareDocumentId = id;
 	shareFolderId = "";
+	shareCategoryId = "";
 	shareDocumentTitle = title;
 	shareFolderName = "";
+	shareCategoryName = "";
 	showShareDialog = true;
 }
 
 function openShareDialogForFolder(id: string, name: string) {
 	shareFolderId = id;
 	shareDocumentId = "";
+	shareCategoryId = "";
 	shareFolderName = name;
 	shareDocumentTitle = "";
+	shareCategoryName = "";
+	showShareDialog = true;
+}
+
+function openShareDialogForCategory(id: string, name: string) {
+	shareCategoryId = id;
+	shareDocumentId = "";
+	shareFolderId = "";
+	shareCategoryName = name;
+	shareDocumentTitle = "";
+	shareFolderName = "";
 	showShareDialog = true;
 }
 
@@ -1698,9 +1714,6 @@ const buckets = $derived.by(() => {
               <ChevronRight class="size-3.5 shrink-0" />
             {/if}
             <span class="min-w-0 truncate">{bucket.category.name}</span>
-            <span class="ml-auto shrink-0 text-[10px] font-normal normal-case text-muted-foreground">
-              {bucket.folders.length}
-            </span>
           </button>
           <DropdownMenu>
             <DropdownMenuTrigger>
@@ -1725,6 +1738,9 @@ const buckets = $derived.by(() => {
               </DropdownMenuItem>
               <DropdownMenuItem onSelect={() => openNewFolderInCategory(bucket.category.id)}>
                 {m.folders_new()}
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => openShareDialogForCategory(bucket.category.id, bucket.category.name)}>
+                {m.doc_share()}
               </DropdownMenuItem>
               <DropdownMenuItem onSelect={() => openEditCategoryDialog(bucket.category)}>
                 {m.action_edit()}
@@ -1829,9 +1845,6 @@ const buckets = $derived.by(() => {
             <ChevronRight class="size-3.5 shrink-0" />
           {/if}
           <span class="min-w-0 truncate">{m.sidebar_uncategorized()}</span>
-          <span class="ml-auto shrink-0 text-[10px] font-normal normal-case text-muted-foreground">
-            {uncatBucket.folders.length}
-          </span>
         </button>
       </div>
       {#if uncategorizedExpanded}
@@ -1988,4 +2001,6 @@ const buckets = $derived.by(() => {
   documentTitle={shareDocumentTitle}
   folderId={shareFolderId}
   folderName={shareFolderName}
+  categoryId={shareCategoryId}
+  categoryName={shareCategoryName}
 />

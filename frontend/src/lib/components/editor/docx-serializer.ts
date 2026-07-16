@@ -155,9 +155,15 @@ export const customAsyncNodes = {
 	async image(state, node) {
 		const src = node?.attrs?.src;
 		if (typeof src !== "string" || !src) return;
-		const imageType = await state.options.getImageType?.(src);
-		await state.image(src, undefined, undefined, undefined, imageType);
-		state.closeBlock(node);
+		try {
+			const imageType = await state.options.getImageType?.(src);
+			await state.image(src, undefined, undefined, undefined, imageType);
+			state.closeBlock(node);
+		} catch {
+			// A stale or temporarily unavailable remote image must not invalidate
+			// the entire DOCX. Do not log `src`: presigned image URLs contain
+			// credentials and signatures that must not leak into browser logs.
+		}
 	},
 	async table(state, node) {
 		const actualChildren = state.children;

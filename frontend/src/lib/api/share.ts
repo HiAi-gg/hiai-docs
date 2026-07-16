@@ -5,11 +5,12 @@ export interface ShareLink {
 	token: string;
 	documentId?: string;
 	folderId?: string;
+	categoryId?: string;
 	hasPassword: boolean;
 	expiresAt?: string | null;
 	createdAt: string;
 	title?: string;
-	type?: "document" | "folder";
+	type?: "document" | "folder" | "category";
 	guestEmails: string[];
 }
 
@@ -21,6 +22,7 @@ export interface ShareContent {
 export interface CreateShareLinkInput {
 	documentId?: string;
 	folderId?: string;
+	categoryId?: string;
 	password?: string;
 	expiresIn?: "1h" | "1d" | "7d" | "30d" | "never";
 	guestEmails?: string[];
@@ -31,9 +33,11 @@ export interface CreateShareLinkInput {
 export function createShareLink(
 	data: CreateShareLinkInput,
 ): Promise<ShareLink> {
-	if (!data.documentId && !data.folderId) {
+	if (!data.documentId && !data.folderId && !data.categoryId) {
 		return Promise.reject(
-			new Error("createShareLink: documentId or folderId is required"),
+			new Error(
+				"createShareLink: documentId, folderId, or categoryId is required",
+			),
 		);
 	}
 	return apiFetch("/api/share", { method: "POST", body: JSON.stringify(data) });

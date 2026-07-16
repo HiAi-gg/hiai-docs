@@ -43,7 +43,7 @@
 - `CODE_OF_CONDUCT.md` — community standards
 - `SECURITY.md` — vulnerability reporting
 - `CHANGELOG.md` — release notes and breaking-change narrative
-- `LICENSE` — MIT license
+- `LICENSE` — Apache-2.0 license
 
 ### Project-specific
 

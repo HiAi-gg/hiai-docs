@@ -335,6 +335,10 @@ function buildSelectProxy(ctx: SelectCtx): any {
           ctx.where = cond;
           return buildSelectProxy(ctx);
         };
+      // Drizzle's row-locking clause is a no-op for the in-memory harness;
+      // production uses FOR UPDATE on the same transaction connection.
+      if (prop === "for")
+        return (_lock: string) => buildSelectProxy(ctx);
       if (prop === "limit")
         return (n: number) => {
           ctx.limit = n;

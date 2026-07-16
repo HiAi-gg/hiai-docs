@@ -1,6 +1,7 @@
-# Releasing hiai-docs
+# Releasing DocsMint
 
-This is the evergreen maintainer flow. Release-specific evidence belongs in CI
+This is the evergreen maintainer flow for the DocsMint public repository.
+Release-specific evidence belongs in CI
 and the GitHub Release, not in this file.
 
 ## 1. Prepare
@@ -8,7 +9,6 @@ and the GitHub Release, not in this file.
 1. Work from a clean release branch based on the intended `main` revision.
 2. Update `CHANGELOG.md` with user-visible changes and migration notes.
 3. Keep the version synchronized in:
-   - `package.json`
    - `package.public.json`
    - `backend/package.json`
    - `frontend/package.json`
@@ -21,7 +21,14 @@ and the GitHub Release, not in this file.
 4. Update `.env.example`, documentation, migrations, and OpenAPI whenever their
    public contracts changed.
 5. Check that no credentials, local environment files, generated reports, or
-   private fixtures are tracked.
+   private fixtures are tracked. `AGENTS.md`, `.bob/`, `docs/superpowers/`,
+   screenshots, local QA reports, and development fixtures must not enter a
+   public release archive unless explicitly classified as public project docs.
+
+6. If the release includes the external workspace contract, verify the
+   signed-assertion role matrix, UUID validation, tag-route authorization,
+   workspace backfill/zero-null migration gate, and direct isolation tests for
+   attachments, versions, embeddings, tags, audit rows, and queue jobs.
 
 ## 2. Verify
 
@@ -29,11 +36,12 @@ Run from the repository root:
 
 ```bash
 bun install --frozen-lockfile
-bun run lint
-bun run typecheck
-bun run test
+bun run --filter '*' lint
+bun run --filter '*' typecheck
+bun run --filter '*' test
 bun run --filter '*' build
 docker compose config --quiet
+COMPOSE_BAKE=false docker compose build
 ```
 
 Then verify the release-specific contours affected by the change:
@@ -46,6 +54,9 @@ Then verify the release-specific contours affected by the change:
   a clean consumer directory;
 - exercise global and category keys when authentication or API routes changed;
 - run live search/GraphRAG relevance gates when retrieval or providers changed;
+- verify PWA installability, `/sw.js` controller activation, offline fallback,
+  absence of private Cache Storage entries, explicit-draft/no-replay behavior,
+  and mobile browser flows with `agent-browser`;
 - inspect `git diff --check` and run the repository's secret scan.
 
 Use [Deployment](DEPLOYMENT.md) for database, queue, provider, and operational

@@ -3,7 +3,7 @@
  *
  * External consumers should NOT import this module — it pulls in
  * `./config` and crashes the process if any required env var is missing.
- * Use the npm export `@hiai-gg/hiai-docs/backend/lib/redis` instead,
+ * Use the npm export `@hiai-gg/docsmint/backend/lib/redis` instead,
  * which resolves to `./redis-factory.ts` (pure, side-effect-free).
  */
 import type Redis from "ioredis";

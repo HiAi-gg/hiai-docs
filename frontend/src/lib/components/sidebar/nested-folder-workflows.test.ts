@@ -18,6 +18,14 @@ describe("nested folder workflows", () => {
 		expect(treeSource).toContain("categoryId: newFolderCategoryId");
 	});
 
+	test("category menus open the shared dialog with category scope", () => {
+		expect(treeSource).toContain(
+			"openShareDialogForCategory(bucket.category.id, bucket.category.name)",
+		);
+		expect(treeSource).toContain("categoryId={shareCategoryId}");
+		expect(treeSource).toContain("categoryName={shareCategoryName}");
+	});
+
 	test("new subfolders expand and refresh their parent immediately", () => {
 		expect(treeSource).toContain(
 			"expandedFolderIds = new Set(expandedFolderIds).add(parentId)",

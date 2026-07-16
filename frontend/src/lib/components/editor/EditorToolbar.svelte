@@ -56,6 +56,7 @@ const {
 	toolbarExtensions = null,
 	editorActions = [],
 	editorActionContext,
+	minimal = false,
 }: {
 	editor?: Editor | null;
 	documentId?: string;
@@ -77,6 +78,7 @@ const {
 	/** Typed actions supplied by a host extension manifest. */
 	editorActions?: readonly EditorActionExtension[];
 	editorActionContext?: Omit<EditorActionContext, "selection" | "commands">;
+	minimal?: boolean;
 } = $props();
 
 function createExtensionCommands(): Readonly<
@@ -206,11 +208,25 @@ let alignOpenUp = $state(false);
 let highlightOpenUp = $state(false);
 let emojiOpenUp = $state(false);
 let tableOpenUp = $state(false);
+let headingOpenLeft = $state(false);
+let listOpenLeft = $state(false);
+let alignOpenLeft = $state(false);
+let highlightOpenLeft = $state(false);
+let emojiOpenLeft = $state(false);
+let tableOpenLeft = $state(false);
 
 function checkOpenUp(element: HTMLElement | null): boolean {
 	if (!element) return false;
 	const rect = element.getBoundingClientRect();
 	return rect.top > window.innerHeight / 2;
+}
+
+function checkOpenLeft(element: HTMLElement | null): boolean {
+	if (!element) return false;
+	const rect = element.getBoundingClientRect();
+	// Keep a comfortable margin for the widest toolbar popover. Aligning its
+	// right edge to the trigger is preferable to letting it leave the viewport.
+	return rect.left + 200 > window.innerWidth - 8;
 }
 
 // TipTap mutates its internal state during transactions but doesn't bump
@@ -312,6 +328,7 @@ function toggleHighlightPicker() {
 	highlightPickerOpen = !highlightPickerOpen;
 	if (highlightPickerOpen) {
 		highlightOpenUp = checkOpenUp(highlightPickerRoot);
+		highlightOpenLeft = checkOpenLeft(highlightPickerRoot);
 	}
 }
 
@@ -331,6 +348,7 @@ function toggleEmojiPicker() {
 	emojiPickerOpen = !emojiPickerOpen;
 	if (emojiPickerOpen) {
 		emojiOpenUp = checkOpenUp(emojiPickerRoot);
+		emojiOpenLeft = checkOpenLeft(emojiPickerRoot);
 	}
 }
 
@@ -350,6 +368,7 @@ function toggleTablePicker() {
 	tableHoverCols = 0;
 	if (tablePickerOpen) {
 		tableOpenUp = checkOpenUp(tablePickerRoot);
+		tableOpenLeft = checkOpenLeft(tablePickerRoot);
 	}
 }
 
@@ -363,6 +382,7 @@ function toggleHeadingDropdown() {
 	headingDropdownOpen = !headingDropdownOpen;
 	if (headingDropdownOpen) {
 		headingOpenUp = checkOpenUp(headingDropdownRoot);
+		headingOpenLeft = checkOpenLeft(headingDropdownRoot);
 	}
 }
 
@@ -380,6 +400,7 @@ function toggleListDropdown() {
 	listDropdownOpen = !listDropdownOpen;
 	if (listDropdownOpen) {
 		listOpenUp = checkOpenUp(listDropdownRoot);
+		listOpenLeft = checkOpenLeft(listDropdownRoot);
 	}
 }
 
@@ -439,6 +460,7 @@ function toggleAlignDropdown() {
 	alignDropdownOpen = !alignDropdownOpen;
 	if (alignDropdownOpen) {
 		alignOpenUp = checkOpenUp(alignDropdownRoot);
+		alignOpenLeft = checkOpenLeft(alignDropdownRoot);
 	}
 }
 
@@ -782,7 +804,7 @@ $effect(() => {
 		</button>
 
 		{#if headingDropdownOpen}
-			<div class="dropdown-popover" class:open-up={headingOpenUp} role="menu" aria-label={m.editor_toolbar_heading()}>
+			<div class="dropdown-popover" class:open-up={headingOpenUp} class:open-left={headingOpenLeft} role="menu" aria-label={m.editor_toolbar_heading()}>
 				<button
 					type="button"
 					class="dropdown-item"
@@ -847,7 +869,7 @@ $effect(() => {
 		</button>
 
 		{#if listDropdownOpen}
-			<div class="dropdown-popover" class:open-up={listOpenUp} role="menu" aria-label={m.editor_toolbar_list()}>
+			<div class="dropdown-popover" class:open-up={listOpenUp} class:open-left={listOpenLeft} role="menu" aria-label={m.editor_toolbar_list()}>
 				<button
 					type="button"
 					class="dropdown-item"
@@ -869,14 +891,14 @@ $effect(() => {
 					<span>{m.editor_toolbar_ordered_list()}</span>
 				</button>
 				<button
-					type="button"
-					class="dropdown-item"
-					class:selected={activeStates.taskList ?? false}
-					role="menuitem"
-					onclick={() => applyList("task")}
-				>
-					<ListChecks size={16} />
-					<span>Task list</span>
+						type="button"
+						class="dropdown-item"
+						class:selected={activeStates.taskList ?? false}
+						role="menuitem"
+						onclick={() => applyList("task")}
+					>
+						<ListChecks size={16} />
+						<span>Task list</span>
 				</button>
 			</div>
 		{/if}
@@ -910,7 +932,7 @@ $effect(() => {
 		</button>
 
 		{#if alignDropdownOpen}
-			<div class="dropdown-popover" class:open-up={alignOpenUp} role="menu" aria-label={m.editor_toolbar_align()}>
+			<div class="dropdown-popover" class:open-up={alignOpenUp} class:open-left={alignOpenLeft} role="menu" aria-label={m.editor_toolbar_align()}>
 				<button
 					type="button"
 					class="dropdown-item"
@@ -1034,7 +1056,7 @@ $effect(() => {
 		</button>
 
 		{#if highlightPickerOpen}
-			<div class="highlight-popover" class:open-up={highlightOpenUp} role="menu" aria-label={m.editor_toolbar_highlight()}>
+			<div class="highlight-popover" class:open-up={highlightOpenUp} class:open-left={highlightOpenLeft} role="menu" aria-label={m.editor_toolbar_highlight()}>
 				<div class="highlight-swatch-grid">
 					{#each HIGHLIGHT_COLORS as color (color.value)}
 						<button
@@ -1080,7 +1102,7 @@ $effect(() => {
 		</button>
 
 		{#if emojiPickerOpen}
-			<div class="emoji-popover" class:open-up={emojiOpenUp} role="menu" aria-label={m.editor_toolbar_emoji()}>
+			<div class="emoji-popover" class:open-up={emojiOpenUp} class:open-left={emojiOpenLeft} role="menu" aria-label={m.editor_toolbar_emoji()}>
 				<div class="emoji-grid">
 					{#each EMOJIS as emoji (emoji)}
 						<button
@@ -1115,7 +1137,7 @@ $effect(() => {
 		</button>
 
 		{#if tablePickerOpen}
-			<div class="table-popover" class:open-up={tableOpenUp} role="menu" aria-label="Insert table">
+			<div class="table-popover" class:open-up={tableOpenUp} class:open-left={tableOpenLeft} role="menu" aria-label="Insert table">
 				<div class="table-grid" role="presentation">
 					{#each Array(TABLE_GRID_MAX) as _, r}
 						{#each Array(TABLE_GRID_MAX) as _, c}
@@ -1165,18 +1187,7 @@ $effect(() => {
 	</button>
 {/snippet}
 
-{#snippet actionsSnippet()}
-	<button
-		class="toolbar-btn snapshot-btn"
-		disabled={isDisabled() || !documentId}
-		onclick={() => (snapshotDialogOpen = true)}
-		title={m.version_create_snapshot()}
-		aria-label={m.version_create_snapshot()}
-		type="button"
-	>
-		<Camera size={16} />
-	</button>
-
+{#snippet copyContentSnippet()}
 	<button
 		class="toolbar-btn copy-btn"
 		class:copied={copyConfirmation}
@@ -1192,6 +1203,21 @@ $effect(() => {
 			<Copy size={16} />
 		{/if}
 	</button>
+{/snippet}
+
+{#snippet actionsSnippet()}
+	<button
+		class="toolbar-btn snapshot-btn"
+		disabled={isDisabled() || !documentId}
+		onclick={() => (snapshotDialogOpen = true)}
+		title={m.version_create_snapshot()}
+		aria-label={m.version_create_snapshot()}
+		type="button"
+	>
+		<Camera size={16} />
+	</button>
+
+	{@render copyContentSnippet()}
 {/snippet}
 
 {#if editor}
@@ -1218,11 +1244,34 @@ $effect(() => {
 			tabindex="0"
 			aria-label={m.editor_toolbar_text_formatting()}
 		>
-			{#if isScrolled}
+			{#if minimal}
+				<div class="floating-toolbar-row flex items-center gap-1.5 w-full">
+					{#if isScrolled}
+						<div class="flex items-center gap-1 text-muted-foreground mr-1" title="Drag to re-position">
+							<GripHorizontal size={14} class="select-none pointer-events-none cursor-grab" />
+						</div>
+					{/if}
+					{@render basicFormatSnippet()}
+					{@render listDropdown()}
+					{@render highlightPicker()}
+					{@render copyContentSnippet()}
+					{#if isScrolled}
+						<div class="floating-toolbar-spacer flex-1"></div>
+						<button
+							type="button"
+							class="floating-toolbar-close toolbar-btn text-destructive hover:bg-destructive/10 ml-auto"
+							onclick={() => { isFloatingExpanded = false; }}
+							title="Close Toolbar"
+						>
+							<X size={16} />
+						</button>
+					{/if}
+				</div>
+			{:else if isScrolled}
 				<!-- Floating two-row layout -->
-				<div class="flex flex-col gap-1.5 w-full max-w-full">
+				<div class="floating-toolbar-layout flex flex-col gap-1.5 w-full max-w-full">
 					<!-- Row 1: Drag handle + Core formatting + Dropdowns + Close X -->
-					<div class="flex items-center gap-1.5 w-full">
+					<div class="floating-toolbar-row flex items-center gap-1.5 w-full">
 						<div class="flex items-center gap-1 text-muted-foreground mr-1" title="Drag to re-position">
 							<GripHorizontal size={14} class="select-none pointer-events-none cursor-grab" />
 						</div>
@@ -1233,11 +1282,11 @@ $effect(() => {
 						{@render listDropdown()}
 						{@render alignDropdown()}
 						
-						<div class="flex-1"></div>
+						<div class="floating-toolbar-spacer flex-1"></div>
 						
 						<button
 							type="button"
-							class="toolbar-btn text-destructive hover:bg-destructive/10 ml-auto"
+							class="floating-toolbar-close toolbar-btn text-destructive hover:bg-destructive/10 ml-auto"
 							onclick={() => { isFloatingExpanded = false; }}
 							title="Close Toolbar"
 						>
@@ -1246,7 +1295,7 @@ $effect(() => {
 					</div>
 					
 					<!-- Row 2: Block formatting + Popovers/insert tools + Actions -->
-					<div class="flex items-center gap-1.5 w-full pl-6">
+					<div class="floating-toolbar-row floating-toolbar-row-secondary flex items-center gap-1.5 w-full pl-6">
 						{@render blockFormatSnippet()}
 						{@render linkBtn()}
 						{@render highlightPicker()}
@@ -1363,6 +1412,7 @@ $effect(() => {
 		gap: 1px;
 		padding: 6px 10px;
 		border-bottom: 1px solid var(--border);
+		border-radius: 7px 7px 0 0;
 		background: var(--card);
 		flex-wrap: wrap;
 		position: sticky;
@@ -1765,12 +1815,63 @@ $effect(() => {
 		overflow: visible;
 	}
 
+	@media (max-width: 640px) {
+		.toolbar.floating-bar {
+			left: 8px;
+			right: 8px;
+			bottom: max(10px, env(safe-area-inset-bottom));
+			width: auto;
+			max-width: none;
+			padding: 8px;
+			transform: none;
+			border-radius: 10px;
+		}
+
+		.floating-toolbar-layout {
+			display: flex;
+			flex-direction: row;
+			flex-wrap: wrap;
+			align-items: center;
+			gap: 4px;
+			max-height: min(42vh, 260px);
+			overflow-y: auto;
+			padding-right: 34px;
+		}
+
+		.floating-toolbar-row {
+			display: contents;
+		}
+
+		.floating-toolbar-spacer {
+			display: none;
+		}
+
+		.floating-toolbar-close {
+			position: absolute;
+			top: 6px;
+			right: 6px;
+			margin-left: 0;
+		}
+
+		.floating-toolbar-row-secondary {
+			display: contents;
+		}
+	}
+
 	.dropdown-popover.open-up,
 	.highlight-popover.open-up,
 	.emoji-popover.open-up,
 	.table-popover.open-up {
 		top: auto;
 		bottom: calc(100% + 6px);
+	}
+
+	.dropdown-popover.open-left,
+	.highlight-popover.open-left,
+	.emoji-popover.open-left,
+	.table-popover.open-left {
+		left: auto;
+		right: 0;
 	}
 
 	@keyframes floatUp {

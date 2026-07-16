@@ -1,5 +1,10 @@
 @import "tailwindcss";
 
+/* The application theme store toggles `.dark` on the root element. Tailwind v4
+ * otherwise resolves `dark:` from the operating-system media query, which
+ * makes explicit Light/Dark settings ineffective for utility classes. */
+@custom-variant dark (&:where(.dark, .dark *));
+
 /* Canonical design tokens (oklch, shadcn-svelte new-york / slate) — single source
  * of truth lives in @hiai-gg/hiai-ui. This file is intentionally minimal: docs-specific
  * additions only. To change tokens, edit packages/hiai-ui/src/styles/tokens.css. */

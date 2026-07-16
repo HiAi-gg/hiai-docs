@@ -1,5 +1,7 @@
 import { redirect } from "@sveltejs/kit";
+import { browser } from "$app/environment";
 import { createDocument, getDocument } from "$lib/api/documents";
+import { getDocumentCached } from "$lib/offline/cache-documents";
 import { refreshDocs } from "$lib/stores/tag-store.svelte.js";
 import type { PageLoad } from "./$types";
 
@@ -19,7 +21,7 @@ export const load: PageLoad = async ({ params, fetch, url }) => {
 				fetch,
 			);
 		} catch (err) {
-			console.error("Failed to auto-create document in load:", err);
+			if (browser) throw err;
 		}
 
 		if (doc) {
@@ -43,9 +45,12 @@ export const load: PageLoad = async ({ params, fetch, url }) => {
 	}
 
 	try {
-		const document = await getDocument(params.id, fetch);
+		const document = browser
+			? await getDocumentCached(params.id, fetch)
+			: await getDocument(params.id, fetch);
 		return { document };
-	} catch {
+	} catch (err) {
+		if (browser) throw err;
 		// Fallback when backend unavailable
 		return {
 			document: {

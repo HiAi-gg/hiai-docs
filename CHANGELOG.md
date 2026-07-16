@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to hiai-docs are documented in this file.
+All notable changes to DocsMint are documented in this file.
 
 <!-- v0.2.8 publication verified 2026-07-12. -->
 
@@ -8,6 +8,62 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+- Repository: `HiAi-gg/docsmint`
+- npm: `@hiai-gg/docsmint`
+- Docker: `ghcr.io/hiai-gg/docsmint-*`
+- License: Apache-2.0
+
+#### Added
+
+- Installable Progressive Web App support with a manifest, `/sw.js`, offline
+  shell, installability prompt, update prompt, responsive mobile shell, and
+  host-provided branding/icons.
+- Identity-partitioned Dexie snapshots for cached offline reads and explicit
+  local drafts with saved timestamps, review/apply flow, and conflict recovery.
+- Typed frontend host surfaces and additive extension slots for dashboard,
+  search, navigation, settings, editor actions, and document tabs.
+
+#### Changed
+
+- Standalone UI, repository, and public package are branded as DocsMint.
+- Dashboard, editor header, mobile sidebar, raw Markdown, Settings, and recent
+  document ordering were refined for narrow screens and PWA use.
+- Offline updates use explicit drafts and optimistic `expectedUpdatedAt`
+  concurrency; reconnect never silently replays mutations.
+
+#### Fixed
+
+- Private API and authenticated navigation responses are network-only and are
+  not stored in shared Cache Storage.
+- Service-worker registration, offline fallback, host-prefixed cache cleanup,
+  logout partition cleanup, and install/update safety were tightened.
+- Mobile editor scrolling, Saved status placement, action overflow, and recent
+  document ordering were corrected.
+
+#### Security
+
+- The public npm package is renamed to `@hiai-gg/docsmint`; the legacy
+  `hiai-docs` and `hiai-docs-mcp` binaries remain compatibility aliases.
+- Docker publication moves to GHCR images
+  `ghcr.io/hiai-gg/docsmint-{api,web,caddy}`.
+- Licensing changes from MIT to Apache-2.0 across source, package metadata,
+  Swagger/OpenAPI, and documentation.
+
+#### Migration notes
+
+- `PUBLIC_APP_ID` and `PUBLIC_DEPLOYMENT_ID` define the PWA host/deployment
+  boundary; keep them stable per deployment strategy.
+- Offline schema upgrades discard legacy mutation-queue rows without replay.
+- Standalone HiAi-Docs remains owner-scoped. Workspace lifecycle, membership,
+  billing, and tenant provisioning belong to the SaaS host contract.
+
+### Breaking changes
+
+- The GitHub repository is now `HiAi-gg/docsmint`; install
+  `@hiai-gg/docsmint` and pull `ghcr.io/hiai-gg/docsmint-*` images.
+- The project is licensed under Apache-2.0. Existing `hiai-docs` CLI aliases
+  remain available throughout the `0.3.x` series.
 
 ## [0.2.9] - 2026-07-12
 

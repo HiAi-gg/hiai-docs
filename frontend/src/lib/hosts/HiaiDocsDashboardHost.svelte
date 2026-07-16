@@ -25,9 +25,9 @@ import {
 	Folder,
 	FolderKanban,
 	FolderOpen,
-	FolderPlus,
 	LayoutDashboard,
 	Loader2,
+	MoreVertical,
 	Plus,
 	RotateCcw,
 	Share2,
@@ -117,11 +117,31 @@ let deleteFolderTargetId = $state<string | null>(null);
 let deleteFolderBusy = $state(false);
 
 let showShareDialog = $state(false);
+type ShareTarget =
+	| { kind: "document"; documentId: string; title: string }
+	| { kind: "folder"; folderId: string; name: string }
+	| { kind: "category"; categoryId: string; name: string };
+let shareTarget = $state<ShareTarget | null>(null);
 let importOpen = $state(false);
 let importItems = $state<ImportItem[]>([]);
 let importInput = $state<HTMLInputElement | undefined>(undefined);
 let duplicatingDocumentId = $state<string | null>(null);
 let optimisticDocuments = $state<Document[]>([]);
+
+function openShareDialogForDocument(id: string, title: string) {
+	shareTarget = { kind: "document", documentId: id, title };
+	showShareDialog = true;
+}
+
+function openShareDialogForFolder(id: string, name: string) {
+	shareTarget = { kind: "folder", folderId: id, name };
+	showShareDialog = true;
+}
+
+function openShareDialogForCategory(id: string, name: string) {
+	shareTarget = { kind: "category", categoryId: id, name };
+	showShareDialog = true;
+}
 
 // --- Mutating actions ---
 function handleNewDocument() {
@@ -132,12 +152,6 @@ function handleNewDocument() {
 	const qs = params.toString();
 	if (qs) url += `?${qs}`;
 	goto(url);
-}
-
-function handleNewFolder() {
-	folderDialogMode = "create";
-	folderDialogTarget = null;
-	showFolderDialog = true;
 }
 
 function handleRenameFolder(id: string) {
@@ -264,6 +278,37 @@ async function handleImportFile(e: Event) {
 			};
 		});
 
+		// The page data is immutable until SvelteKit invalidates the route. Keep
+		// successful imports in the dashboard's local projection immediately so
+		// Recent Documents updates without requiring a full reload.
+		const importedDocuments: Document[] = results.items
+			.flatMap((item) =>
+				item.status === "ok" && item.document ? [item.document] : [],
+			)
+			.map((doc) => {
+				return {
+					id: doc.id,
+					title: doc.title,
+					content: doc.content,
+					folderId: doc.folderId ?? null,
+					folderName: doc.folderName ?? "",
+					categoryId: doc.categoryId ?? null,
+					tags: (doc.tags ?? []).map((tag) => tag.id),
+					createdAt: doc.createdAt,
+					updatedAt: doc.updatedAt,
+					excerpt: doc.excerpt ?? doc.content?.slice(0, 200) ?? "",
+				};
+			});
+		if (importedDocuments.length > 0) {
+			optimisticDocuments = [
+				...optimisticDocuments.filter(
+					(existing) =>
+						!importedDocuments.some((doc) => doc.id === existing.id),
+				),
+				...importedDocuments,
+			];
+		}
+
 		await invalidateAll();
 		refreshDocs();
 	} catch (err) {
@@ -372,7 +417,13 @@ const filteredDocuments = $derived.by(() => {
 	const extras = optimisticDocuments.filter(
 		(doc) => !list.some((current: Document) => current.id === doc.id),
 	);
-	list = extras.length > 0 ? [...list, ...extras] : list;
+	if (extras.length > 0) list = [...list, ...extras];
+	// Keep the newest document first after optimistic imports/duplicates too.
+	// The API already returns this order, but local extras are otherwise
+	// appended and end up at the bottom of the single-column mobile grid.
+	list = [...list].sort(
+		(a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt),
+	);
 
 	// Filter by search query locally
 	if (searchQuery.trim()) {
@@ -468,10 +519,10 @@ const isFolderEmpty = $derived(
   </title>
 </svelte:head>
 
-<div class="mx-auto max-w-5xl px-6 py-8">
+<div class="dashboard-shell mx-auto max-w-5xl px-6 py-8">
   <!-- Header -->
-  <div class="mb-8 flex flex-wrap items-center justify-between gap-4">
-    <div class="flex items-center gap-3 flex-1 min-w-0">
+  <div class="dashboard-header mb-8 flex flex-wrap items-center justify-between gap-4">
+    <div class="dashboard-context-identity flex items-center gap-3 flex-1 min-w-0">
       {#if activeFolderId}
         <Button
           variant="ghost"
@@ -515,18 +566,20 @@ const isFolderEmpty = $derived(
           {data.categories.find((c: Category) => c.id === activeCategoryId)?.name || "Category"}
         </h1>
       {:else}
-        <div class="flex size-10 items-center justify-center rounded-lg bg-primary/10">
+        <div class="dashboard-identity flex items-center gap-3">
+          <div class="flex size-10 items-center justify-center rounded-lg bg-primary/10">
           <LayoutDashboard class="size-5 text-primary" />
-        </div>
-        <div>
-          <h1 class="text-2xl font-semibold tracking-tight">{m.dashboard_title()}</h1>
-          <p class="text-sm text-muted-foreground">{m.dashboard_subtitle()}</p>
+          </div>
+          <div>
+            <h1 class="text-2xl font-semibold tracking-tight">{m.dashboard_title()}</h1>
+            <p class="text-sm text-muted-foreground">{m.dashboard_subtitle()}</p>
+          </div>
         </div>
       {/if}
     </div>
 
     <!-- Top Action Buttons -->
-    <div class="flex items-center gap-2">
+    <div class="dashboard-header-actions ml-auto flex items-center justify-end gap-2">
       <input
         type="file"
         accept=".md,.txt,.json,.markdown,.docx"
@@ -535,23 +588,27 @@ const isFolderEmpty = $derived(
         bind:this={importInput}
         onchange={handleImportFile}
       />
-      <Button variant="outline" size="sm" onclick={triggerImport} class="text-muted-foreground">
+      <Button variant="outline" size="sm" onclick={triggerImport} class="text-muted-foreground" aria-label={m.dashboard_import()}>
         <Upload class="size-4" />
-        {m.dashboard_import()}
+        <span class="dashboard-action-label">{m.dashboard_import()}</span>
       </Button>
-      <Button variant="outline" size="sm" onclick={handleNewFolder} class="text-muted-foreground">
-        <FolderPlus class="size-4" />
-        {activeFolderId ? "New Subfolder" : "New Folder"}
-      </Button>
-      <Button size="sm" onclick={handleNewDocument}>
+      <Button size="sm" onclick={handleNewDocument} aria-label={m.dashboard_new_document()}>
         <Plus class="size-4" />
-        {m.dashboard_new_document()}
+        <span class="dashboard-action-label">{m.dashboard_new_document()}</span>
       </Button>
-      {#if activeFolderId}
-        <Button variant="outline" size="sm" onclick={() => (showShareDialog = true)}>
+      {#if activeFolderId && data.activeFolder}
+        <Button variant="outline" size="sm" onclick={() => openShareDialogForFolder(activeFolderId, data.activeFolder?.name || "Folder")} aria-label={m.doc_share()}>
           <Share2 class="size-3.5" />
-          {m.doc_share()}
+          <span class="dashboard-action-label">{m.doc_share()}</span>
         </Button>
+      {:else if activeCategoryId}
+        {@const activeCategory = data.categories.find((category: Category) => category.id === activeCategoryId)}
+        {#if activeCategory}
+        <Button variant="outline" size="sm" onclick={() => openShareDialogForCategory(activeCategory.id, activeCategory.name)} aria-label={m.doc_share()}>
+          <Share2 class="size-3.5" />
+          <span class="dashboard-action-label">{m.doc_share()}</span>
+        </Button>
+        {/if}
       {/if}
     </div>
   </div>
@@ -761,6 +818,7 @@ const isFolderEmpty = $derived(
                 {folder}
                 onDelete={handleDeleteFolder}
                 onRename={handleRenameFolder}
+				onShare={openShareDialogForFolder}
               />
             {/each}
           </div>
@@ -779,6 +837,7 @@ const isFolderEmpty = $derived(
                 document={doc}
                 onDelete={handleDeleteDocument}
                 onDuplicate={handleDuplicateDocument}
+				onShare={openShareDialogForDocument}
                 duplicateBusy={duplicatingDocumentId === doc.id}
               />
             {/each}
@@ -803,21 +862,34 @@ const isFolderEmpty = $derived(
     {:else}
       <!-- Grouped Category Sections of Folders -->
       {#each visibleSections as section (section.key)}
-        {@const folderSum = section.folders.reduce((acc, f) => acc + 1 + f.subfolderCount, 0)}
         {@const docSum = section.folders.reduce((acc, f) => acc + f.documentCount, 0)}
         <section id="category-{section.key}" class="mb-8">
-          <h2 class="mb-3 flex items-center gap-2 text-xs font-medium uppercase tracking-wider text-muted-foreground">
-            <span>{section.category ? section.category.name : m.sidebar_uncategorized()}</span>
+          <div class="mb-3 flex items-center gap-2 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+            <h2>{section.category ? section.category.name : m.sidebar_uncategorized()}</h2>
             <Badge variant="secondary" class="text-[10px]">
-              {folderSum} {folderSum === 1 ? 'folder' : 'folders'} &middot; {docSum} {docSum === 1 ? 'file' : 'files'}
+              {docSum} {docSum === 1 ? 'file' : 'files'}
             </Badge>
-          </h2>
+            {#if section.category}
+              <DropdownMenu>
+                <DropdownMenuTrigger class="ml-auto inline-flex size-8 items-center justify-center rounded-md hover:bg-accent" aria-label={m.editor_more_options()}>
+                  <MoreVertical class="size-4" />
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onSelect={() => openShareDialogForCategory(section.category!.id, section.category!.name)}>
+                    <Share2 class="size-4" />
+                    {m.doc_share()}
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            {/if}
+          </div>
           <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {#each section.folders as folder (folder.id)}
               <FolderCard
                 {folder}
                 onDelete={handleDeleteFolder}
                 onRename={handleRenameFolder}
+				onShare={openShareDialogForFolder}
               />
             {/each}
           </div>
@@ -836,6 +908,7 @@ const isFolderEmpty = $derived(
                 document={doc}
                 onDelete={handleDeleteDocument}
                 onDuplicate={handleDuplicateDocument}
+				onShare={openShareDialogForDocument}
                 duplicateBusy={duplicatingDocumentId === doc.id}
               />
             {/each}
@@ -845,6 +918,56 @@ const isFolderEmpty = $derived(
     {/if}
   {/if}
 </div>
+
+<style>
+  .dashboard-shell {
+    position: relative;
+  }
+
+  @media (max-width: 767px) {
+    .dashboard-header {
+      min-height: 44px;
+    }
+
+    .dashboard-header-actions {
+      position: absolute;
+      top: calc(0.75rem + env(safe-area-inset-top));
+      right: 0.75rem;
+      z-index: 10;
+    }
+
+	.dashboard-context-identity {
+		margin-left: 56px;
+		min-width: 0;
+	}
+  }
+
+  @media (max-width: 520px) {
+    .dashboard-header-actions :global(button) {
+      width: 40px;
+      height: 40px;
+      padding: 0;
+    }
+
+    .dashboard-action-label {
+      display: none;
+    }
+  }
+
+  @media (max-width: 449px) {
+    .dashboard-context-identity {
+		margin-left: 52px;
+    }
+
+	.dashboard-context-identity p {
+		display: none;
+	}
+
+	.dashboard-context-identity h1 {
+		font-size: 1.25rem;
+	}
+  }
+</style>
 
 <!-- Folder creation / renaming dialog -->
 <FolderDialog
@@ -867,12 +990,16 @@ const isFolderEmpty = $derived(
   onCancel={() => (showDeleteFolderDialog = false)}
 />
 
-<!-- Share folder dialog (when viewing a folder) -->
-{#if activeFolderId && data.activeFolder}
+<!-- Shared dialog for document, folder, and category entry points. -->
+{#if shareTarget}
   <ShareDialog
     bind:open={showShareDialog}
-    folderId={activeFolderId}
-    folderName={data.activeFolder?.name || ""}
+    documentId={shareTarget.kind === "document" ? shareTarget.documentId : ""}
+    documentTitle={shareTarget.kind === "document" ? shareTarget.title : ""}
+    folderId={shareTarget.kind === "folder" ? shareTarget.folderId : ""}
+    folderName={shareTarget.kind === "folder" ? shareTarget.name : ""}
+    categoryId={shareTarget.kind === "category" ? shareTarget.categoryId : ""}
+    categoryName={shareTarget.kind === "category" ? shareTarget.name : ""}
   />
 {/if}
 

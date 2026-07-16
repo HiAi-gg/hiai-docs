@@ -392,6 +392,61 @@ describe("PATCH /api/documents/:id", () => {
     expect(stored.title).toBe("New");
   });
 
+  it("updates when expectedUpdatedAt matches the server timestamp", async () => {
+    const doc = seedDocument({
+      id: "99999999-9999-4999-8999-999999999998",
+      title: "Old",
+      updatedAt: new Date("2024-06-01T00:00:00.000Z"),
+    });
+
+    const res = await authedPatch(`/api/documents/${doc.id}`, {
+      title: "New",
+      expectedUpdatedAt: doc.updatedAt.toISOString(),
+    });
+    expect(res.status).toBe(200);
+    expect((res.body as any).title).toBe("New");
+  });
+
+  it("returns a structured 409 conflict without version or update side effects", async () => {
+    const doc = seedDocument({
+      id: "99999999-9999-4999-8999-999999999997",
+      title: "Server title",
+      content: "Server body",
+      contentJson: { type: "doc" },
+      updatedAt: new Date("2024-06-01T00:00:00.000Z"),
+    });
+
+    const res = await authedPatch(`/api/documents/${doc.id}`, {
+      title: "Local title",
+      expectedUpdatedAt: "2024-05-31T00:00:00.000Z",
+    });
+    expect(res.status).toBe(409);
+    expect(res.body).toEqual({
+      error: "Document changed on the server",
+      code: "DOCUMENT_CONFLICT",
+      currentUpdatedAt: doc.updatedAt.toISOString(),
+      serverVersion: {
+        id: doc.id,
+        title: "Server title",
+        content: "Server body",
+        contentJson: { type: "doc" },
+      },
+    });
+    expect(getState().documents.get(doc.id)).toMatchObject({ title: "Server title" });
+    expect(getState().versions).toHaveLength(0);
+    expect(getState().enqueuedEmbeddings).not.toContain(doc.id);
+  });
+
+  it("rejects an expectedUpdatedAt value without an explicit timezone", async () => {
+    const doc = seedDocument({ id: "99999999-9999-4999-8999-999999999996" });
+    const res = await authedPatch(`/api/documents/${doc.id}`, {
+      title: "New",
+      expectedUpdatedAt: "2024-06-01T00:00:00",
+    });
+    expect(res.status).toBe(400);
+    expect((res.body as any).error).toBe("Invalid input");
+  });
+
   it("updates content and re-enqueues embedding", async () => {
     const doc = seedDocument({
       id: "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee",

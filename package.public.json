@@ -1,16 +1,16 @@
 {
-  "name": "@hiai-gg/hiai-docs",
-  "version": "0.2.9",
+  "name": "@hiai-gg/docsmint",
+  "version": "0.3.0",
   "type": "module",
-  "license": "MIT",
+  "license": "Apache-2.0",
   "description": "The lightweight, AI-native self-hosted knowledge base \u2014 built-in RAG, hybrid semantic search, and a clean REST API for AI agents.",
   "repository": {
     "type": "git",
-    "url": "https://github.com/HiAi-gg/hiai-docs"
+    "url": "https://github.com/HiAi-gg/docsmint"
   },
-  "homepage": "https://github.com/hiai-gg/hiai-docs#readme",
+  "homepage": "https://github.com/hiai-gg/docsmint#readme",
   "bugs": {
-    "url": "https://github.com/hiai-gg/hiai-docs/issues"
+    "url": "https://github.com/hiai-gg/docsmint/issues"
   },
   "keywords": [
     "knowledge-base",
@@ -24,6 +24,10 @@
     "pgvector",
     "ollama",
     "local-llm",
+    "pwa",
+    "progressive-web-app",
+    "offline-knowledge-base",
+    "docsmint",
     "outline-alternative",
     "docmost-alternative"
   ],
@@ -100,6 +104,8 @@
     }
   },
   "bin": {
+    "docsmint": "./packages/cli/src/index.ts",
+    "docsmint-mcp": "./packages/mcp-server/src/index.ts",
     "hiai-docs": "./packages/cli/src/index.ts",
     "hiai-docs-mcp": "./packages/mcp-server/src/index.ts"
   },

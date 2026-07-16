@@ -1,6 +1,6 @@
 {
   "$schema": "https://inlang.com/schema/message-format",
-  "app_name": "HiAi-Docs",
+  "app_name": "DocsMint",
   "app_description": "AI-first documentation platform",
 
   "nav_dashboard": "Dashboard",
@@ -19,7 +19,7 @@
   "dashboard_error_retry": "Retry",
   "dashboard_empty_title": "Create your first document",
   "dashboard_empty_description": "Get started by creating a new document. Your notes will be automatically embedded for AI-powered search.",
-  "dashboard_page_title": "Dashboard - HiAi-Docs",
+  "dashboard_page_title": "Dashboard - DocsMint",
 
   "doc_title_placeholder": "Untitled",
   "doc_title_label": "Document title",
@@ -282,7 +282,7 @@
   "login_loading": "Signing in...",
   "login_or": "or",
   "login_demo_hint": "Demo mode - use any email/password to sign in",
-  "login_page_title": "Login - HiAi-Docs",
+  "login_page_title": "Login - DocsMint",
 
   "register_title": "Create account",
   "register_subtitle": "Get started with HiAi-Docs",
@@ -313,7 +313,7 @@
   "doc_save_content_error": "Failed to save content",
   "doc_save_title_error": "Failed to save title",
   "doc_delete_error": "Failed to delete document",
-  "doc_page_title": "{title} - HiAi-Docs",
+  "doc_page_title": "{title} - DocsMint",
   "tags_load_error": "Failed to load tags",
   "tag_add_error": "Failed to add tag",
   "tag_remove_error": "Failed to remove tag",
@@ -340,7 +340,7 @@
   "share_access_button": "Access content",
   "share_password_incorrect": "Incorrect password. Please try again.",
   "share_missing_token": "Missing share token",
-  "share_via_label": "Shared via HiAi-Docs",
+  "share_via_label": "Shared via DocsMint",
   "share_copied": "Copied",
   "share_empty_document": "Empty document",
   "share_folder_empty": "This folder is empty",
@@ -458,7 +458,7 @@
   "doc_change_folder": "Change folder",
   "doc_new_folder_name_aria": "New folder name input",
 
-  "sidebar_powered_by": "Powered by HiAi-Docs",
+  "sidebar_powered_by": "Powered by DocsMint",
 
   "scroll_to_top_aria": "Scroll to top",
 

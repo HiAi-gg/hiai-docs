@@ -90,6 +90,47 @@ export async function shareTokenAccessForDocument(
 		}
 	}
 
+	if (link.categoryId) {
+		const doc = await withTenant(ctx, async (tx) => {
+			const [row] = await tx
+				.select({
+					categoryId: documents.categoryId,
+					folderId: documents.folderId,
+				})
+				.from(documents)
+				.where(eq(documents.id, documentId))
+				.limit(1);
+			return row ?? null;
+		});
+		if (doc) {
+			let effectiveCategoryId = doc.categoryId;
+			let currentFolderId = doc.folderId;
+			const visited = new Set<string>();
+			while (
+				!effectiveCategoryId &&
+				currentFolderId &&
+				!visited.has(currentFolderId)
+			) {
+				visited.add(currentFolderId);
+				const folder = await withTenant(ctx, async (tx) => {
+					const [row] = await tx
+						.select({
+							categoryId: folders.categoryId,
+							parentId: folders.parentId,
+						})
+						.from(folders)
+						.where(eq(folders.id, currentFolderId as string))
+						.limit(1);
+					return row ?? null;
+				});
+				if (!folder) break;
+				effectiveCategoryId = folder.categoryId;
+				currentFolderId = folder.parentId;
+			}
+			if (effectiveCategoryId === link.categoryId) return "granted";
+		}
+	}
+
 	return "no-access";
 }
 
@@ -165,6 +206,7 @@ export async function resolveShareDocumentScope(
 				createdBy: shareLinks.createdBy,
 				documentId: shareLinks.documentId,
 				folderId: shareLinks.folderId,
+				categoryId: shareLinks.categoryId,
 				passwordHash: shareLinks.passwordHash,
 				expiresAt: shareLinks.expiresAt,
 			})
@@ -180,10 +222,19 @@ export async function resolveShareDocumentScope(
 		role: "user" as const,
 	};
 	const folderIds = new Set<string>();
-	if (link.folderId) {
-		const ownerFolders = await withTenant(ownerCtx, async (tx) =>
+	let ownerFolders: Array<{
+		id: string;
+		parentId: string | null;
+		categoryId: string | null;
+	}> = [];
+	if (link.folderId || link.categoryId) {
+		ownerFolders = await withTenant(ownerCtx, async (tx) =>
 			tx
-				.select({ id: folders.id, parentId: folders.parentId })
+				.select({
+					id: folders.id,
+					parentId: folders.parentId,
+					categoryId: folders.categoryId,
+				})
 				.from(folders)
 				.where(eq(folders.ownerId, link.createdBy)),
 		);
@@ -193,7 +244,7 @@ export async function resolveShareDocumentScope(
 			children.push(folder.id);
 			byParent.set(folder.parentId, children);
 		}
-		const pending = [link.folderId];
+		const pending = link.folderId ? [link.folderId] : [];
 		while (pending.length > 0) {
 			const current = pending.pop();
 			if (!current || folderIds.has(current)) continue;
@@ -201,27 +252,63 @@ export async function resolveShareDocumentScope(
 			pending.push(...(byParent.get(current) ?? []));
 		}
 	}
-	if (!link.documentId && folderIds.size === 0) {
-		return {
-			ownerId: link.createdBy,
-			documentIds: [],
-			passwordHash: link.passwordHash,
-			expiresAt: link.expiresAt,
-		};
-	}
-	const rows = await withTenant(ownerCtx, async (tx) =>
-		tx
-			.select({ id: documents.id })
-			.from(documents)
-			.where(
-				and(
-					eq(documents.ownerId, link.createdBy),
-					link.documentId
-						? eq(documents.id, link.documentId)
-						: inArray(documents.folderId, [...folderIds]),
-				),
-			),
-	);
+
+	const rows = link.categoryId
+		? await withTenant(ownerCtx, async (tx) => {
+				const ownerDocuments = await tx
+					.select({
+						id: documents.id,
+						categoryId: documents.categoryId,
+						folderId: documents.folderId,
+					})
+					.from(documents)
+					.where(eq(documents.ownerId, link.createdBy));
+				const foldersById = new Map(
+					ownerFolders.map((folder) => [folder.id, folder]),
+				);
+				const effectiveFolderCategory = (folderId: string | null) => {
+					const visited = new Set<string>();
+					let currentId = folderId;
+					while (currentId && !visited.has(currentId)) {
+						visited.add(currentId);
+						const folder = foldersById.get(currentId);
+						if (!folder) return null;
+						if (folder.categoryId) return folder.categoryId;
+						currentId = folder.parentId;
+					}
+					return null;
+				};
+				return ownerDocuments.filter(
+					(document) =>
+						(document.categoryId ??
+							effectiveFolderCategory(document.folderId)) === link.categoryId,
+				);
+			})
+		: link.documentId
+			? await withTenant(ownerCtx, async (tx) =>
+					tx
+						.select({ id: documents.id })
+						.from(documents)
+						.where(
+							and(
+								eq(documents.ownerId, link.createdBy),
+								eq(documents.id, link.documentId as string),
+							),
+						),
+				)
+			: folderIds.size > 0
+				? await withTenant(ownerCtx, async (tx) =>
+						tx
+							.select({ id: documents.id })
+							.from(documents)
+							.where(
+								and(
+									eq(documents.ownerId, link.createdBy),
+									inArray(documents.folderId, [...folderIds]),
+								),
+							),
+					)
+				: [];
 	return {
 		ownerId: link.createdBy,
 		documentIds: rows.map((row) => row.id),

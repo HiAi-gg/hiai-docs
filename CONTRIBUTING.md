@@ -107,11 +107,11 @@ hiai-docs exposes three stable integration surfaces. Use these instead of forkin
 ### npm SDK — programmatic API access
 
 ```bash
-bun add @hiai-gg/hiai-docs
+bun add @hiai-gg/docsmint
 ```
 
 ```ts
-import { DocsClient } from "@hiai-gg/hiai-docs";
+import { DocsClient } from "@hiai-gg/docsmint";
 
 const docs = new DocsClient({
   baseUrl: "https://your-hiai-docs-host.com",
@@ -129,7 +129,7 @@ The SDK has no runtime dependencies. Full method list in [packages/sdk/README.md
 If you share the same PostgreSQL database and want typed queries against hiai-docs tables:
 
 ```ts
-import { documents, folders, tags } from "@hiai-gg/hiai-docs/schema";
+import { documents, folders, tags } from "@hiai-gg/docsmint/schema";
 import { drizzle } from "drizzle-orm/postgres-js";
 ```
 

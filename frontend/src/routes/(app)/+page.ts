@@ -1,9 +1,12 @@
 import { redirect } from "@sveltejs/kit";
 import { listCategories } from "$lib/api/categories.js";
 import { ApiError } from "$lib/api/client.js";
-import { listDocuments } from "$lib/api/documents.js";
-import { getFolder, getFolderPath, listFolders } from "$lib/api/folders.js";
+import { getFolder, getFolderPath } from "$lib/api/folders.js";
 import { listTags } from "$lib/api/tags.js";
+import {
+	listDocumentsCached,
+	listFoldersCached,
+} from "$lib/offline/cache-documents";
 import type { Document, Folder } from "$lib/types.js";
 import type { PageLoad } from "./$types.js";
 
@@ -32,8 +35,8 @@ export const load: PageLoad = async ({ url, fetch, depends }) => {
 			breadcrumb = path;
 		} else {
 			const [rootResult, docsResult] = await Promise.all([
-				listFolders(null, false, fetch),
-				listDocuments({ limit: 100 }, fetch).catch(() => ({ items: [] })),
+				listFoldersCached(null, false, fetch),
+				listDocumentsCached({ limit: 100 }, fetch).catch(() => ({ items: [] })),
 			]);
 			rootFolders = rootResult[0]?.children ?? [];
 			recentDocs = (docsResult.items ?? []).map((doc) => ({

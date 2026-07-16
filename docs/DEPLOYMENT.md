@@ -13,7 +13,7 @@ Requirements:
 - an OpenRouter API key, or an accessible Ollama installation.
 
 ```bash
-git clone https://github.com/HiAi-gg/hiai-docs.git
+git clone https://github.com/HiAi-gg/docsmint.git
 cd hiai-docs
 cp .env.example .env
 # Add OPENROUTER_API_KEY, or set AI_PROVIDER=ollama and OLLAMA_PORT.

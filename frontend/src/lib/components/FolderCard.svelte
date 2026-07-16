@@ -12,6 +12,7 @@ import {
 	FolderInput,
 	MoreVertical,
 	Pencil,
+	Share2,
 	Trash2,
 } from "lucide-svelte";
 import { goto, invalidateAll } from "$app/navigation";
@@ -25,10 +26,12 @@ const {
 	folder,
 	onDelete,
 	onRename,
+	onShare,
 }: {
 	folder: FolderType;
 	onDelete?: (id: string) => void;
 	onRename?: (id: string) => void;
+	onShare?: (id: string, name: string) => void;
 } = $props();
 
 function navigateToFolder() {
@@ -62,7 +65,7 @@ async function handleMove(parentId: string | null, categoryId: string | null) {
     </div>
     <DropdownMenu>
       <DropdownMenuTrigger
-        class="inline-flex size-8 shrink-0 items-center justify-center rounded-md opacity-0 transition-opacity hover:bg-accent group-hover:opacity-100"
+        class="inline-flex size-8 shrink-0 items-center justify-center rounded-md opacity-100 transition-opacity hover:bg-accent sm:opacity-0 sm:group-hover:opacity-100 focus-visible:opacity-100"
         onclick={(e: MouseEvent) => e.stopPropagation()}
       >
         <MoreVertical class="size-4" />
@@ -80,6 +83,10 @@ async function handleMove(parentId: string | null, categoryId: string | null) {
         <DropdownMenuItem onclick={(e: Event) => { e.stopPropagation(); showMoveDialog = true; }}>
           <FolderInput class="size-4" />
           {m.folders_move()}
+        </DropdownMenuItem>
+        <DropdownMenuItem onclick={(e: Event) => { e.stopPropagation(); onShare?.(folder.id, folder.name); }}>
+          <Share2 class="size-4" />
+          {m.doc_share()}
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem

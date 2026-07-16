@@ -34,7 +34,7 @@ Import from the stable public package path:
   import {
     HiaiDocsDashboardHost,
     HiaiDocsExtensionProvider,
-  } from "@hiai-gg/hiai-docs/frontend/hosts";
+  } from "@hiai-gg/docsmint/frontend/hosts";
   import UsageWidget from "./UsageWidget.svelte";
 
   const extensions = {
@@ -94,7 +94,7 @@ consumers.
 
 ```svelte
 <script lang="ts">
-  import { HiaiDocsExtensionProvider } from "@hiai-gg/hiai-docs/frontend/hosts";
+  import { HiaiDocsExtensionProvider } from "@hiai-gg/docsmint/frontend/hosts";
   import HtmlPreviewPanel from "./HtmlPreviewPanel.svelte";
   import CodeIcon from "lucide-svelte/icons/code";
 
@@ -134,5 +134,5 @@ interface DocTabPanelProps {
 3. Use existing HiAi-Docs design tokens and compact accessible controls.
 4. Keep Markdown and the structured TipTap JSON equivalent when adding editor
    nodes so sharing and export continue to work.
-5. Treat `@hiai-gg/hiai-docs/frontend/hosts` and
-   `@hiai-gg/hiai-docs/frontend/extensions` as semver-versioned public APIs.
+5. Treat `@hiai-gg/docsmint/frontend/hosts` and
+   `@hiai-gg/docsmint/frontend/extensions` as semver-versioned public APIs.

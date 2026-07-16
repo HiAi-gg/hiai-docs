@@ -1,4 +1,4 @@
-import { pgTable, uuid, text, timestamp, bigint, jsonb, index, uniqueIndex, customType, boolean, integer, pgEnum, type AnyPgColumn } from "drizzle-orm/pg-core";
+import { pgTable, uuid, text, timestamp, bigint, jsonb, index, uniqueIndex, customType, boolean, check, integer, pgEnum, type AnyPgColumn } from "drizzle-orm/pg-core";
 
 // pgvector vector type — maps to PostgreSQL vector(n) column
 const vector = customType<{
@@ -428,6 +428,9 @@ export const shareLinks = pgTable(
     folderId: uuid("folder_id").references(() => folders.id, {
       onDelete: "cascade",
     }),
+    categoryId: uuid("category_id").references(() => categories.id, {
+      onDelete: "cascade",
+    }),
     token: text("token").notNull().unique(),
     passwordHash: text("password_hash"),
     role: shareRoleEnum("role").notNull().default("viewer"),
@@ -441,6 +444,11 @@ export const shareLinks = pgTable(
     index("share_links_token_idx").on(table.token),
     index("share_links_document_id_idx").on(table.documentId),
     index("share_links_folder_id_idx").on(table.folderId),
+    index("share_links_category_id_idx").on(table.categoryId),
+    check(
+      "share_links_exactly_one_target_check",
+      sql`num_nonnulls(${table.documentId}, ${table.folderId}, ${table.categoryId}) = 1`,
+    ),
   ]
 );
 
@@ -452,6 +460,10 @@ export const shareLinkRelations = relations(shareLinks, ({ one, many }) => ({
   folder: one(folders, {
     fields: [shareLinks.folderId],
     references: [folders.id],
+  }),
+  category: one(categories, {
+    fields: [shareLinks.categoryId],
+    references: [categories.id],
   }),
   creator: one(users, {
     fields: [shareLinks.createdBy],

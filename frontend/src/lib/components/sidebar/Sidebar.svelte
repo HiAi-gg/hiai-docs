@@ -20,10 +20,22 @@ import { resolveExtensions } from "$lib/extensions/resolve";
 import * as m from "$lib/paraglide/messages.js";
 import { cn } from "$lib/utils";
 
+let {
+	mobile = false,
+	mobileOpen = false,
+	element = $bindable(null),
+}: {
+	mobile?: boolean;
+	mobileOpen?: boolean;
+	element?: HTMLElement | null;
+} = $props();
+
+const SIDEBAR_COLLAPSED_KEY = "hiai_sidebar_collapsed";
 let collapsed = $state(false);
 let showSettings = $state(false);
 type PanelMode = "all" | "recent" | "tags";
 let activePanel = $state<PanelMode>("all");
+const isCollapsed = $derived(!mobile && collapsed);
 
 let width = $state(256); // default is 256px
 let isResizing = $state(false);
@@ -37,6 +49,11 @@ const navigationExtensions = $derived(
 
 $effect(() => {
 	if (typeof window !== "undefined") {
+		try {
+			collapsed = localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === "1";
+		} catch {
+			// Ignore storage failures (for example private browsing restrictions).
+		}
 		const saved = localStorage.getItem("hiai_sidebar_width");
 		if (saved) {
 			const parsed = parseInt(saved, 10);
@@ -80,25 +97,51 @@ function openSearch() {
 function togglePanel(mode: PanelMode) {
 	activePanel = activePanel === mode ? "all" : mode;
 	collapsed = false;
+	persistCollapsed();
 }
 
 function toggleCollapse() {
 	collapsed = !collapsed;
+	persistCollapsed();
 	if (collapsed) {
 		activePanel = "all";
+	}
+}
+
+function persistCollapsed() {
+	if (typeof localStorage === "undefined") return;
+	try {
+		localStorage.setItem(SIDEBAR_COLLAPSED_KEY, collapsed ? "1" : "0");
+	} catch {
+		// Ignore storage failures; the sidebar remains usable for this session.
 	}
 }
 </script>
 
 <aside
+  bind:this={element}
+  id={mobile ? "mobile-navigation" : undefined}
+  role={mobile && mobileOpen ? "dialog" : undefined}
+  aria-modal={mobile && mobileOpen ? "true" : undefined}
+  aria-label={mobile ? "Navigation" : undefined}
+  aria-hidden={mobile && !mobileOpen ? "true" : undefined}
+  tabindex="-1"
+  inert={mobile && !mobileOpen}
   class={cn(
-    "relative flex h-screen flex-col border-r border-border bg-card",
-    !isResizing && "transition-[width] duration-200"
+	"flex flex-col border-r border-border bg-card",
+	mobile && "fixed inset-y-0 left-0 z-50 h-full w-[80%] max-w-[320px] shadow-xl transition-transform duration-300 ease-out",
+	mobile && (mobileOpen ? "translate-x-0" : "-translate-x-full"),
+	!mobile && "relative h-screen",
+    !mobile && !isResizing && "transition-[width] duration-200"
   )}
-  style={collapsed ? "width: 48px;" : `width: ${width}px;`}
+  style={mobile
+	? "padding-top: env(safe-area-inset-top);"
+    : isCollapsed
+      ? "width: 48px;"
+      : `width: ${width}px;`}
 >
-  <!-- Resize Handle -->
-  {#if !collapsed}
+  <!-- Resize Handle (desktop only — disabled inside the mobile sheet) -->
+  {#if !mobile && !isCollapsed}
     <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
     <!-- svelte-ignore a11y_click_events_have_key_events -->
     <div
@@ -111,19 +154,21 @@ function toggleCollapse() {
       onmousedown={startResize}
     ></div>
   {/if}
-  <!-- Toggle -->
-  <button
-    onclick={toggleCollapse}
-    class="absolute -right-3 top-4 z-40 flex size-6 items-center justify-center rounded-full border border-border bg-background shadow-sm hover:bg-accent"
-  >
-    {#if collapsed}
-      <PanelLeftOpen class="size-3.5" />
-    {:else}
-      <PanelLeftClose class="size-3.5" />
-    {/if}
-  </button>
+  <!-- Toggle (desktop only — the collapse affordance is irrelevant in the sheet) -->
+  {#if !mobile}
+    <button
+      onclick={toggleCollapse}
+      class="absolute -right-3 top-4 z-40 flex size-6 items-center justify-center rounded-full border border-border bg-background shadow-sm hover:bg-accent"
+    >
+      {#if isCollapsed}
+        <PanelLeftOpen class="size-3.5" />
+      {:else}
+        <PanelLeftClose class="size-3.5" />
+      {/if}
+    </button>
+  {/if}
 
-  {#if !collapsed}
+  {#if !isCollapsed}
     <div class="flex flex-1 flex-col gap-4 overflow-y-auto p-3">
       <!-- Search — leave a right gap so the collapse toggle button
            (positioned at the panel's top-right edge) stays clear of it. -->
@@ -222,7 +267,7 @@ function toggleCollapse() {
   {/if}
 
   <div class="border-t border-border p-2">
-    {#if collapsed}
+    {#if isCollapsed}
       <div class="flex flex-col items-center gap-2">
         <button
           type="button"
@@ -234,19 +279,21 @@ function toggleCollapse() {
           <SettingsIcon class="size-4" />
         </button>
         <a
-          href="https://github.com/HiAi-gg/hiai-docs/"
+          href="https://docsmint.com"
           target="_blank"
           rel="noopener noreferrer"
-          class="text-xs text-muted-foreground hover:text-foreground transition-colors"
+          class="flex size-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
           title={m.sidebar_powered_by()}
+          aria-label={m.sidebar_powered_by()}
         >
-          HiAi
+          <img src="/favicon.ico" alt="DocsMint" class="size-5 object-contain dark:hidden" />
+          <img src="/favicon_white.ico" alt="" aria-hidden="true" class="hidden size-5 object-contain dark:block" />
         </a>
       </div>
     {:else}
       <div class="flex items-center justify-between">
         <a
-          href="https://github.com/HiAi-gg/hiai-docs/"
+          href="https://docsmint.com"
           target="_blank"
           rel="noopener noreferrer"
           class="text-xs text-muted-foreground hover:text-foreground transition-colors"

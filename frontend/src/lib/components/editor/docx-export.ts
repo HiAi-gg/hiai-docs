@@ -123,6 +123,27 @@ function decodeDataUrl(src: string): ResolvedImage | undefined {
 	return { buffer, type };
 }
 
+function isExpiredS3PresignedUrl(url: URL, now = Date.now()): boolean {
+	const signedAt = url.searchParams.get("X-Amz-Date");
+	const expiresSeconds = Number(url.searchParams.get("X-Amz-Expires"));
+	const match = signedAt?.match(
+		/^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z$/,
+	);
+	if (!match || !Number.isFinite(expiresSeconds) || expiresSeconds < 0) {
+		return false;
+	}
+	const [, year, month, day, hour, minute, second] = match;
+	const signedAtMs = Date.UTC(
+		Number(year),
+		Number(month) - 1,
+		Number(day),
+		Number(hour),
+		Number(minute),
+		Number(second),
+	);
+	return now >= signedAtMs + expiresSeconds * 1000;
+}
+
 /**
  * Build the image callbacks consumed by `DocxSerializerAsync`.
  *
@@ -165,6 +186,9 @@ export function createDocxImageFetcher(
 			const url = new URL(src, browserOrigin());
 			if (url.protocol !== "http:" && url.protocol !== "https:") {
 				throw new Error("DOCX export cannot fetch this image URL");
+			}
+			if (isExpiredS3PresignedUrl(url)) {
+				throw new Error("The presigned image URL has expired");
 			}
 			const sameOrigin = url.origin === browserOrigin();
 			const requestUrl =

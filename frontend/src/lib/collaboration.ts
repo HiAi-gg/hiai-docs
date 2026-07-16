@@ -17,7 +17,10 @@ export function startCollaboration(
 	stopCollaboration();
 
 	const doc = new Y.Doc();
-	const wsUrl = `ws://${window.location.hostname}:${window.location.port}/api/ws/collab/${documentId}?token=${encodeURIComponent(accessToken)}`;
+	// Derive the WebSocket protocol from the page protocol so collaboration
+	// works behind HTTPS (wss:) as well as plain HTTP (ws:).
+	const wsProtocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+	const wsUrl = `${wsProtocol}//${window.location.hostname}${window.location.port ? `:${window.location.port}` : ""}/api/ws/collab/${documentId}?token=${encodeURIComponent(accessToken)}`;
 
 	const provider = new WebsocketProvider(wsUrl, documentId, doc, {
 		connect: true,

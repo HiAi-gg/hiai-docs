@@ -1,14 +1,14 @@
 # hiai-docs MCP server
 
-Stdio Model Context Protocol server for a running [hiai-docs](https://github.com/HiAi-gg/hiai-docs) instance.
+Stdio Model Context Protocol server for a running [hiai-docs](https://github.com/HiAi-gg/docsmint) instance.
 
 ## Run the published server
 
 ```bash
-bunx --package @hiai-gg/hiai-docs hiai-docs-mcp
+bunx --package @hiai-gg/docsmint docsmint-mcp
 ```
 
-The MCP binary is shipped by `@hiai-gg/hiai-docs`; `@hiai-gg/hiai-docs-mcp` is not the package name.
+The MCP binary is shipped by `@hiai-gg/docsmint`; `@hiai-gg/docsmint-mcp` is not the package name.
 
 ## Client configuration
 
@@ -17,7 +17,7 @@ The MCP binary is shipped by `@hiai-gg/hiai-docs`; `@hiai-gg/hiai-docs-mcp` is n
   "mcpServers": {
     "hiai-docs": {
       "command": "bunx",
-      "args": ["--package", "@hiai-gg/hiai-docs", "hiai-docs-mcp"],
+      "args": ["--package", "@hiai-gg/docsmint", "docsmint-mcp"],
       "env": {
         "HIAI_DOCS_URL": "http://localhost:50700",
         "HIAI_DOCS_API_KEY": "your-global-or-category-key"

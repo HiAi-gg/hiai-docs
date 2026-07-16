@@ -90,12 +90,12 @@ function highlightText(text: string, q: string): string {
       goto(`/docs/${id}`);
     }
   }}
-  class="group block rounded-lg border border-border bg-card p-5 shadow-sm transition-all hover:border-primary/30 hover:shadow-md"
+  class="group block min-w-0 overflow-hidden rounded-lg border border-border bg-card p-5 shadow-sm transition-all hover:border-primary/30 hover:shadow-md"
 >
   <!-- Header: title + score -->
-  <div class="flex items-start justify-between gap-3">
+  <div class="flex min-w-0 items-start justify-between gap-3">
     <h3
-      class="text-lg font-semibold leading-snug text-foreground group-hover:text-primary transition-colors"
+      class="min-w-0 break-words [overflow-wrap:anywhere] text-lg font-semibold leading-snug text-foreground group-hover:text-primary transition-colors"
     >
       {title}
     </h3>
@@ -119,7 +119,7 @@ function highlightText(text: string, q: string): string {
 
   <!-- Snippet with highlighted terms -->
   <p
-    class="mt-2 text-sm leading-relaxed text-muted-foreground [&_mark]:rounded-sm [&_mark]:bg-primary/20 [&_mark]:px-0.5 [&_mark]:text-inherit dark:[&_mark]:bg-primary/30"
+    class="mt-2 min-w-0 break-words [overflow-wrap:anywhere] text-sm leading-relaxed text-muted-foreground [&_mark]:rounded-sm [&_mark]:bg-primary/20 [&_mark]:px-0.5 [&_mark]:text-inherit dark:[&_mark]:bg-primary/30"
   >
     {@html highlightedSnippet}
   </p>
@@ -127,7 +127,7 @@ function highlightText(text: string, q: string): string {
   {#if explanations.length > 0}
     <div class="mt-3 flex flex-wrap gap-1.5" aria-label="Search match explanations">
       {#each explanations.slice(0, 3) as explanation, index (index)}
-        <span class="inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
+        <span class="inline-flex min-w-0 max-w-full break-words [overflow-wrap:anywhere] items-center rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
           {explanation.label}
         </span>
       {/each}
@@ -139,7 +139,7 @@ function highlightText(text: string, q: string): string {
     class="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-muted-foreground"
   >
     {#if folderName}
-      <span class="inline-flex items-center gap-1">
+      <span class="inline-flex min-w-0 max-w-full items-center gap-1 break-words [overflow-wrap:anywhere]">
         <Folder class="size-3.5" />
         {folderName}
       </span>
@@ -147,7 +147,7 @@ function highlightText(text: string, q: string): string {
 
     {#if tags.length > 0}
       {#each tags as tag (tag.id)}
-        <span class="inline-flex items-center gap-1 rounded-full bg-secondary px-1.5 py-0.5 text-xs text-secondary-foreground">
+        <span class="inline-flex min-w-0 max-w-full items-center gap-1 rounded-full bg-secondary px-1.5 py-0.5 text-xs text-secondary-foreground break-words [overflow-wrap:anywhere]">
           {#if tag.color}
             <span class="inline-block size-2 rounded-full" style="background-color: {tag.color}"></span>
           {/if}

@@ -1,0 +1,2 @@
+[test]
+preload = ["./src/lib/offline/__tests__/setup.ts"]

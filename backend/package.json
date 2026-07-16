@@ -1,12 +1,12 @@
 {
   "name": "@hiai-docs/backend",
-  "version": "0.2.9",
+  "version": "0.3.0",
   "private": true,
   "type": "module",
-  "license": "MIT",
+  "license": "Apache-2.0",
   "scripts": {
     "dev": "bun run --watch src/index.ts",
-    "build": "bun build src/index.ts --outdir dist --target bun --external drizzle-orm --external drizzle-orm/* --external postgres",
+    "build": "bun build src/index.ts --outdir dist --target bun --define process.env.NODE_ENV='\"production\"' --external drizzle-orm --external drizzle-orm/* --external postgres",
     "start": "bun run dist/index.js",
     "lint": "biome check src/",
     "lint:fix": "biome check --fix src/",

@@ -1,6 +1,6 @@
-# @hiai-gg/hiai-docs-sdk
+# DocsMint SDK workspace
 
-A typed TypeScript client for the [hiai-docs](https://github.com/hiai-gg/hiai-docs) REST API. Bun-native `fetch`-based wrapper with Bearer auth, typed responses, and automatic retries with exponential backoff.
+A typed TypeScript client for the [DocsMint](https://github.com/HiAi-gg/docsmint) REST API. This private workspace is bundled into the single public `@hiai-gg/docsmint` package; it is not published independently.
 
 > Bun-native, ESM-only, TypeScript strict.
 
@@ -9,9 +9,7 @@ A typed TypeScript client for the [hiai-docs](https://github.com/hiai-gg/hiai-do
 ## Installation
 
 ```bash
-bun add @hiai-gg/hiai-docs-sdk
-# or
-npm install @hiai-gg/hiai-docs-sdk
+bun add @hiai-gg/docsmint
 ```
 
 The SDK has no runtime dependencies.
@@ -19,7 +17,7 @@ The SDK has no runtime dependencies.
 ## Quick start
 
 ```ts
-import { DocsClient } from "@hiai-gg/hiai-docs-sdk";
+import { DocsClient } from "@hiai-gg/docsmint";
 
 const client = new DocsClient({
   baseUrl: process.env.HIAI_DOCS_URL ?? "http://localhost:50700",
@@ -111,7 +109,7 @@ new DocsClient({
 All non-OK responses throw `DocsApiError`:
 
 ```ts
-import { DocsApiError } from "@hiai-gg/hiai-docs-sdk";
+import { DocsApiError } from "@hiai-gg/docsmint";
 
 try {
   await client.getDoc(id);
@@ -167,4 +165,4 @@ bun run build        # tsc → dist/
 
 ## License
 
-MIT
+Apache-2.0

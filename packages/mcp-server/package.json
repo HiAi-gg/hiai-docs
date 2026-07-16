@@ -1,8 +1,9 @@
 {
   "name": "@hiai-docs/mcp-server",
-  "version": "0.2.9",
+  "version": "0.3.0",
+  "private": true,
   "type": "module",
-  "license": "MIT",
+  "license": "Apache-2.0",
   "bin": {
     "hiai-docs-mcp": "./src/index.ts"
   },

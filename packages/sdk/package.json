@@ -1,8 +1,9 @@
 {
-  "name": "@hiai-gg/hiai-docs-sdk",
-  "version": "0.2.9",
+  "name": "@hiai-docs/sdk",
+  "version": "0.3.0",
+  "private": true,
   "type": "module",
-  "license": "MIT",
+  "license": "Apache-2.0",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {

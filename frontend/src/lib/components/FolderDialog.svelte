@@ -142,7 +142,7 @@ function close(force = false) {
 	</form>
 	{/if}
 
-	<DialogFooter>
+	<DialogFooter class="gap-2 max-sm:flex-col max-sm:items-stretch">
 		{#if createdFolderName}
 			<Button variant="outline" type="button" onclick={createAnother}>
 				Create another

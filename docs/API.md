@@ -202,23 +202,23 @@ owner-wide automation.
 
 | Interface | Best for | Entry point |
 | --- | --- | --- |
-| TypeScript SDK | Bun applications and typed service integration | `@hiai-gg/hiai-docs-sdk` |
-| CLI | Shell workflows and human-operated automation | `hiai-docs` binary in `@hiai-gg/hiai-docs` |
-| MCP server | AI clients and agent tool calling | `hiai-docs-mcp` binary in `@hiai-gg/hiai-docs` |
+| TypeScript SDK | Bun applications and typed service integration | `@hiai-gg/docsmint` |
+| CLI | Shell workflows and human-operated automation | `docsmint` binary in `@hiai-gg/docsmint` |
+| MCP server | AI clients and agent tool calling | `docsmint-mcp` binary in `@hiai-gg/docsmint` |
 
 ```bash
 # CLI
-bunx --package @hiai-gg/hiai-docs hiai-docs \
+bunx --package @hiai-gg/docsmint docsmint \
   init --url http://localhost:50700 --key "$HIAI_DOCS_API_KEY"
-bunx --package @hiai-gg/hiai-docs hiai-docs search 'deployment guide'
+bunx --package @hiai-gg/docsmint docsmint search 'deployment guide'
 # MCP server (stdio)
 HIAI_DOCS_URL=http://localhost:50700 \
 HIAI_DOCS_API_KEY="$HIAI_DOCS_API_KEY" \
-bunx --package @hiai-gg/hiai-docs hiai-docs-mcp
+bunx --package @hiai-gg/docsmint docsmint-mcp
 ```
 
 ```ts
-import { DocsClient } from "@hiai-gg/hiai-docs-sdk";
+import { DocsClient } from "@hiai-gg/docsmint";
 
 const docs = new DocsClient({
   baseUrl: process.env.HIAI_DOCS_URL ?? "http://localhost:50700",
