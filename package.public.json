@@ -89,18 +89,6 @@
     "./backend/lib/logger": {
       "import": "./backend/src/lib/logger.ts",
       "types": "./backend/src/lib/logger.ts"
-    },
-    "./backend/lib/rate-limit": {
-      "import": "./backend/src/lib/rate-limit-factory.ts",
-      "types": "./backend/src/lib/rate-limit-factory.ts"
-    },
-    "./backend/lib/api-keys": {
-      "import": "./backend/src/lib/api-keys.ts",
-      "types": "./backend/src/lib/api-keys.ts"
-    },
-    "./backend/lib/audit": {
-      "import": "./backend/src/lib/audit.ts",
-      "types": "./backend/src/lib/audit.ts"
     }
   },
   "bin": {
@@ -110,14 +98,34 @@
     "hiai-docs-mcp": "./packages/mcp-server/src/index.ts"
   },
   "files": [
-    "packages/sdk/dist",
-    "packages/db/src",
-    "packages/cli/src",
-    "packages/mcp-server/src",
-    "backend/src",
+    "packages/sdk/dist/index.js",
+    "packages/sdk/dist/index.d.ts",
+    "packages/sdk/dist/client.js",
+    "packages/sdk/dist/client.d.ts",
+    "packages/sdk/dist/types.js",
+    "packages/sdk/dist/types.d.ts",
+    "packages/db/src/index.ts",
+    "packages/db/src/client.ts",
+    "packages/db/src/schema.ts",
+    "packages/db/src/with-tenant.ts",
+    "packages/cli/src/index.ts",
+    "packages/cli/src/client.ts",
+    "packages/cli/src/config.ts",
+    "packages/cli/src/format.ts",
+    "packages/cli/src/commands",
+    "packages/mcp-server/src/index.ts",
+    "packages/mcp-server/src/client.ts",
+    "packages/mcp-server/src/types.ts",
+    "packages/mcp-server/src/tools",
+    "backend/src/lib/redis-factory.ts",
+    "backend/src/lib/storage-factory.ts",
+    "backend/src/lib/logger.ts",
     "frontend/src/lib/index.ts",
-    "frontend/src/lib/extensions",
-	"frontend/src/lib/hosts",
+    "frontend/src/lib/extensions/context.ts",
+    "frontend/src/lib/extensions/doc-tabs.ts",
+    "frontend/src/lib/extensions/resolve.ts",
+    "frontend/src/lib/extensions/types.ts",
+    "frontend/src/lib/hosts",
     "frontend/src/lib/stores/doc-tab-registry.svelte.ts",
     "frontend/src/lib/components/editor/shared-document.ts",
     "README.md",
@@ -125,6 +133,9 @@
   ],
   "engines": {
     "bun": ">= 1.3.14"
+  },
+  "publishConfig": {
+    "access": "public"
   },
   "scripts": {
     "dev": "docker compose up -d",
