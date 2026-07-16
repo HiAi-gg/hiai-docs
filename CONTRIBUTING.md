@@ -1,4 +1,4 @@
-# Contributing to hiai-docs
+# Contributing to DocsMint
 
 Thanks for your interest in contributing!
 
@@ -69,7 +69,7 @@ adding a new shortcut:
 ## Project Structure
 
 ```
-hiai-docs/
+docsmint/
 ├── backend/          # Elysia API (Bun)
 ├── frontend/         # SvelteKit (Svelte 5 + Tailwind v4)
 ├── packages/db/      # Drizzle ORM schema + migrations
@@ -102,7 +102,7 @@ bun run typecheck
 
 ## Extension Guide
 
-hiai-docs exposes three stable integration surfaces. Use these instead of forking core.
+DocsMint exposes three stable integration surfaces. Use these instead of forking core.
 
 ### npm SDK — programmatic API access
 
@@ -114,7 +114,7 @@ bun add @hiai-gg/docsmint
 import { DocsClient } from "@hiai-gg/docsmint";
 
 const docs = new DocsClient({
-  baseUrl: "https://your-hiai-docs-host.com",
+  baseUrl: "https://your-docsmint-host.com",
   apiKey: process.env.HIAI_DOCS_API_KEY ?? "",
 });
 
@@ -126,7 +126,7 @@ The SDK has no runtime dependencies. Full method list in [packages/sdk/README.md
 
 ### Drizzle schema import — shared table definitions
 
-If you share the same PostgreSQL database and want typed queries against hiai-docs tables:
+If you share the same PostgreSQL database and want typed queries against DocsMint tables:
 
 ```ts
 import { documents, folders, tags } from "@hiai-gg/docsmint/schema";
@@ -143,11 +143,11 @@ Point a Model Context Protocol client (Claude, Cursor, etc.) at the built-in MCP
 bun run mcp:dev
 ```
 
-The server is in `packages/mcp-server/` and exposes hiai-docs tools (search, read, write) to AI assistants.
+The server is in `packages/mcp-server/` and exposes DocsMint tools (search, read, write) to AI assistants.
 
 ### What NOT to add to core
 
-The following belong in downstream products, not in `hiai-docs` itself:
+The following are intentionally outside the DocsMint core:
 
 - Product-specific analytics or usage tracking
 - White-label UI themes

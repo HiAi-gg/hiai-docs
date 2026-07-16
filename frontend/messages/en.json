@@ -285,9 +285,9 @@
   "login_page_title": "Login - DocsMint",
 
   "register_title": "Create account",
-  "register_subtitle": "Get started with HiAi-Docs",
+  "register_subtitle": "Get started with DocsMint",
   "register_loading": "Creating account...",
-  "register_page_title": "Register - HiAi-Docs",
+  "register_page_title": "Register - DocsMint",
 
   "breadcrumb_home": "Home",
   "aria_breadcrumb": "Breadcrumb",
@@ -326,13 +326,13 @@
   "folder_new_subfolder": "New Subfolder",
   "folder_empty_title": "This folder is empty",
   "folder_empty_description": "Create a document or subfolder to get started",
-  "folder_page_title": "{name} - HiAi-Docs",
+  "folder_page_title": "{name} - DocsMint",
 
   "sort_name": "Name",
   "sort_date_modified": "Date modified",
   "sort_date_created": "Date created",
 
-  "share_page_title": "Shared Content - HiAi-Docs",
+  "share_page_title": "Shared Content - DocsMint",
   "share_load_error": "Failed to load shared content",
   "share_network_error": "Network error",
   "share_go_home": "Go to homepage",
@@ -345,7 +345,7 @@
   "share_empty_document": "Empty document",
   "share_folder_empty": "This folder is empty",
 
-  "settings_page_title": "Settings - HiAi-Docs",
+  "settings_page_title": "Settings - DocsMint",
   "settings_tab_embedding": "Embedding",
   "settings_tab_danger": "Danger",
   "settings_saving": "Saving...",

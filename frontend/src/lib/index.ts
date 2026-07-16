@@ -1,5 +1,5 @@
 /**
- * Public entrypoint for the hiai-docs frontend extension package.
+ * Public entrypoint for the DocsMint frontend extension package.
  *
  * Keep this barrel limited to SSR-safe contracts and pure helpers. Hosts such
  * as DocsMint import this path from the published package; route modules and

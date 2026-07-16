@@ -7,7 +7,17 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
-No changes yet.
+### Changed
+
+- Public documentation and user-facing metadata now use DocsMint consistently;
+  legacy names remain only for documented compatibility identifiers.
+- Application, favicon, Apple touch, maskable, and PWA icon assets now use the
+  DocsMint mark instead of the former HiAi document logo.
+
+### Removed
+
+- Product-specific workspace integration guidance from the public open-source
+  documentation set.
 
 ## [0.3.1] - 2026-07-16
 

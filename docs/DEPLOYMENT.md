@@ -14,7 +14,7 @@ Requirements:
 
 ```bash
 git clone https://github.com/HiAi-gg/docsmint.git
-cd hiai-docs
+cd docsmint
 cp .env.example .env
 # Add OPENROUTER_API_KEY, or set AI_PROVIDER=ollama and OLLAMA_PORT.
 bash scripts/quickstart.sh
@@ -84,7 +84,7 @@ Open the UI at <http://localhost:50701> and API documentation at
 
 ## PostgreSQL requirement
 
-hiai-docs does **not** support a plain PostgreSQL image for the complete search
+DocsMint does **not** support a plain PostgreSQL image for the complete search
 stack. Use the repository image built from `postgres/Dockerfile`. It combines:
 
 - PostgreSQL 18;
@@ -183,15 +183,15 @@ objects describe the same point in time.
 ```bash
 # Database backup
 docker compose exec -T postgres \
-  pg_dump -U aiuser -d hiai_docs --format=custom > hiai-docs.dump
+  pg_dump -U aiuser -d hiai_docs --format=custom > docsmint.dump
 
 # Database restore into an empty compatible database
 docker compose exec -T postgres \
-  pg_restore -U aiuser -d hiai_docs --clean --if-exists < hiai-docs.dump
+  pg_restore -U aiuser -d hiai_docs --clean --if-exists < docsmint.dump
 ```
 
 Back up the SeaweedFS Docker volume with your infrastructure's volume-snapshot
-mechanism. Test restoration periodically against the same hiai-docs PostgreSQL
+mechanism. Test restoration periodically against the same DocsMint PostgreSQL
 image version. Stop application writes or use coordinated snapshots while
 capturing both stores. Never commit backup files.
 

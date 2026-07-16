@@ -2,7 +2,7 @@
   ExtensionExamplePanel.svelte
   
   This is a reference/example panel component demonstrating how to build
-  a custom tab panel for document page extensions in hiai-docs.
+  a custom tab panel for document page extensions in DocsMint.
 -->
 <script lang="ts">
 import InfoIcon from "lucide-svelte/icons/info";

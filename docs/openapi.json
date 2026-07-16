@@ -2622,7 +2622,7 @@
         "type": "http",
         "scheme": "bearer",
         "bearerFormat": "hiai_docs_*",
-        "description": "Global or category-scoped hiai-docs API key. The operator key is also accepted as a bearer token on operator-capable routes."
+        "description": "Global or category-scoped DocsMint API key. The operator key is also accepted as a bearer token on operator-capable routes."
       },
       "SessionAuth": {
         "type": "apiKey",

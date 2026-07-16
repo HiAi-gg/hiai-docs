@@ -25,11 +25,6 @@ and the GitHub Release, not in this file.
    screenshots, local QA reports, and development fixtures must not enter a
    public release archive unless explicitly classified as public project docs.
 
-6. If the release includes the external workspace contract, verify the
-   signed-assertion role matrix, UUID validation, tag-route authorization,
-   workspace backfill/zero-null migration gate, and direct isolation tests for
-   attachments, versions, embeddings, tags, audit rows, and queue jobs.
-
 ## 2. Verify
 
 Run from the repository root:

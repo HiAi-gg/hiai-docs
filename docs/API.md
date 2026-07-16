@@ -48,7 +48,7 @@ Health is public:
 curl -fsS http://localhost:50700/api/health
 ```
 ## Authentication and keys
-hiai-docs has three separate credential models:
+DocsMint has three separate credential models:
 
 1. **Better Auth session** for the web application and key management.
 2. **User API key** for REST, SDK, CLI, MCP, and service integrations.
@@ -242,7 +242,7 @@ client-specific flags and tool schemas:
 - Never expose a global or operator credential in browser code.
 - Use category keys to apply least privilege to Docsmint or another consumer.
 - API-key lifecycle remains a browser-session-only owner operation.
-- hiai-docs does not emit outbound attachment or document lifecycle webhooks.
+- DocsMint does not emit outbound attachment or document lifecycle webhooks.
   The deprecated `POST /api/webhooks/storage` route is a signed compatibility
   no-op; use REST, SDK, or MCP for integrations.
 - The collaboration WebSocket is `WS /ws/collab/:documentId`; it accepts a

@@ -1,8 +1,8 @@
 /**
  * Public application hosts.
  *
- * These components preserve the standalone HiAi-Docs routes while allowing a
- * product build to mount typed, additive frontend extensions.
+ * These components preserve the standalone DocsMint routes while allowing
+ * typed, additive frontend extensions.
  */
 
 export { default as DocsmintSharedDocumentHost } from "./DocsmintSharedDocumentHost.svelte";

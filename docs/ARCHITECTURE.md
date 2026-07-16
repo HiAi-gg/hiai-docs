@@ -3,7 +3,7 @@
 ## Monorepo Structure
 
 ```
-hiai-docs/
+docsmint/
 ├── backend/              # Elysia REST API (Bun runtime)
 │   └── src/
 │       ├── api/routes/   # Route handlers (documents, folders, search, share, tags, auth, metrics)
@@ -33,7 +33,9 @@ hiai-docs/
 
 ### Module Boundaries & DI Factories
 
-The `backend/src/lib/` directory uses a **factory pattern** that enables external consumers (e.g. `docsmint`) to reuse Redis and SeaweedFS infrastructure **without coupling to hiai-docs' `.env` validation**:
+The `backend/src/lib/` directory uses a **factory pattern** so optional public
+subpath imports can reuse Redis and SeaweedFS infrastructure without coupling
+to DocsMint's `.env` validation:
 
 | File | Purpose | For external use? |
 |------|---------|-----------------|
@@ -50,7 +52,7 @@ The `backend/src/lib/` directory uses a **factory pattern** that enables externa
 // RLS-tenant-scoped queries (from shared package)
 import { withTenant, adminTenantContext } from "@hiai-gg/docsmint/db/with-tenant";
 
-// Pure factories — no hiai-docs config dependency
+// Pure factories — no DocsMint config dependency
 import { createRedis } from "@hiai-gg/docsmint/backend/lib/redis";
 import { createStorage } from "@hiai-gg/docsmint/backend/lib/storage";
 
@@ -58,7 +60,8 @@ import { createStorage } from "@hiai-gg/docsmint/backend/lib/storage";
 import { documents, folders } from "@hiai-gg/docsmint/schema";
 ```
 
-The RLS tenant context (`with-tenant.ts`) lives in `packages/db/` so it can be shared across both the backend API and any external consumer that imports hiai-docs tables directly.
+The RLS context (`with-tenant.ts`) lives in `packages/db/` so the backend and
+documented database subpath exports use the same transaction boundary.
 
 ## Tech Stack
 
@@ -162,17 +165,17 @@ Search queries run exact/title, language-neutral lexical, fuzzy, and active-gene
 - **Validation**: Zod schemas on all API inputs
 - **No secrets in code**: all config via environment variables
 
-## External integration and authorization boundary
+## Integration and authorization boundary
 
-REST is the canonical boundary used by the SDK, CLI, MCP server, and downstream products such as docsmint. The public package exposes typed SDK and schema contracts, but consumers must not bypass owner/category authorization with direct database writes.
+REST is the canonical boundary used by the SDK, CLI, and MCP server. The public
+package exposes typed SDK and schema contracts, but integrations must not
+bypass owner/category authorization with direct database writes.
 
 Authentication resolves to one principal: Better Auth session, static operator credential, global user API key, or category API key. Global keys receive owner-wide content access. Category keys are restricted to one effective category and an explicit set of `read`, `edit`, and `write` permissions; permissions do not imply each other. Effective category is the document's explicit category or, when absent, the category inherited from folder ancestry. This rule is shared by documents, folders, search, graph, versions, attachments, tags, sharing, and visibility.
 
 API-key issuance, listing, category-secret disclosure, and revocation deliberately bypass the generic Bearer principal resolver and require a Better Auth browser session. Global raw secrets are hash-only and shown once. Category secrets are encrypted at rest so the owning session can recover them. The static operator key is accepted on admin routes through either `x-api-key` or Bearer syntax; an unset operator key fails closed.
 
-hiai-docs does not publish outbound document webhooks. The deprecated signed storage webhook is a no-op compatibility endpoint, not a synchronization mechanism. Consumers should use REST/SDK/MCP and query the durable document pipeline endpoint when they need processing readiness.
-
-Trusted server-side integrations may opt into the generic external workspace
-contract described in [External workspace context](EXTERNAL_WORKSPACE.md).
-HiAi-Docs verifies a short-lived signed assertion and stores only the opaque
-workspace dimension.
+DocsMint does not publish outbound document webhooks. The deprecated signed
+storage webhook is a no-op compatibility endpoint, not a synchronization
+mechanism. Integrations should use REST, SDK, or MCP and query the durable
+document pipeline endpoint when they need processing readiness.

@@ -11,7 +11,7 @@ type OrderedExtension = {
  * extensions that are unavailable in the current host context.
  *
  * Extension manifests are an optional product boundary. A faulty visibility
- * predicate must not prevent the stock HiAi-Docs UI from rendering, so a
+ * predicate must not prevent the stock DocsMint UI from rendering, so a
  * throwing predicate is treated as not visible.
  */
 export function resolveExtensions<T extends OrderedExtension>(

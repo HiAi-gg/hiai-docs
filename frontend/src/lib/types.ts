@@ -1,4 +1,4 @@
-/** Shared types for hiai-docs frontend */
+/** Shared types for the DocsMint frontend. */
 
 export interface Document {
 	id: string;

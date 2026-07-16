@@ -173,7 +173,7 @@ export interface SharedDocumentExtension {
 }
 
 /**
- * Complete frontend extension manifest consumed by hiai-docs app-shell and
+ * Complete frontend extension manifest consumed by the DocsMint app shell and
  * page components. Arrays are readonly to keep registration request-scoped
  * and to prevent extensions mutating one another during SSR.
  */

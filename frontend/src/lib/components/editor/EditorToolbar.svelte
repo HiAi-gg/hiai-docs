@@ -124,7 +124,7 @@ async function runEditorAction(action: EditorActionExtension) {
 		await action.run(createEditorActionContext());
 	} catch (error) {
 		// A product extension must not take down the stock toolbar when it fails.
-		console.error(`HiAi-Docs editor extension "${action.id}" failed`, error);
+		console.error(`DocsMint editor extension "${action.id}" failed`, error);
 	}
 }
 

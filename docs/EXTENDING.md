@@ -1,8 +1,8 @@
-# Extending HiAi-Docs
+# Extending DocsMint
 
-HiAi-Docs exposes additive, typed frontend extension points for product builds
-and submodule consumers. Use them to add product features without copying a
-route, sidebar, dashboard, editor, or authentication flow.
+DocsMint exposes additive, typed frontend extension points for self-hosted
+customization. Use them to add features without copying a route, sidebar,
+dashboard, editor, or authentication flow.
 
 Extensions cannot replace authentication, permissions, retrieval, GraphRAG,
 storage, or standard editor behavior. The base application remains the owner of
@@ -15,10 +15,10 @@ zones:
 
 | Host | Extensions it consumes | Use it for |
 |---|---|---|
-| `HiaiDocsDashboardHost` | `dashboardWidgets` | Usage, templates, classification widgets |
-| `HiaiDocsSearchHost` | `searchWidgets` | Product context next to read-only search state |
-| Built-in sidebar | `navigation` | Templates, Billing, Usage links |
-| Built-in Settings dialog | `settingsSections` | Product-owned settings tabs |
+| `DocsmintDashboardHost` | `dashboardWidgets` | Custom cards and classification widgets |
+| `DocsmintSearchHost` | `searchWidgets` | Custom context next to read-only search state |
+| Built-in sidebar | `navigation` | Additional self-hosted navigation links |
+| Built-in Settings dialog | `settingsSections` | Custom settings sections |
 | Built-in document editor | `editorActions`, `documentTabs` | AI actions and HTML rendition tabs |
 
 Hosts are SvelteKit components. They intentionally use the normal `$app` and
@@ -32,8 +32,8 @@ Import from the stable public package path:
 ```svelte
 <script lang="ts">
   import {
-    HiaiDocsDashboardHost,
-    HiaiDocsExtensionProvider,
+    DocsmintDashboardHost,
+    DocsmintExtensionProvider,
   } from "@hiai-gg/docsmint/frontend/hosts";
   import UsageWidget from "./UsageWidget.svelte";
 
@@ -56,13 +56,13 @@ Import from the stable public package path:
   };
 </script>
 
-<HiaiDocsExtensionProvider {extensions}>
-  <HiaiDocsDashboardHost {data} />
-</HiaiDocsExtensionProvider>
+<DocsmintExtensionProvider {extensions}>
+  <DocsmintDashboardHost {data} />
+</DocsmintExtensionProvider>
 ```
 
 The provider creates a request-scoped manifest. With no provider, each host
-uses an empty manifest and renders the unchanged standalone HiAi-Docs UI.
+uses an empty manifest and renders the unchanged standalone DocsMint UI.
 Extension ids are deterministic, visibility predicates are isolated, and a
 failing visibility predicate is hidden rather than breaking the base UI.
 
@@ -94,7 +94,7 @@ consumers.
 
 ```svelte
 <script lang="ts">
-  import { HiaiDocsExtensionProvider } from "@hiai-gg/docsmint/frontend/hosts";
+  import { DocsmintExtensionProvider } from "@hiai-gg/docsmint/frontend/hosts";
   import HtmlPreviewPanel from "./HtmlPreviewPanel.svelte";
   import CodeIcon from "lucide-svelte/icons/code";
 
@@ -111,9 +111,9 @@ consumers.
   };
 </script>
 
-<HiaiDocsExtensionProvider {extensions}>
+<DocsmintExtensionProvider {extensions}>
   {@render children()}
-</HiaiDocsExtensionProvider>
+</DocsmintExtensionProvider>
 ```
 
 Tab panels receive:
@@ -128,10 +128,10 @@ interface DocTabPanelProps {
 
 ## Integration rules
 
-1. Keep all extension components and product data in the consuming project.
-2. Import only documented public entrypoints, never a private HiAi-Docs route
+1. Keep extension components and their data outside the core routes.
+2. Import only documented public entrypoints, never a private DocsMint route
    or internal store.
-3. Use existing HiAi-Docs design tokens and compact accessible controls.
+3. Use existing DocsMint design tokens and compact accessible controls.
 4. Keep Markdown and the structured TipTap JSON equivalent when adding editor
    nodes so sharing and export continue to work.
 5. Treat `@hiai-gg/docsmint/frontend/hosts` and

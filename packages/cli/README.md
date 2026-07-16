@@ -1,6 +1,6 @@
-# hiai-docs CLI
+# DocsMint CLI
 
-Bun-native terminal client for a running [hiai-docs](https://github.com/HiAi-gg/docsmint) instance.
+Bun-native terminal client for a running [DocsMint](https://github.com/HiAi-gg/docsmint) instance.
 
 ## Run the published CLI
 
@@ -8,7 +8,10 @@ Bun-native terminal client for a running [hiai-docs](https://github.com/HiAi-gg/
 bunx --package @hiai-gg/docsmint docsmint --help
 ```
 
-The public package contains the `hiai-docs` binary; there is no separate public `@hiai-docs/cli` install requirement. From a source checkout use `bun --filter '@hiai-docs/cli' dev -- <args>`.
+The public package contains the canonical `docsmint` binary. The legacy
+`hiai-docs` binary remains a compatibility alias; there is no separate public
+CLI package. From a source checkout use
+`bun --filter '@hiai-docs/cli' dev -- <args>`.
 
 ## Configure
 

@@ -1,6 +1,6 @@
-# hiai-docs MCP server
+# DocsMint MCP server
 
-Stdio Model Context Protocol server for a running [hiai-docs](https://github.com/HiAi-gg/docsmint) instance.
+Stdio Model Context Protocol server for a running [DocsMint](https://github.com/HiAi-gg/docsmint) instance.
 
 ## Run the published server
 
@@ -15,7 +15,7 @@ The MCP binary is shipped by `@hiai-gg/docsmint`; `@hiai-gg/docsmint-mcp` is not
 ```json
 {
   "mcpServers": {
-    "hiai-docs": {
+    "docsmint": {
       "command": "bunx",
       "args": ["--package", "@hiai-gg/docsmint", "docsmint-mcp"],
       "env": {
