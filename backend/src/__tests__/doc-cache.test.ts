@@ -100,6 +100,27 @@ describe("docListKey", () => {
 		expect(key).toBe("hiai-docs:cache:docs:list:user-A:p:1:l:100");
 		expect(key).not.toContain("list::");
 	});
+
+	it("namespaces external workspace list keys without changing personal keys", () => {
+		const workspaceKey = mod.docListKey(
+			"user-A",
+			undefined,
+			undefined,
+			1,
+			20,
+			"workspace-A",
+		);
+		const otherWorkspaceKey = mod.docListKey(
+			"user-A",
+			undefined,
+			undefined,
+			1,
+			20,
+			"workspace-B",
+		);
+		expect(workspaceKey).not.toBe(otherWorkspaceKey);
+		expect(workspaceKey).toContain(":w:workspace-A:");
+	});
 });
 
 describe("docSingleKey", () => {
@@ -116,6 +137,12 @@ describe("docSingleKey", () => {
 	it("keeps the single-prefix namespace", () => {
 		expect(mod.docSingleKey("doc-1", "user-A")).toMatch(
 			/^hiai-docs:cache:docs:single:/,
+		);
+	});
+
+	it("separates two workspaces for the same actor and document", () => {
+		expect(mod.docSingleKey("doc-1", "user-A", "workspace-A")).not.toBe(
+			mod.docSingleKey("doc-1", "user-A", "workspace-B"),
 		);
 	});
 });

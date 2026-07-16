@@ -154,7 +154,8 @@ Search queries run exact/title, language-neutral lexical, fuzzy, and active-gene
 
 ## Security Model
 
-- **Data isolation**: every query filters by `ownerId` (user-scoped)
+- **Data isolation**: personal queries use `ownerId`; trusted external requests
+  use the verified opaque `workspaceId` boundary and PostgreSQL RLS
 - **Auth**: Better Auth session cookies (7-day expiry)
 - **Sharing**: token-based links with optional password + expiry
 - **Rate limiting**: 10 req/min per IP on public share endpoints
@@ -170,3 +171,8 @@ Authentication resolves to one principal: Better Auth session, static operator c
 API-key issuance, listing, category-secret disclosure, and revocation deliberately bypass the generic Bearer principal resolver and require a Better Auth browser session. Global raw secrets are hash-only and shown once. Category secrets are encrypted at rest so the owning session can recover them. The static operator key is accepted on admin routes through either `x-api-key` or Bearer syntax; an unset operator key fails closed.
 
 hiai-docs does not publish outbound document webhooks. The deprecated signed storage webhook is a no-op compatibility endpoint, not a synchronization mechanism. Consumers should use REST/SDK/MCP and query the durable document pipeline endpoint when they need processing readiness.
+
+Trusted hosts may opt into the generic external workspace contract described in
+[External workspace context](EXTERNAL_WORKSPACE.md). HiAi-Docs verifies a
+short-lived signed assertion and stores only the opaque workspace dimension;
+the host remains responsible for membership, lifecycle, billing, and UI.

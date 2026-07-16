@@ -4,6 +4,9 @@ import { db } from "./client";
 export interface TenantContext {
 	userId: string;
 	role: "admin" | "user" | "none";
+	workspaceId?: string;
+	source?: "personal" | "external";
+	actorRole?: "owner" | "admin" | "editor" | "viewer";
 }
 
 export const ZERO_UUID = "00000000-0000-0000-0000-000000000000";
@@ -63,6 +66,9 @@ export async function withTenant<T>(
 		);
 		await tx.execute(
 			sql`SELECT set_config('app.current_user_role', ${ctx.role}, true)`,
+		);
+		await tx.execute(
+			sql`SELECT set_config('app.current_workspace_id', ${ctx.workspaceId ?? ""}, true)`,
 		);
 		return fn(tx);
 	});

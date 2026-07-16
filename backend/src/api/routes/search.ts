@@ -8,6 +8,8 @@ import {
 	type ContentAccess,
 	canAccessContent,
 	resolveContentAccess,
+	tenantOwnerCondition,
+	tenantOwnerSql,
 } from "../../lib/content-access";
 import { logger } from "../../lib/logger";
 import { resolveShareDocumentScope } from "../../lib/share-access";
@@ -281,7 +283,7 @@ export function createSearchRoutes(
 				set.status = 403;
 				return { error: "Forbidden" };
 			}
-			const userId = ctx.userId;
+			const _userId = ctx.userId;
 			const parsed = suggestQuerySchema.safeParse(query);
 			if (!parsed.success) {
 				set.status = 400;
@@ -298,7 +300,7 @@ export function createSearchRoutes(
 					return tx.execute(sql`
 					SELECT id, title, similarity(title, ${q}) as score
 					FROM documents
-					WHERE owner_id = ${userId}
+					WHERE ${tenantOwnerSql("documents", ctx)}
 						${
 							scopedIds
 								? sql`AND id IN (${sql.join(
@@ -358,12 +360,20 @@ async function loadCategoryDocumentIds(
 				folders,
 				and(
 					eq(folders.id, documents.folderId),
-					eq(folders.ownerId, access.userId),
+					tenantOwnerCondition(
+						folders.ownerId,
+						folders.workspaceId,
+						access.ctx,
+					),
 				),
 			)
 			.where(
 				and(
-					eq(documents.ownerId, access.userId),
+					tenantOwnerCondition(
+						documents.ownerId,
+						documents.workspaceId,
+						access.ctx,
+					),
 					or(
 						eq(documents.categoryId, categoryId),
 						and(
@@ -413,13 +423,13 @@ async function hydrateResults(
 				folders,
 				and(
 					eq(folders.id, documents.folderId),
-					eq(folders.ownerId, ctx.userId),
+					tenantOwnerCondition(folders.ownerId, folders.workspaceId, ctx),
 				),
 			)
 			.where(
 				and(
 					or(
-						eq(documents.ownerId, ctx.userId),
+						tenantOwnerCondition(documents.ownerId, documents.workspaceId, ctx),
 						eq(documents.visibility, "public"),
 					),
 					inArray(documents.id, visibleIds),
@@ -470,7 +480,7 @@ async function hydrateResults(
 						ids.map((id) => sql`${id}`),
 						sql`, `,
 					)})
-						AND d.owner_id = ${ctx.userId}
+						AND ${tenantOwnerSql("d", ctx)}
 						AND d.embedding_status = 'ready'
 						AND d.active_embedding_generation IS NOT NULL
 						AND de.generation_id = d.active_embedding_generation
@@ -526,7 +536,7 @@ async function withTags<T extends { id: string }>(
 			.where(
 				and(
 					inArray(documentTags.documentId, ids),
-					eq(tagsTable.ownerId, ctx.userId),
+					tenantOwnerCondition(tagsTable.ownerId, tagsTable.workspaceId, ctx),
 				),
 			);
 	});

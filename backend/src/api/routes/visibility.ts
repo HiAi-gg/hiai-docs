@@ -7,6 +7,7 @@ import {
 	effectiveDocumentCategory,
 	isAuthorizedCategory,
 	resolveContentAccess,
+	tenantOwnerCondition,
 } from "../../lib/content-access";
 import { withTenant } from "../../lib/with-tenant";
 import { rateLimitHeaders, writeRateLimiter } from "../middleware/rate-limit";
@@ -66,7 +67,14 @@ export const visibilityRoutes = new Elysia({ prefix: "/api" })
 					.update(documents)
 					.set({ visibility: "public" })
 					.where(
-						and(eq(documents.id, params.id), eq(documents.ownerId, userId)),
+						and(
+							eq(documents.id, params.id),
+							tenantOwnerCondition(
+								documents.ownerId,
+								documents.workspaceId,
+								ctx,
+							),
+						),
 					)
 					.returning();
 
@@ -158,7 +166,14 @@ export const visibilityRoutes = new Elysia({ prefix: "/api" })
 					.update(documents)
 					.set({ visibility: "private" })
 					.where(
-						and(eq(documents.id, params.id), eq(documents.ownerId, userId)),
+						and(
+							eq(documents.id, params.id),
+							tenantOwnerCondition(
+								documents.ownerId,
+								documents.workspaceId,
+								ctx,
+							),
+						),
 					)
 					.returning();
 

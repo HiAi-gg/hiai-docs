@@ -51,6 +51,23 @@ describe("config schema", () => {
 		}
 	});
 
+	test("requires issuer and secret when external tenancy is enabled", () => {
+		const disabled = realEnvSchema.safeParse({
+			EXTERNAL_TENANT_ENABLED: "false",
+		});
+		expect(disabled.success).toBe(true);
+		const enabledWithoutCredentials = realEnvSchema.safeParse({
+			EXTERNAL_TENANT_ENABLED: "true",
+		});
+		expect(enabledWithoutCredentials.success).toBe(false);
+		const enabled = realEnvSchema.safeParse({
+			EXTERNAL_TENANT_ENABLED: "true",
+			EXTERNAL_TENANT_ISSUER: "trusted-gateway",
+			EXTERNAL_TENANT_SECRET: "a-secret",
+		});
+		expect(enabled.success).toBe(true);
+	});
+
 	test("rejects invalid NODE_ENV", () => {
 		const result = envSchema.safeParse({ NODE_ENV: "staging" });
 		expect(result.success).toBe(false);

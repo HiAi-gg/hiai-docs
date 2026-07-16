@@ -476,6 +476,8 @@ export interface DocsRequestContext {
 	authorization?: string;
 	cookie?: string;
 	requestId?: string;
+	/** Short-lived signed assertion from a trusted external workspace gateway. */
+	externalTenantAssertion?: string;
 	headers?: HeadersInit;
 	signal?: AbortSignal;
 }

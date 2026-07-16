@@ -14,6 +14,7 @@ import { activateEmbeddingGeneration } from "../embedding/generation";
 import { getEmbedding } from "../embedding/index";
 import { chunkHash } from "../lib/chunk-hash";
 import { config } from "../lib/config";
+import { tenantOwnerCondition } from "../lib/content-access";
 import { extractEntities } from "../lib/graph/extract-entities";
 import type {
 	EmbedBatchJob,
@@ -33,6 +34,15 @@ import type { PipelineStageDependencies } from "./start";
 import type { PipelineStageStatus } from "./workers/graph.worker";
 
 const admin = adminTenantContext(ZERO_UUID);
+
+function jobTenant(job: { ownerId: string; workspaceId?: string }) {
+	return {
+		userId: job.ownerId,
+		role: "user" as const,
+		source: job.workspaceId ? ("external" as const) : ("personal" as const),
+		workspaceId: job.workspaceId,
+	};
+}
 
 function providerProfile(name: string): ProviderLimiterProfile {
 	return {
@@ -115,7 +125,7 @@ async function claimPendingBatches(
 	job: PrepareJob | EmbedBatchJob,
 	limit: number,
 ): Promise<EmbedBatchJob[]> {
-	return withTenant(admin, async (tx) => {
+	return withTenant({ ...admin, workspaceId: job.workspaceId }, async (tx) => {
 		const [run] = await tx
 			.select({ totalBatches: documentPipelineRuns.totalBatches })
 			.from(documentPipelineRuns)
@@ -180,8 +190,8 @@ export function createPipelineStageDependencies(
 			claimPendingBatches,
 			markStale: (job, errorCode) =>
 				markRunStale(job.generationId, "prepare", errorCode),
-			async loadDocument({ documentId, ownerId }) {
-				return withTenant(admin, async (tx) => {
+			async loadDocument({ documentId, ownerId, workspaceId }) {
+				return withTenant({ ...admin, workspaceId }, async (tx) => {
 					const [doc] = await tx
 						.select({
 							title: documents.title,
@@ -190,7 +200,16 @@ export function createPipelineStageDependencies(
 						})
 						.from(documents)
 						.where(
-							and(eq(documents.id, documentId), eq(documents.ownerId, ownerId)),
+							and(
+								eq(documents.id, documentId),
+								tenantOwnerCondition(
+									documents.ownerId,
+									documents.workspaceId,
+									workspaceId
+										? jobTenant({ ownerId, workspaceId })
+										: { userId: ownerId, role: "user" as const },
+								),
+							),
 						)
 						.limit(1);
 					if (!doc) return null;
@@ -206,105 +225,116 @@ export function createPipelineStageDependencies(
 				});
 			},
 			async prepareRun({ job, totalChunks, batches }) {
-				return withTenant(admin, async (tx) => {
-					if ((batches.at(-1)?.chunkEnd ?? 0) !== totalChunks) {
-						return "stale" as const;
-					}
-					const [run] = await tx
-						.select({ status: documentPipelineRuns.prepareStatus })
-						.from(documentPipelineRuns)
-						.where(
-							and(
-								eq(documentPipelineRuns.generationId, job.generationId),
-								eq(documentPipelineRuns.ownerId, job.ownerId),
-								eq(documentPipelineRuns.revision, job.revision),
-							),
-						)
-						.limit(1);
-					if (!run) return "stale" as const;
-					if (run.status === "ready") return "duplicate" as const;
-					await tx
-						.update(documents)
-						.set({
-							pendingEmbeddingGeneration: job.generationId,
-							embeddingStatus: "processing",
-							embeddingErrorCode: null,
-						})
-						.where(
-							and(
-								eq(documents.id, job.documentId),
-								eq(documents.ownerId, job.ownerId),
-							),
-						);
-					if (batches.length > 0) {
-						await tx
-							.insert(documentPipelineBatches)
-							.values(
-								batches.map((batch) => ({
-									documentId: job.documentId,
-									generationId: job.generationId,
-									batchIndex: batch.batchIndex,
-									chunkStart: batch.chunkStart,
-									chunkEnd: batch.chunkEnd,
-								})),
+				return withTenant(
+					{ ...admin, workspaceId: job.workspaceId },
+					async (tx) => {
+						if ((batches.at(-1)?.chunkEnd ?? 0) !== totalChunks) {
+							return "stale" as const;
+						}
+						const [run] = await tx
+							.select({ status: documentPipelineRuns.prepareStatus })
+							.from(documentPipelineRuns)
+							.where(
+								and(
+									eq(documentPipelineRuns.generationId, job.generationId),
+									tenantOwnerCondition(
+										documentPipelineRuns.ownerId,
+										documentPipelineRuns.workspaceId,
+										jobTenant(job),
+									),
+									eq(documentPipelineRuns.revision, job.revision),
+								),
 							)
-							.onConflictDoNothing();
-					}
-					await tx
-						.update(documentPipelineRuns)
-						.set({
-							prepareStatus: "ready",
-							embedStatus: "pending",
-							status: "processing",
-							totalBatches: batches.length,
-							updatedAt: new Date(),
-						})
-						.where(eq(documentPipelineRuns.generationId, job.generationId));
-					return "prepared" as const;
-				});
+							.limit(1);
+						if (!run) return "stale" as const;
+						if (run.status === "ready") return "duplicate" as const;
+						await tx
+							.update(documents)
+							.set({
+								pendingEmbeddingGeneration: job.generationId,
+								embeddingStatus: "processing",
+								embeddingErrorCode: null,
+							})
+							.where(
+								and(
+									eq(documents.id, job.documentId),
+									eq(documents.ownerId, job.ownerId),
+								),
+							);
+						if (batches.length > 0) {
+							await tx
+								.insert(documentPipelineBatches)
+								.values(
+									batches.map((batch) => ({
+										documentId: job.documentId,
+										workspaceId: job.workspaceId,
+										generationId: job.generationId,
+										batchIndex: batch.batchIndex,
+										chunkStart: batch.chunkStart,
+										chunkEnd: batch.chunkEnd,
+									})),
+								)
+								.onConflictDoNothing();
+						}
+						await tx
+							.update(documentPipelineRuns)
+							.set({
+								prepareStatus: "ready",
+								embedStatus: "pending",
+								status: "processing",
+								totalBatches: batches.length,
+								updatedAt: new Date(),
+							})
+							.where(eq(documentPipelineRuns.generationId, job.generationId));
+						return "prepared" as const;
+					},
+				);
 			},
 			async completeEmpty(job) {
-				await withTenant(admin, async (tx) => {
-					// A zero-chunk generation is still the newest source of truth.
-					// Activate it without inventing a vector/profile, remove any
-					// previous generation rows, and leave downstream optional stages
-					// to mark themselves skipped.
-					const activated = await tx
-						.update(documents)
-						.set({
-							activeEmbeddingGeneration: job.generationId,
-							pendingEmbeddingGeneration: null,
-							embeddingProfile: null,
-							embeddingStatus: "ready",
-							embeddingErrorCode: null,
-							embeddingUpdatedAt: new Date(),
-						})
-						.where(
-							and(
-								eq(documents.id, job.documentId),
-								eq(documents.ownerId, job.ownerId),
-								eq(documents.pendingEmbeddingGeneration, job.generationId),
-							),
-						)
-						.returning({ id: documents.id });
-					if (activated.length !== 1) return;
-					await tx
-						.delete(documentEmbeddings)
-						.where(
-							and(
-								eq(documentEmbeddings.documentId, job.documentId),
-								ne(documentEmbeddings.generationId, job.generationId),
-							),
-						);
-					await tx
-						.update(documentPipelineRuns)
-						.set({
-							embedStatus: "skipped",
-							completedBatches: 0,
-							updatedAt: new Date(),
-						})
-						.where(eq(documentPipelineRuns.generationId, job.generationId));
-				});
+				await withTenant(
+					{ ...admin, workspaceId: job.workspaceId },
+					async (tx) => {
+						// A zero-chunk generation is still the newest source of truth.
+						// Activate it without inventing a vector/profile, remove any
+						// previous generation rows, and leave downstream optional stages
+						// to mark themselves skipped.
+						const activated = await tx
+							.update(documents)
+							.set({
+								activeEmbeddingGeneration: job.generationId,
+								pendingEmbeddingGeneration: null,
+								embeddingProfile: null,
+								embeddingStatus: "ready",
+								embeddingErrorCode: null,
+								embeddingUpdatedAt: new Date(),
+							})
+							.where(
+								and(
+									eq(documents.id, job.documentId),
+									eq(documents.ownerId, job.ownerId),
+									eq(documents.pendingEmbeddingGeneration, job.generationId),
+								),
+							)
+							.returning({ id: documents.id });
+						if (activated.length !== 1) return;
+						await tx
+							.delete(documentEmbeddings)
+							.where(
+								and(
+									eq(documentEmbeddings.documentId, job.documentId),
+									ne(documentEmbeddings.generationId, job.generationId),
+								),
+							);
+						await tx
+							.update(documentPipelineRuns)
+							.set({
+								embedStatus: "skipped",
+								completedBatches: 0,
+								updatedAt: new Date(),
+							})
+							.where(eq(documentPipelineRuns.generationId, job.generationId));
+					},
+				);
 			},
 			enqueueEmbed(data, options) {
 				return queue("embed").add("embed", data, options);
@@ -320,8 +350,8 @@ export function createPipelineStageDependencies(
 			},
 			markStale: (job, errorCode) =>
 				markRunStale(job.generationId, "embed", errorCode),
-			async loadDocument({ documentId, ownerId, generationId }) {
-				return withTenant(admin, async (tx) => {
+			async loadDocument({ documentId, ownerId, generationId, workspaceId }) {
+				return withTenant({ ...admin, workspaceId }, async (tx) => {
 					const [doc] = await tx
 						.select({
 							title: documents.title,
@@ -333,7 +363,13 @@ export function createPipelineStageDependencies(
 						.where(
 							and(
 								eq(documents.id, documentId),
-								eq(documents.ownerId, ownerId),
+								tenantOwnerCondition(
+									documents.ownerId,
+									documents.workspaceId,
+									workspaceId
+										? jobTenant({ ownerId, workspaceId })
+										: { userId: ownerId, role: "user" as const },
+								),
 								eq(documents.pendingEmbeddingGeneration, generationId),
 							),
 						)
@@ -358,40 +394,44 @@ export function createPipelineStageDependencies(
 					() => getEmbedding(text),
 				),
 			async storeBatch({ job, rows }) {
-				return withTenant(admin, async (tx) => {
-					const [batch] = await tx
-						.select({ status: documentPipelineBatches.status })
-						.from(documentPipelineBatches)
-						.where(
-							and(
-								eq(documentPipelineBatches.generationId, job.generationId),
-								eq(documentPipelineBatches.batchIndex, job.batchIndex),
-							),
-						)
-						.limit(1);
-					if (!batch) return "stale" as const;
-					if (batch.status === "ready") return "duplicate" as const;
-					await tx
-						.insert(documentEmbeddings)
-						.values(
-							rows.map((row) => ({
-								documentId: job.documentId,
-								generationId: job.generationId,
-								chunkIndex: row.chunkIndex,
-								chunkText: row.chunkText,
-								chunkHash: chunkHash(row.chunkText),
-								charStart: row.charStart,
-								charEnd: row.charEnd,
-								embedding: row.embedding,
-								embeddingModel: row.model,
-								embeddingProfile: row.profile,
-								embeddingDimensions: row.dimensions,
-								isValid: true,
-							})),
-						)
-						.onConflictDoNothing();
-					return "stored" as const;
-				});
+				return withTenant(
+					{ ...admin, workspaceId: job.workspaceId },
+					async (tx) => {
+						const [batch] = await tx
+							.select({ status: documentPipelineBatches.status })
+							.from(documentPipelineBatches)
+							.where(
+								and(
+									eq(documentPipelineBatches.generationId, job.generationId),
+									eq(documentPipelineBatches.batchIndex, job.batchIndex),
+								),
+							)
+							.limit(1);
+						if (!batch) return "stale" as const;
+						if (batch.status === "ready") return "duplicate" as const;
+						await tx
+							.insert(documentEmbeddings)
+							.values(
+								rows.map((row) => ({
+									documentId: job.documentId,
+									workspaceId: job.workspaceId,
+									generationId: job.generationId,
+									chunkIndex: row.chunkIndex,
+									chunkText: row.chunkText,
+									chunkHash: chunkHash(row.chunkText),
+									charStart: row.charStart,
+									charEnd: row.charEnd,
+									embedding: row.embedding,
+									embeddingModel: row.model,
+									embeddingProfile: row.profile,
+									embeddingDimensions: row.dimensions,
+									isValid: true,
+								})),
+							)
+							.onConflictDoNothing();
+						return "stored" as const;
+					},
+				);
 			},
 			async completeBatch({ job, profile }) {
 				return withTenant(admin, async (tx) => {
@@ -472,7 +512,11 @@ export function createPipelineStageDependencies(
 						.where(
 							and(
 								eq(documents.id, job.documentId),
-								eq(documents.ownerId, job.ownerId),
+								tenantOwnerCondition(
+									documents.ownerId,
+									documents.workspaceId,
+									jobTenant(job),
+								),
 							),
 						)
 						.limit(1);
@@ -491,7 +535,7 @@ export function createPipelineStageDependencies(
 				const data: PipelineJob = { ...job, stage: "summarize" };
 				await queue("summarize").add("summarize", data, {
 					...DEFAULT_JOB_OPTIONS,
-					jobId: JOB_IDS.summarize(job.generationId),
+					jobId: JOB_IDS.summarize(job.generationId, job.workspaceId),
 					priority: SOURCE_PRIORITY[job.source],
 				});
 			},
@@ -517,7 +561,7 @@ export function createPipelineStageDependencies(
 				const data: PipelineJob = { ...job, stage: "finalize" };
 				await queue("finalize").add("finalize", data, {
 					...DEFAULT_JOB_OPTIONS,
-					jobId: JOB_IDS.finalize(job.generationId),
+					jobId: JOB_IDS.finalize(job.generationId, job.workspaceId),
 					priority: SOURCE_PRIORITY[job.source],
 				});
 			},

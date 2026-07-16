@@ -15,6 +15,7 @@ import {
 	effectiveDocumentCategory,
 	isAuthorizedCategory,
 	resolveContentAccess,
+	tenantOwnerCondition,
 } from "../../lib/content-access";
 import { logger } from "../../lib/logger";
 import { fetchRemoteImage } from "../../lib/remote-image";
@@ -52,7 +53,14 @@ async function authorizeDocument(
 			.from(documents)
 			.leftJoin(folders, eq(folders.id, documents.folderId))
 			.where(
-				and(eq(documents.id, documentId), eq(documents.ownerId, access.userId)),
+				and(
+					eq(documents.id, documentId),
+					tenantOwnerCondition(
+						documents.ownerId,
+						documents.workspaceId,
+						access.ctx,
+					),
+				),
 			)
 			.limit(1);
 		return document ?? null;
@@ -79,6 +87,16 @@ const LEGACY_MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
  * load so per-request checks stay cheap.
  */
 const ATTACHMENT_MAX_SIZE_BYTES = config.ATTACHMENT_MAX_SIZE_MB * 1024 * 1024;
+
+function attachmentKeyPrefix(
+	ctx: { source?: "personal" | "external"; workspaceId?: string },
+	userId: string,
+	documentId: string,
+): string {
+	return ctx.source === "external" && ctx.workspaceId
+		? `${ctx.workspaceId}/${userId}/${documentId}`
+		: `${userId}/${documentId}`;
+}
 
 const PRESIGN_EXPIRY_SECONDS = config.ATTACHMENT_PRESIGN_EXPIRY_SECONDS;
 
@@ -279,6 +297,7 @@ export const attachmentRoutes = new Elysia({ prefix: "/api" })
 					error: authorization.row ? "Forbidden" : "Document not found",
 				};
 			}
+			const ctx = authorization.access.ctx;
 			const userId = authorization.access.userId;
 
 			const payload = body as
@@ -313,7 +332,7 @@ export const attachmentRoutes = new Elysia({ prefix: "/api" })
 			// download route (GET /attachments/:id/raw) keeps working for
 			// any old records created before presign was introduced.
 			const ext = filename.split(".").pop() ?? "bin";
-			const key = `${userId}/${documentId}/${nanoid()}.${ext}`;
+			const key = `${attachmentKeyPrefix(ctx, userId, documentId)}/${nanoid()}.${ext}`;
 
 			try {
 				const url = await getSignedUrl(
@@ -399,7 +418,7 @@ export const attachmentRoutes = new Elysia({ prefix: "/api" })
 			// different user or document. The presign endpoint always
 			// generates keys in that shape; rejecting mismatches here is a
 			// belt-and-braces guard against a hand-crafted request.
-			const expectedPrefix = `${userId}/${documentId}/`;
+			const expectedPrefix = `${attachmentKeyPrefix(ctx, userId, documentId)}/`;
 			if (!key.startsWith(expectedPrefix)) {
 				set.status = 400;
 				return { error: "key does not match this document/user" };
@@ -541,7 +560,7 @@ export const attachmentRoutes = new Elysia({ prefix: "/api" })
 
 		// Generate storage key
 		const ext = file.name.split(".").pop() ?? "bin";
-		const key = `${userId}/${documentId}/${nanoid()}.${ext}`;
+		const key = `${attachmentKeyPrefix(ctx, userId, documentId)}/${nanoid()}.${ext}`;
 
 		try {
 			// Upload to SeaweedFS
@@ -632,7 +651,7 @@ export const attachmentRoutes = new Elysia({ prefix: "/api" })
 			return { error: authorization.row ? "Forbidden" : "Document not found" };
 		}
 		const ctx = authorization.access.ctx;
-		const userId = authorization.access.userId;
+		const _userId = authorization.access.userId;
 
 		const documentId = params.id;
 
@@ -641,7 +660,12 @@ export const attachmentRoutes = new Elysia({ prefix: "/api" })
 			const [doc] = await tx
 				.select({ id: documents.id })
 				.from(documents)
-				.where(and(eq(documents.id, documentId), eq(documents.ownerId, userId)))
+				.where(
+					and(
+						eq(documents.id, documentId),
+						tenantOwnerCondition(documents.ownerId, documents.workspaceId, ctx),
+					),
+				)
 				.limit(1);
 			if (!doc) {
 				return null;

@@ -10,6 +10,7 @@ export function docListKey(
 	tag?: string,
 	page = 1,
 	limit = 20,
+	workspaceId?: string,
 ): string {
 	// LIST_PREFIX already ends with `:`. Starting with it as a separate
 	// `join(":")` segment produced a double-colon key (`list::user`) while
@@ -17,18 +18,23 @@ export function docListKey(
 	// PATCHes could succeed while the sidebar kept reading the stale list until
 	// Redis TTL expiry.
 	const parts = [`${LIST_PREFIX}${userId}`];
+	if (workspaceId) parts.push(`w:${workspaceId}`);
 	if (folderId) parts.push(`f:${folderId}`);
 	if (tag) parts.push(`t:${tag}`);
 	parts.push(`p:${page}`, `l:${limit}`);
 	return parts.join(":");
 }
 
-export function docSingleKey(docId: string, userId: string): string {
+export function docSingleKey(
+	docId: string,
+	userId: string,
+	workspaceId?: string,
+): string {
 	// Tenant-scope the single-doc cache: User A's cached fetch must not
 	// be returned to User B even if both happen to query the same `docId`
 	// in succession. See invalidateDocCache for the matching wildcard
 	// invalidation that clears every user's variant on write.
-	return `${SINGLE_PREFIX}${userId}:${docId}`;
+	return `${SINGLE_PREFIX}${userId}${workspaceId ? `:w:${workspaceId}` : ""}:${docId}`;
 }
 
 export async function cacheGetOrSet<T>(

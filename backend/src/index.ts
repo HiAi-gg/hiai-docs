@@ -28,6 +28,7 @@ import { webhookRoutes } from "./api/routes/webhooks";
 import { ensureApiKeyOwner } from "./lib/api-key-owner";
 import { config } from "./lib/config";
 import { drainLegacyEmbeddingQueue } from "./lib/embedding-queue";
+import { ExternalTenantContextError } from "./lib/external-tenant-context";
 import { logger } from "./lib/logger";
 import { BUCKET, ensureBucket, storage } from "./lib/storage";
 import { createPipelineStageDependencies } from "./queue/adapters";
@@ -167,6 +168,12 @@ const swaggerConfig = {
 
 const app = new Elysia()
 	.use(bodySizeLimit)
+	.onError(({ error, set }) => {
+		if (error instanceof ExternalTenantContextError) {
+			set.status = error.status;
+			return { error: error.message };
+		}
+	})
 	.onAfterHandle(({ set }) => {
 		set.headers["Content-Security-Policy"] = CSP_POLICY;
 		set.headers["Strict-Transport-Security"] = HSTS_POLICY;

@@ -42,6 +42,7 @@ import {
 } from "@hiai-docs/db/with-tenant";
 import { and, eq, inArray } from "drizzle-orm";
 import { config } from "./config";
+import { tenantOwnerCondition } from "./content-access";
 import { enqueueEmbedding } from "./embedding-queue";
 import { logger } from "./logger";
 import { redis } from "./redis";
@@ -68,8 +69,11 @@ const REEMBED_ADMIN_TENANT = adminTenantContext(ZERO_UUID);
  *
  * @internal
  */
-async function claimEnqueueSlot(docId: string): Promise<boolean> {
-	const key = `${DEDUP_KEY_PREFIX}${docId}`;
+async function claimEnqueueSlot(
+	docId: string,
+	workspaceId?: string,
+): Promise<boolean> {
+	const key = `${DEDUP_KEY_PREFIX}${workspaceId ? `${workspaceId}:` : ""}${docId}`;
 	try {
 		const result = await redis.set(key, "1", "EX", DEDUP_TTL_SECONDS, "NX");
 		return result === "OK";
@@ -97,6 +101,7 @@ async function claimEnqueueSlot(docId: string): Promise<boolean> {
  */
 export async function enqueueReembed(
 	docIds: Iterable<string | null | undefined>,
+	workspaceId?: string,
 ): Promise<number> {
 	const unique = new Set<string>();
 	for (const id of docIds) {
@@ -106,7 +111,7 @@ export async function enqueueReembed(
 
 	let pushed = 0;
 	for (const id of unique) {
-		if (await claimEnqueueSlot(id)) {
+		if (await claimEnqueueSlot(id, workspaceId)) {
 			// Keep the legacy list bridge for metadata-triggered re-embeds until
 			// the reconciliation worker owns this path. The bridge accepts the
 			// document id and preserves existing dedup/retry behavior.
@@ -131,18 +136,30 @@ export async function enqueueReembed(
 export async function reembedDocsInFolder(
 	folderId: string,
 	ownerId: string,
+	workspaceId?: string,
 ): Promise<number> {
 	const limit = config.FOLDER_REEMBED_BATCH_SIZE;
-	const rows = await withTenant({ userId: ownerId, role: "user" }, (tx) => {
+	const tenant = { userId: ownerId, role: "user" as const, workspaceId };
+	const rows = await withTenant(tenant, (tx) => {
 		const query = tx
 			.select({ id: documents.id })
 			.from(documents)
 			.where(
-				and(eq(documents.folderId, folderId), eq(documents.ownerId, ownerId)),
+				and(
+					eq(documents.folderId, folderId),
+					tenantOwnerCondition(
+						documents.ownerId,
+						documents.workspaceId,
+						tenant,
+					),
+				),
 			);
 		return limit > 0 ? query.limit(limit) : query;
 	});
-	const enqueued = await enqueueReembed(rows.map((r) => r.id));
+	const enqueued = await enqueueReembed(
+		rows.map((r) => r.id),
+		workspaceId,
+	);
 	if (enqueued > 0) {
 		logger.info(
 			{ folderId, enqueued, limit },
@@ -203,11 +220,12 @@ export async function reembedDocsInFolderAdmin(
 export async function reembedDocsInCategory(
 	categoryId: string,
 	ownerId: string,
+	workspaceId?: string,
 ): Promise<number> {
 	const limit = config.CATEGORY_REEMBED_BATCH_SIZE;
 
 	const [directRows, folderDocRows] = await withTenant(
-		{ userId: ownerId, role: "user" },
+		{ userId: ownerId, role: "user", workspaceId },
 		async (tx) => {
 			const directRows = await tx
 				.select({ id: documents.id })
@@ -215,14 +233,25 @@ export async function reembedDocsInCategory(
 				.where(
 					and(
 						eq(documents.categoryId, categoryId),
-						eq(documents.ownerId, ownerId),
+						tenantOwnerCondition(documents.ownerId, documents.workspaceId, {
+							userId: ownerId,
+							role: "user",
+							workspaceId,
+						}),
 					),
 				);
 			const folderRows = await tx
 				.select({ id: folders.id })
 				.from(folders)
 				.where(
-					and(eq(folders.categoryId, categoryId), eq(folders.ownerId, ownerId)),
+					and(
+						eq(folders.categoryId, categoryId),
+						tenantOwnerCondition(folders.ownerId, folders.workspaceId, {
+							userId: ownerId,
+							role: "user",
+							workspaceId,
+						}),
+					),
 				);
 			const folderIds = folderRows.map((row) => row.id);
 			if (folderIds.length === 0) return [directRows, []] as const;
@@ -231,7 +260,11 @@ export async function reembedDocsInCategory(
 				.from(documents)
 				.where(
 					and(
-						eq(documents.ownerId, ownerId),
+						tenantOwnerCondition(documents.ownerId, documents.workspaceId, {
+							userId: ownerId,
+							role: "user",
+							workspaceId,
+						}),
 						inArray(documents.folderId, folderIds),
 					),
 				);
@@ -246,7 +279,7 @@ export async function reembedDocsInCategory(
 
 	const idArray = Array.from(allIds);
 	const bounded = limit > 0 ? idArray.slice(0, limit) : idArray;
-	const enqueued = await enqueueReembed(bounded);
+	const enqueued = await enqueueReembed(bounded, workspaceId);
 
 	if (enqueued > 0) {
 		logger.info(
@@ -277,10 +310,11 @@ export async function reembedDocsInCategory(
 export async function reembedDocsByTag(
 	tagId: string,
 	ownerId?: string,
+	workspaceId?: string,
 ): Promise<number> {
 	const limit = config.TAG_REEMBED_BATCH_SIZE;
 	const tenant = ownerId
-		? { userId: ownerId, role: "user" as const }
+		? { userId: ownerId, role: "user" as const, workspaceId }
 		: REEMBED_ADMIN_TENANT;
 	const rows = await withTenant(tenant, (tx) => {
 		const query = tx
@@ -289,7 +323,10 @@ export async function reembedDocsByTag(
 			.where(eq(documentTags.tagId, tagId));
 		return limit > 0 ? query.limit(limit) : query;
 	});
-	const enqueued = await enqueueReembed(rows.map((r) => r.documentId));
+	const enqueued = await enqueueReembed(
+		rows.map((r) => r.documentId),
+		workspaceId,
+	);
 	if (enqueued > 0) {
 		logger.info(
 			{ tagId, enqueued, limit },

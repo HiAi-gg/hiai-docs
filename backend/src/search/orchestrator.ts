@@ -195,7 +195,7 @@ export async function searchDocuments(
 		const expandedStarted = performance.now();
 		try {
 			const expansion = await expand(plan, {
-				tenantScope: ctx.userId,
+				tenantScope: ctx.workspaceId ?? ctx.userId,
 				ownerId: ctx.userId,
 			});
 			if (expansion) {

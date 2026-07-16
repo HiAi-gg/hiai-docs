@@ -9,6 +9,12 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+### Added
+- Generic signed external workspace context with transaction-local workspace
+  RLS, workspace-scoped cache/object-storage/pipeline identifiers, SDK header
+  propagation, migration `0034_external_workspace_context`, and self-hosted
+  personal-mode compatibility.
+
 ## [0.2.9] - 2026-07-12
 
 ### Added

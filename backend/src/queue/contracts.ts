@@ -17,6 +17,7 @@ const basePipelineJobSchema = z.object({
 	schemaVersion: z.literal(PIPELINE_SCHEMA_VERSION),
 	documentId: z.uuid(),
 	ownerId: z.uuid(),
+	workspaceId: z.string().min(1).optional(),
 	generationId: z.uuid(),
 	revision: z.string().min(1),
 	requestedAt: z.iso.datetime(),
@@ -74,6 +75,7 @@ export type PipelineJob = z.infer<typeof pipelineJobSchema>;
 export const enqueueDocumentPipelineSchema = z.object({
 	documentId: z.uuid(),
 	ownerId: z.uuid(),
+	workspaceId: z.string().min(1).optional(),
 	revision: z.string().min(1),
 	source: pipelineSourceSchema,
 	requestedAt: z.iso.datetime().optional(),
@@ -83,11 +85,14 @@ export type EnqueueDocumentPipelineInput = z.infer<
 >;
 
 export const JOB_IDS = {
-	prepare: (documentId: string, generationId: string) =>
-		`prepare-${documentId}-${generationId}`,
-	embed: (generationId: string, batchIndex: number) =>
-		`embed-${generationId}-${batchIndex}`,
-	graph: (generationId: string) => `graph-${generationId}`,
-	summarize: (generationId: string) => `summary-${generationId}`,
-	finalize: (generationId: string) => `finalize-${generationId}`,
+	prepare: (documentId: string, generationId: string, workspaceId?: string) =>
+		`prepare-${documentId}-${generationId}${workspaceId ? `-${workspaceId}` : ""}`,
+	embed: (generationId: string, batchIndex: number, workspaceId?: string) =>
+		`embed-${generationId}-${batchIndex}${workspaceId ? `-${workspaceId}` : ""}`,
+	graph: (generationId: string, workspaceId?: string) =>
+		`graph-${generationId}${workspaceId ? `-${workspaceId}` : ""}`,
+	summarize: (generationId: string, workspaceId?: string) =>
+		`summary-${generationId}${workspaceId ? `-${workspaceId}` : ""}`,
+	finalize: (generationId: string, workspaceId?: string) =>
+		`finalize-${generationId}${workspaceId ? `-${workspaceId}` : ""}`,
 } as const;

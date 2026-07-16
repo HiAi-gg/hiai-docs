@@ -22,8 +22,8 @@ describe("sibling folder name migration", () => {
 
 	it("is the latest journaled migration", () => {
 		expect(journal.entries.at(-1)).toMatchObject({
-			idx: 32,
-			tag: "0032_unique_sibling_folder_names",
+			idx: 34,
+			tag: "0034_external_workspace_context",
 		});
 	});
 });

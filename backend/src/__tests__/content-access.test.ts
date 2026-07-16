@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import type { AuthPrincipal } from "../lib/auth-principal";
 import {
 	canAccessContent,
+	contentAccessForExternalContext,
 	contentAccessForPrincipal,
 	effectiveDocumentCategory,
 	isAuthorizedCategory,
@@ -67,6 +68,20 @@ describe("content API authorization matrix", () => {
 		expect(canAccessContent(access, "read")).toBe(true);
 		expect(canAccessContent(access, "edit")).toBe(true);
 		expect(canAccessContent(access, "write")).toBe(false);
+	});
+
+	test("external roles map to workspace permissions without category restrictions", () => {
+		const viewer = contentAccessForExternalContext({
+			userId: ownerId,
+			workspaceId: "workspace-a",
+			source: "external",
+			role: "user",
+			actorRole: "viewer",
+		});
+		expect(canAccessContent(viewer, "read")).toBe(true);
+		expect(canAccessContent(viewer, "edit")).toBe(false);
+		expect(canAccessContent(viewer, "write")).toBe(false);
+		expect(isAuthorizedCategory(viewer, otherCategoryId)).toBe(true);
 	});
 
 	test("document category prefers its explicit category and falls back to folder ancestry", () => {

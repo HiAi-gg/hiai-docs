@@ -33,6 +33,7 @@ import {
 	type ContentAccess,
 	canAccessContent,
 	resolveContentAccess,
+	tenantOwnerCondition,
 } from "../../lib/content-access";
 import { getGraphDb } from "../../lib/graph/init";
 import {
@@ -431,12 +432,20 @@ async function allowedGraphDocumentIds(
 				folders,
 				and(
 					eq(folders.id, documents.folderId),
-					eq(folders.ownerId, access.userId),
+					tenantOwnerCondition(
+						folders.ownerId,
+						folders.workspaceId,
+						access.ctx,
+					),
 				),
 			)
 			.where(
 				and(
-					eq(documents.ownerId, access.userId),
+					tenantOwnerCondition(
+						documents.ownerId,
+						documents.workspaceId,
+						access.ctx,
+					),
 					inArray(documents.id, docIds),
 					access.restricted
 						? access.categoryId
@@ -471,7 +480,10 @@ async function filterToOwnedDocuments(
 			.select({ id: documents.id })
 			.from(documents)
 			.where(
-				and(eq(documents.ownerId, ctx.userId), inArray(documents.id, docIds)),
+				and(
+					tenantOwnerCondition(documents.ownerId, documents.workspaceId, ctx),
+					inArray(documents.id, docIds),
+				),
 			);
 	});
 	return new Set(rows.map((r) => r.id));
