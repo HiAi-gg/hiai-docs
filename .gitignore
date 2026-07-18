@@ -76,3 +76,9 @@ scratch/
 notes/
 .packages/
 .worktrees/
+
+# Private product handoff and integration notes
+docs/internal/
+docs/handoff/
+docs/*-integration-prompt.md
+docs/*-implementation-prompt.md

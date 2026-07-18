@@ -64,15 +64,13 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ### Removed
 
-- Product-specific workspace integration guidance from the public open-source
-  documentation set.
 - The unstable Raw JSON editor mode and its Settings toggle; existing
   JSON-only preferences safely fall back to the visual editor.
 
 ### Added
 
-- Stable server-side lifecycle, workspace assertion, cursor-listing, storage,
-  and package integration seams for downstream SaaS hosts.
+- Stable server-side lifecycle, workspace assertion, cursor-listing, and
+  storage package APIs.
 
 ## [0.3.1] - 2026-07-16
 
