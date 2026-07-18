@@ -23,12 +23,33 @@ test("lifecycle migration defines durable operation constraints and tenant RLS",
 	expect(migration).not.toContain("raw_error");
 });
 
-test("lifecycle migration is the latest journaled operation", async () => {
+test("lifecycle retention is the latest journaled operation", async () => {
 	const journal = JSON.parse(await readFile(journalPath, "utf8")) as {
 		entries: Array<{ idx: number; tag: string }>;
 	};
 	expect(journal.entries.at(-1)).toMatchObject({
-		idx: 36,
-		tag: "0036_lifecycle_operations",
+		idx: 38,
+		tag: "0038_lifecycle_account_deletion_retention",
 	});
+});
+
+test("lifecycle retention preserves redacted operations after account deletion", async () => {
+	const migration = await readFile(new URL("./migrations/0038_lifecycle_account_deletion_retention.sql", import.meta.url), "utf8");
+	expect(migration).toContain("CREATE EXTENSION IF NOT EXISTS pgcrypto");
+	expect(migration).toContain('"actor_subject_hash" text');
+	expect(migration).toContain("ON DELETE SET NULL");
+	expect(migration).toContain('ALTER COLUMN "actor_user_id" DROP NOT NULL');
+	expect(migration).toContain("actor_subject_hash = OLD.actor_subject_hash");
+});
+
+test("document-create idempotency migration uses a workspace-scoped durable operation", async () => {
+	const migration = await readFile(
+		new URL("./migrations/0037_document_create_idempotency.sql", import.meta.url),
+		"utf8",
+	);
+	expect(migration).toContain('CREATE TABLE "document_create_operations"');
+	expect(migration).toContain('UNIQUE("workspace_id", "actor_user_id", "idempotency_key")');
+	expect(migration).toContain('"document_id" uuid NOT NULL');
+	expect(migration).toContain('ENABLE ROW LEVEL SECURITY');
+	expect(migration).toContain('TO hiai_app');
 });

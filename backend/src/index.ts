@@ -30,6 +30,7 @@ import { config } from "./lib/config";
 import { drainLegacyEmbeddingQueue } from "./lib/embedding-queue";
 import { ExternalTenantContextError } from "./lib/external-tenant-context";
 import { logger } from "./lib/logger";
+import { configureDocsMintRuntime } from "./lib/runtime-options";
 import { BUCKET, ensureBucket, storage } from "./lib/storage";
 import { createPipelineStageDependencies } from "./queue/adapters";
 import { configureOwnerStageLimits } from "./queue/fair-scheduler";
@@ -43,6 +44,10 @@ import { startRegisteredPipelineWorkers } from "./queue/start";
 
 // The API-key principal owns records created by agentic/CLI clients. Provision
 // it before accepting writes so a clean quickstart cannot fail owner FKs.
+// A tenancy-enabled process must receive its quota provider before route or
+// worker initialization. The public in-process launcher configures this first;
+// direct backend starts fail closed instead of accepting unmetered attachments.
+configureDocsMintRuntime();
 await ensureApiKeyOwner();
 
 configureDefaultJobOptions({
@@ -135,7 +140,7 @@ const swaggerConfig = {
 	documentation: {
 		info: {
 			title: "DocsMint API",
-			version: "0.3.5",
+			version: "0.3.6",
 			description:
 				"Self-hosted AI-first documentation platform. Full-text + semantic search, version history, sharing, and folder organization.",
 			contact: { name: "HiAi-gg", url: "https://github.com/HiAi-gg/docsmint" },
@@ -257,10 +262,14 @@ app.listen({
 logger.info({ port: config.API_PORT }, "hiai-docs API started");
 
 // Graceful shutdown
-const shutdown = async () => {
+export const stopDocsMintApi = async () => {
 	logger.info("Shutting down...");
 	await pipelineRuntime.close();
 	await app.stop();
+};
+
+const shutdown = async () => {
+	await stopDocsMintApi();
 	process.exit(0);
 };
 

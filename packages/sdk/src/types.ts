@@ -367,12 +367,19 @@ export interface DocsAttachmentPresignInput {
 export interface DocsAttachmentPresignResponse {
 	url: string;
 	key: string;
+	/**
+	 * Opaque server-issued reservation. Present only when workspace storage
+	 * enforcement is enabled and required verbatim by confirmAttachment.
+	 */
+	quotaReservationId?: string;
 	maxSize: number;
 	expiresIn: number;
 }
 
 export interface DocsAttachmentConfirmInput extends DocsAttachmentPresignInput {
 	key: string;
+	/** The opaque reservation returned by presignAttachment when present. */
+	quotaReservationId?: string;
 }
 
 // ---------------------------------------------------------------------------

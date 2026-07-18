@@ -1,6 +1,7 @@
 <script lang="ts">
 import type { Snippet } from "svelte";
 import { getFrontendExtensions } from "../extensions/context";
+import { sanitizeSharedDocumentExtensionContext } from "../extensions/shared-document-context";
 import type {
 	SharedDocumentExtension,
 	SharedDocumentExtensionContext,
@@ -15,10 +16,11 @@ const {
 } = $props();
 
 const extensions = getFrontendExtensions();
+const safeContext = $derived(sanitizeSharedDocumentExtensionContext(context));
 function permitted(extension: SharedDocumentExtension) {
 	return extension.permission === "annotate"
-		? context.permissions.annotate
-		: context.permissions.edit;
+		? safeContext.permissions.annotate
+		: safeContext.permissions.edit;
 }
 function visible(items: readonly SharedDocumentExtension[]) {
 	const seen = new Set<string>();
@@ -27,7 +29,7 @@ function visible(items: readonly SharedDocumentExtension[]) {
 			if (seen.has(extension.id) || !permitted(extension)) return false;
 			seen.add(extension.id);
 			try {
-				return extension.visible?.(context) ?? true;
+				return extension.visible?.(safeContext) ?? true;
 			} catch {
 				return false;
 			}
@@ -41,24 +43,24 @@ function visible(items: readonly SharedDocumentExtension[]) {
 <div data-docsmint-shared-document-host>
 	<div data-extension-zone="shared-header-actions">
 		{#each visible(extensions.sharedDocumentHeaderActions) as extension (extension.id)}
-			<extension.component {context} />
+			<extension.component context={safeContext} />
 		{/each}
 	</div>
 	{@render children()}
 	<div data-extension-zone="shared-document-tabs">
 		{#each visible(extensions.sharedDocumentTabs) as extension (extension.id)}
-			<extension.component {context} />
+			<extension.component context={safeContext} />
 		{/each}
 	</div>
 	<div data-extension-zone="shared-document-notes">
 		{#each visible(extensions.sharedDocumentNotesModes) as extension (extension.id)}
-			<extension.component {context} />
+			<extension.component context={safeContext} />
 		{/each}
 	</div>
 	<div data-extension-zone="shared-document-editor">
-		{#if context.permissions.edit}
+		{#if safeContext.permissions.edit}
 			{#each visible(extensions.sharedDocumentEditorModes) as extension (extension.id)}
-				<extension.component {context} />
+				<extension.component context={safeContext} />
 			{/each}
 		{/if}
 	</div>

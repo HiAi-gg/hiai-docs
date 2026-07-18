@@ -2,13 +2,13 @@ import { expect, test } from "bun:test";
 import { readFile } from "node:fs/promises";
 
 const repositoryRoot = new URL("../../../", import.meta.url);
-const releaseVersion = "0.3.5";
+const releaseVersion = "0.3.6";
 
 async function json(path: string): Promise<Record<string, unknown>> {
 	return JSON.parse(await readFile(new URL(path, repositoryRoot), "utf8"));
 }
 
-test("all published and workspace release metadata reports 0.3.5", async () => {
+test("all published and workspace release metadata reports 0.3.6", async () => {
 	for (const path of [
 		"package.public.json",
 		"backend/package.json",
@@ -24,7 +24,7 @@ test("all published and workspace release metadata reports 0.3.5", async () => {
 	const lockfile = await readFile(new URL("bun.lock", repositoryRoot), "utf8");
 	const workspaceBlock = lockfile.slice(0, lockfile.indexOf('  "packages": {'));
 	expect(workspaceBlock).not.toContain('"version": "0.3.0"');
-	expect(workspaceBlock.match(/"version": "0\.3\.5"/g)).toHaveLength(6);
+	expect(workspaceBlock.match(/"version": "0\.3\.6"/g)).toHaveLength(6);
 
 	const publicManifest = await json("package.public.json");
 	expect(publicManifest.name).toBe("@hiai-gg/docsmint");
@@ -50,8 +50,9 @@ test("all published and workspace release metadata reports 0.3.5", async () => {
 		"packages/cli/src/index.ts",
 		"packages/mcp-server/src/index.ts",
 	]) {
-		expect(await readFile(new URL(path, repositoryRoot), "utf8"), path).toContain(
-			releaseVersion,
-		);
+		expect(
+			await readFile(new URL(path, repositoryRoot), "utf8"),
+			path,
+		).toContain(releaseVersion);
 	}
 });

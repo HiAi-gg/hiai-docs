@@ -55,10 +55,71 @@ export type StorageQuotaAdapter = Readonly<{
 }>;
 
 export type StorageQuotaService = Readonly<{
-	reserve(request: StorageQuotaReservationRequest): Promise<StorageQuotaReservation>;
+	reserve(
+		request: StorageQuotaReservationRequest,
+	): Promise<StorageQuotaReservation>;
 	commit(request: StorageQuotaCommitRequest): Promise<StorageQuotaCommitResult>;
-	release(request: StorageQuotaReleaseRequest): Promise<StorageQuotaReleaseResult>;
+	release(
+		request: StorageQuotaReleaseRequest,
+	): Promise<StorageQuotaReleaseResult>;
 }>;
+
+/**
+ * Verified server-side identity for an attachment write.  It is intentionally
+ * richer than the generic quota adapter: attachment storage must be charged
+ * to one workspace, actor and immutable object key before a presign is issued.
+ */
+export type AttachmentStorageQuotaContext = Readonly<{
+	workspaceId: string;
+	actorUserId: string;
+	documentId: string;
+	storageKey: string;
+	proposedSize: number;
+	requestId: string;
+	idempotencyKey: string;
+	signal?: AbortSignal;
+}>;
+
+export type AttachmentStorageQuotaFinalization = Readonly<{
+	reservationId: string;
+	actualSize: number;
+}>;
+
+/**
+ * OSS invokes this only after it has verified tenant context and document
+ * access.  A host provider is never exposed to HTTP or browser code.
+ */
+export type AttachmentStorageQuotaAdmission = Readonly<{
+	reserve(
+		context: AttachmentStorageQuotaContext,
+	): Promise<Readonly<{ id: string }>>;
+	finalize(
+		context: AttachmentStorageQuotaContext,
+		finalization: AttachmentStorageQuotaFinalization,
+	): Promise<void>;
+	releaseReservation(
+		context: AttachmentStorageQuotaContext,
+		reservationId: string,
+	): Promise<void>;
+	releaseCommitted(context: AttachmentStorageQuotaContext): Promise<void>;
+}>;
+
+export class MissingAttachmentStorageQuotaAdmissionError extends Error {
+	readonly code = "ATTACHMENT_STORAGE_QUOTA_ADMISSION_MISSING" as const;
+	constructor() {
+		super(
+			"Attachment storage quota admission is required when workspace tenancy is enabled",
+		);
+		this.name = "MissingAttachmentStorageQuotaAdmissionError";
+	}
+}
+
+export function requireAttachmentStorageQuotaAdmission(
+	admission: AttachmentStorageQuotaAdmission | undefined,
+): AttachmentStorageQuotaAdmission {
+	if (!admission) throw new MissingAttachmentStorageQuotaAdmissionError();
+	return admission;
+}
 
 export class StorageQuotaExceededError extends Error {
 	readonly code = "STORAGE_QUOTA_EXCEEDED" as const;
@@ -144,8 +205,13 @@ export function createStorageQuotaService(
 			assertReservationId(request.reservationId);
 			assertPositiveBytes(request.actualBytes, "actualBytes");
 			const result = await adapter.commit(Object.freeze({ ...request }));
-			if (result.status !== "committed" && result.status !== "already_committed") {
-				throw new TypeError("Storage quota adapter returned an invalid commit status");
+			if (
+				result.status !== "committed" &&
+				result.status !== "already_committed"
+			) {
+				throw new TypeError(
+					"Storage quota adapter returned an invalid commit status",
+				);
 			}
 			return Object.freeze({ ...result });
 		},
@@ -160,7 +226,9 @@ export function createStorageQuotaService(
 				result.status !== "already_released" &&
 				result.status !== "not_found"
 			) {
-				throw new TypeError("Storage quota adapter returned an invalid release status");
+				throw new TypeError(
+					"Storage quota adapter returned an invalid release status",
+				);
 			}
 			return Object.freeze({ ...result });
 		},

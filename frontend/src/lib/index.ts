@@ -52,6 +52,7 @@ export type {
 	SettingsSectionExtension,
 	SettingsSectionProps,
 	SharedDocumentExtension,
+	SharedDocumentExtensionCapability,
 	SharedDocumentExtensionContext,
 } from "./extensions/types";
 export {

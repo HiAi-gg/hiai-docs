@@ -146,14 +146,24 @@ export interface CommandPaletteActionExtension {
 	run: CommandPaletteAction;
 }
 
+/**
+ * Opaque, non-bearer capability metadata issued by a host after its own
+ * server-side share/session validation. It must never contain a share token,
+ * password, workspace assertion, cookie, authorization value, or signature.
+ */
+export interface SharedDocumentExtensionCapability {
+	id: string;
+	expiresAt: string;
+}
+
 /** Safe capability hints for a public shared-document extension. */
 export interface SharedDocumentExtensionContext {
-	shareToken: string;
 	documentId: string;
 	title: string;
 	content: string;
 	contentJson?: object;
 	role: "viewer" | "commenter" | "editor";
+	capability: SharedDocumentExtensionCapability;
 	permissions: {
 		read: true;
 		annotate: boolean;

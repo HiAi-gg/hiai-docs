@@ -698,7 +698,8 @@ export const lifecycleOperations = pgTable(
   "lifecycle_operations",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    actorUserId: uuid("actor_user_id").notNull().references(() => users.id, { onDelete: "restrict" }),
+	actorUserId: uuid("actor_user_id").references(() => users.id, { onDelete: "set null" }),
+	actorSubjectHash: text("actor_subject_hash").notNull(),
     idempotencyKey: text("idempotency_key").notNull(),
     operationKind: lifecycleOperationKindEnum("operation_kind").notNull(),
     status: lifecycleOperationStatusEnum("status").notNull().default("pending"),
@@ -717,7 +718,34 @@ export const lifecycleOperations = pgTable(
     uniqueIndex("lifecycle_operations_actor_idempotency_idx").on(table.actorUserId, table.idempotencyKey),
     index("lifecycle_operations_status_lease_idx").on(table.status, table.leaseExpiresAt),
     index("lifecycle_operations_actor_idx").on(table.actorUserId),
-    index("lifecycle_operations_retryable_idx").on(table.status).where(sql`${table.status} = 'retryable'`),
+	index("lifecycle_operations_retryable_idx").on(table.status).where(sql`${table.status} = 'retryable'`),
+	check("lifecycle_operations_actor_subject_hash", sql`${table.actorSubjectHash} ~ '^[a-f0-9]{64}$'`),
+  ],
+);
+
+// Atomically committed alongside a document and its initial version when an
+// authenticated client supplies Idempotency-Key on POST /api/documents.
+export const documentCreateOperations = pgTable(
+  "document_create_operations",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    workspaceId: text("workspace_id").notNull(),
+    actorUserId: uuid("actor_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    idempotencyKey: text("idempotency_key").notNull(),
+    documentId: uuid("document_id")
+      .notNull()
+      .references(() => documents.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("document_create_operations_workspace_actor_key_idx").on(
+      table.workspaceId,
+      table.actorUserId,
+      table.idempotencyKey,
+    ),
+    uniqueIndex("document_create_operations_document_idx").on(table.documentId),
   ],
 );
 

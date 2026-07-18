@@ -260,6 +260,20 @@
 			"when": 1785000000022,
 			"tag": "0036_lifecycle_operations",
 			"breakpoints": true
+		},
+		{
+			"idx": 37,
+			"version": "7",
+			"when": 1785000000023,
+			"tag": "0037_document_create_idempotency",
+			"breakpoints": true
+		},
+		{
+			"idx": 38,
+			"version": "7",
+			"when": 1785000000024,
+			"tag": "0038_lifecycle_account_deletion_retention",
+			"breakpoints": true
 		}
   ]
 }

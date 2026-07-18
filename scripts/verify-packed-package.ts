@@ -1,4 +1,11 @@
-import { cp, mkdir, readFile, readdir, symlink, writeFile } from "node:fs/promises";
+import {
+	cp,
+	mkdir,
+	readdir,
+	readFile,
+	symlink,
+	writeFile,
+} from "node:fs/promises";
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 
 const root = resolve(import.meta.dir, "..");
@@ -21,7 +28,8 @@ await mkdir(extracted, { recursive: true });
 await mkdir(temporaryDirectory, { recursive: true });
 
 async function copyEntry(entry: string): Promise<void> {
-	const source = entry === "dist" ? join(root, "packages/sdk/dist") : join(root, entry);
+	const source =
+		entry === "dist" ? join(root, "packages/sdk/dist") : join(root, entry);
 	const destination = join(stage, entry);
 	await mkdir(dirname(destination), { recursive: true });
 	await cp(source, destination, { recursive: true });
@@ -70,11 +78,12 @@ const packed = await run(
 	stage,
 );
 const tarballName = packed.stdout.trim().split("\n").at(-1);
-if (!tarballName) throw new Error("bun pm pack did not report a tarball filename");
-const tarball = isAbsolute(tarballName) ? tarballName : join(tarballs, tarballName);
-const listing = (
-	await run(["tar", "-tzf", tarball], root)
-).stdout
+if (!tarballName)
+	throw new Error("bun pm pack did not report a tarball filename");
+const tarball = isAbsolute(tarballName)
+	? tarballName
+	: join(tarballs, tarballName);
+const listing = (await run(["tar", "-tzf", tarball], root)).stdout
 	.split("\n")
 	.filter(Boolean);
 await run(["tar", "-xzf", tarball, "-C", extracted], root);
@@ -101,6 +110,9 @@ const requiredTarEntries = [
 	"package/dist/index.d.ts",
 	"package/dist/lifecycle.js",
 	"package/dist/lifecycle.d.ts",
+	"package/dist/lifecycle-persistent.js",
+	"package/dist/lifecycle-persistent.d.ts",
+	"package/dist/server-only-browser-entry.js",
 	"package/dist/workspace.js",
 	"package/dist/workspace.d.ts",
 	"package/dist/backend-launcher.js",
@@ -114,10 +126,27 @@ const requiredTarEntries = [
 	]),
 ];
 for (const entry of requiredTarEntries) {
-	if (!listing.includes(entry)) throw new Error(`Packed artifact is missing ${entry}`);
+	if (!listing.includes(entry))
+		throw new Error(`Packed artifact is missing ${entry}`);
 }
-if (listing.some((entry) => entry.includes("frontend/src/") || entry.includes("node_modules/"))) {
-	throw new Error("Packed artifact contains private frontend source or node_modules");
+for (const [subpath, conditionMap] of Object.entries(manifest.exports)) {
+	if (typeof conditionMap !== "object" || conditionMap === null) continue;
+	for (const target of Object.values(conditionMap as Record<string, unknown>)) {
+		if (typeof target !== "string" || !target.startsWith("./")) continue;
+		if (!listing.includes(`package/${target.slice(2)}`)) {
+			throw new Error(`Export target is missing for ${subpath}: ${target}`);
+		}
+	}
+}
+if (
+	listing.some(
+		(entry) =>
+			entry.includes("frontend/src/") || entry.includes("node_modules/"),
+	)
+) {
+	throw new Error(
+		"Packed artifact contains private frontend source or node_modules",
+	);
 }
 
 async function walk(directory: string): Promise<string[]> {
@@ -133,9 +162,9 @@ async function walk(directory: string): Promise<string[]> {
 for (const file of await walk(join(packageRoot, "dist"))) {
 	if (!file.endsWith(".js")) continue;
 	const source = await readFile(file, "utf8");
-	const importSpecifiers = [...source.matchAll(/(?:from\s*|import\s*\()(["'])(.*?)\1/g)].map(
-		(match) => match[2] ?? "",
-	);
+	const importSpecifiers = [
+		...source.matchAll(/(?:from\s*|import\s*\()(["'])(.*?)\1/g),
+	].map((match) => match[2] ?? "");
 	for (const specifier of importSpecifiers) {
 		if (
 			specifier === "$lib" ||
@@ -155,10 +184,11 @@ await writeFile(
 	join(packageRoot, "server-import-smoke.ts"),
 	`import { DocsClient } from "${manifest.name}";
 import { encodeUserDataExportNdjson } from "${manifest.name}/lifecycle";
+import { createPersistentLifecycleRuntime } from "${manifest.name}/lifecycle/persistent";
 import { verifyDocsmintWorkspaceAssertion } from "${manifest.name}/workspace";
-import { launchDocsmintBackend, resolveDocsmintBackendEntrypoint } from "${manifest.name}/backend/launcher";
-import { createStorageQuotaService, StorageQuotaExceededError } from "${manifest.name}/storage-quota";
-if (!DocsClient || !encodeUserDataExportNdjson || !verifyDocsmintWorkspaceAssertion || !launchDocsmintBackend || !resolveDocsmintBackendEntrypoint || !createStorageQuotaService || !StorageQuotaExceededError) throw new Error("missing server export");
+import { launchDocsmintBackend, launchDocsMintApi, resolveDocsmintBackendEntrypoint } from "${manifest.name}/backend/launcher";
+import { createStorageQuotaService, StorageQuotaExceededError, requireAttachmentStorageQuotaAdmission } from "${manifest.name}/storage-quota";
+if (!DocsClient || !encodeUserDataExportNdjson || !createPersistentLifecycleRuntime || !verifyDocsmintWorkspaceAssertion || !launchDocsmintBackend || !launchDocsMintApi || !resolveDocsmintBackendEntrypoint || !createStorageQuotaService || !StorageQuotaExceededError || !requireAttachmentStorageQuotaAdmission) throw new Error("missing server export");
 console.log("server imports: pass");
 `,
 );
@@ -186,9 +216,10 @@ await writeFile(
 	join(packageRoot, "declaration-smoke.ts"),
 	`import { DocsClient } from "${manifest.name}";
 import type { PurgeUserDataContext, UserDataExportRecord } from "${manifest.name}/lifecycle";
+import type { LifecycleRuntimeAdapters } from "${manifest.name}/lifecycle/persistent";
 import type { DocsmintWorkspaceContext } from "${manifest.name}/workspace";
-import { launchDocsmintBackend, type DocsmintBackendHandle } from "${manifest.name}/backend/launcher";
-import { createStorageQuotaService, StorageQuotaExceededError, type StorageQuotaAdapter, type StorageQuotaReservation } from "${manifest.name}/storage-quota";
+import { launchDocsmintBackend, launchDocsMintApi, type DocsmintBackendHandle, type DocsMintRuntimeOptions } from "${manifest.name}/backend/launcher";
+import { createStorageQuotaService, StorageQuotaExceededError, type AttachmentStorageQuotaAdmission, type AttachmentStorageQuotaContext, type AttachmentStorageQuotaFinalization, type StorageQuotaAdapter, type StorageQuotaReservation } from "${manifest.name}/storage-quota";
 import { DocsmintDashboardHost } from "${manifest.name}/frontend/dashboard";
 import { DocsmintSearchHost } from "${manifest.name}/frontend/search";
 import { DocsmintSharedDocumentHost } from "${manifest.name}/frontend/shared-document";
@@ -202,8 +233,8 @@ import { Sidebar } from "${manifest.name}/frontend/components/sidebar";
 import { SettingsDialog } from "${manifest.name}/frontend/components/settings";
 import { theme, setTheme, toggleTheme, type ThemeMode } from "${manifest.name}/frontend/theme";
 import { messages, getMessage, setLocale, supportedLocales, type Locale } from "${manifest.name}/frontend/i18n";
-void [DocsClient, launchDocsmintBackend, createStorageQuotaService, StorageQuotaExceededError, DocsmintDashboardHost, DocsmintSearchHost, DocsmintSharedDocumentHost, DocsmintExtensionProvider, listCategories, listDocuments, listFolders, listTags, getProfile, Sidebar, SettingsDialog, theme, setTheme, toggleTheme, messages, getMessage, setLocale, supportedLocales];
-type PublicTypes = PurgeUserDataContext | UserDataExportRecord | DocsmintWorkspaceContext | DocsmintBackendHandle | StorageQuotaAdapter | StorageQuotaReservation | ThemeMode | Locale | CategoryDto | CreateCategoryInput | DocumentDto | UpdateDocumentInput | FolderDto | CreateFolderData | TagDto | CreateTagInput | ProfileDto | EmbeddingConfigDto | DashboardWidgetProps | DocTabPanelProps | SharedDocumentExtensionContext | FrontendExtensions;
+void [DocsClient, launchDocsmintBackend, launchDocsMintApi, createStorageQuotaService, StorageQuotaExceededError, DocsmintDashboardHost, DocsmintSearchHost, DocsmintSharedDocumentHost, DocsmintExtensionProvider, listCategories, listDocuments, listFolders, listTags, getProfile, Sidebar, SettingsDialog, theme, setTheme, toggleTheme, messages, getMessage, setLocale, supportedLocales];
+type PublicTypes = PurgeUserDataContext | UserDataExportRecord | LifecycleRuntimeAdapters | DocsmintWorkspaceContext | DocsmintBackendHandle | DocsMintRuntimeOptions | StorageQuotaAdapter | StorageQuotaReservation | AttachmentStorageQuotaAdmission | AttachmentStorageQuotaContext | AttachmentStorageQuotaFinalization | ThemeMode | Locale | CategoryDto | CreateCategoryInput | DocumentDto | UpdateDocumentInput | FolderDto | CreateFolderData | TagDto | CreateTagInput | ProfileDto | EmbeddingConfigDto | DashboardWidgetProps | DocTabPanelProps | SharedDocumentExtensionContext | FrontendExtensions;
 declare const publicTypes: PublicTypes;
 void publicTypes;
 `,
@@ -259,10 +290,18 @@ const exportsExist = Boolean(DocsmintDashboardHost && DocsmintSearchHost && Docs
 `,
 );
 const viteBinary = join(root, "frontend/node_modules/vite/bin/vite.js");
-await run(["bun", viteBinary, "build", "--configLoader", "runner"], packageRoot);
+await run(
+	["bun", viteBinary, "build", "--configLoader", "runner"],
+	packageRoot,
+);
 
 const browserConsumer = join(runRoot, "browser-consumer");
-const packageLink = join(browserConsumer, "node_modules", "@hiai-gg", "docsmint");
+const packageLink = join(
+	browserConsumer,
+	"node_modules",
+	"@hiai-gg",
+	"docsmint",
+);
 await mkdir(dirname(packageLink), { recursive: true });
 await symlink(packageRoot, packageLink, "dir");
 const serverOnlyBrowserChecks = [
@@ -270,6 +309,11 @@ const serverOnlyBrowserChecks = [
 		id: "workspace",
 		subpath: "workspace",
 		symbol: "verifyDocsmintWorkspaceAssertion",
+	},
+	{
+		id: "lifecycle-persistent",
+		subpath: "lifecycle/persistent",
+		symbol: "createPersistentLifecycleRuntime",
 	},
 	{
 		id: "backend-launcher",
@@ -296,7 +340,7 @@ console.log(${check.symbol});
 		`export default { resolve: { conditions: ["browser"] }, build: { lib: { entry: "${entry}", formats: ["es"] } } };
 `,
 	);
-	const negative = await run(
+	const browserBuild = await run(
 		[
 			"bun",
 			viteBinary,
@@ -309,7 +353,7 @@ console.log(${check.symbol});
 		browserConsumer,
 		false,
 	);
-	if (negative.exitCode === 0) {
+	if (browserBuild.exitCode === 0) {
 		throw new Error(
 			`Server-only ${check.subpath} export unexpectedly entered a browser bundle`,
 		);

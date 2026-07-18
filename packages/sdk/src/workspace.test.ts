@@ -10,10 +10,14 @@ const context = {
 	workspaceId: "ws_opaque_123",
 	actorRole: "owner" as const,
 	issuedAt: 1_700_000_000,
-	expiresAt: 1_700_000_120,
+	expiresAt: 1_700_000_060,
 	issuer: "docsmint-com",
 };
-const options = { secret: "test-secret", issuer: "docsmint-com", nowSeconds: 1_700_000_030 };
+const options = {
+	secret: "test-secret",
+	issuer: "docsmint-com",
+	nowSeconds: 1_700_000_030,
+};
 
 async function signedPayload(payload: string): Promise<string> {
 	const key = await crypto.subtle.importKey(
@@ -33,16 +37,36 @@ async function signedPayload(payload: string): Promise<string> {
 
 describe("workspace assertions", () => {
 	test("signs and verifies an HMAC assertion", async () => {
-		const assertion = await createDocsmintWorkspaceAssertion(context, options.secret);
-		await expect(verifyDocsmintWorkspaceAssertion(assertion, options)).resolves.toEqual(context);
+		const assertion = await createDocsmintWorkspaceAssertion(
+			context,
+			options.secret,
+		);
+		await expect(
+			verifyDocsmintWorkspaceAssertion(assertion, options),
+		).resolves.toEqual(context);
 	});
 
 	test("rejects an extra segment, a wrong secret, and a future assertion", async () => {
-		const assertion = await createDocsmintWorkspaceAssertion(context, options.secret);
-		await expect(verifyDocsmintWorkspaceAssertion(`${assertion}.extra`, options)).rejects.toThrow();
-		await expect(verifyDocsmintWorkspaceAssertion(assertion, { ...options, secret: "wrong" })).rejects.toThrow();
-		const future = await createDocsmintWorkspaceAssertion({ ...context, issuedAt: 1_700_001_000, expiresAt: 1_700_001_120 }, options.secret);
-		await expect(verifyDocsmintWorkspaceAssertion(future, options)).rejects.toThrow();
+		const assertion = await createDocsmintWorkspaceAssertion(
+			context,
+			options.secret,
+		);
+		await expect(
+			verifyDocsmintWorkspaceAssertion(`${assertion}.extra`, options),
+		).rejects.toThrow();
+		await expect(
+			verifyDocsmintWorkspaceAssertion(assertion, {
+				...options,
+				secret: "wrong",
+			}),
+		).rejects.toThrow();
+		const future = await createDocsmintWorkspaceAssertion(
+			{ ...context, issuedAt: 1_700_001_000, expiresAt: 1_700_001_060 },
+			options.secret,
+		);
+		await expect(
+			verifyDocsmintWorkspaceAssertion(future, options),
+		).rejects.toThrow();
 	});
 
 	test("rejects wrong issuer, expired assertions, and excessive TTL", async () => {
@@ -55,7 +79,7 @@ describe("workspace assertions", () => {
 		).rejects.toThrow("issuer");
 
 		const expired = await createDocsmintWorkspaceAssertion(
-			{ ...context, issuedAt: 1_699_999_000, expiresAt: 1_699_999_100 },
+			{ ...context, issuedAt: 1_699_999_000, expiresAt: 1_699_999_060 },
 			options.secret,
 		);
 		await expect(
@@ -63,7 +87,7 @@ describe("workspace assertions", () => {
 		).rejects.toThrow("lifetime");
 
 		const excessiveTtl = await createDocsmintWorkspaceAssertion(
-			{ ...context, expiresAt: context.issuedAt + 301 },
+			{ ...context, expiresAt: context.issuedAt + 61 },
 			options.secret,
 		);
 		await expect(
@@ -73,7 +97,11 @@ describe("workspace assertions", () => {
 
 	test("accepts only the documented five-second clock skew", async () => {
 		const withinSkew = await createDocsmintWorkspaceAssertion(
-			{ ...context, issuedAt: options.nowSeconds + 5, expiresAt: options.nowSeconds + 30 },
+			{
+				...context,
+				issuedAt: options.nowSeconds + 5,
+				expiresAt: options.nowSeconds + 30,
+			},
 			options.secret,
 		);
 		await expect(
@@ -81,7 +109,11 @@ describe("workspace assertions", () => {
 		).resolves.toMatchObject({ actorUserId: context.actorUserId });
 
 		const outsideSkew = await createDocsmintWorkspaceAssertion(
-			{ ...context, issuedAt: options.nowSeconds + 6, expiresAt: options.nowSeconds + 30 },
+			{
+				...context,
+				issuedAt: options.nowSeconds + 6,
+				expiresAt: options.nowSeconds + 30,
+			},
 			options.secret,
 		);
 		await expect(

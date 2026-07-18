@@ -1,5 +1,42 @@
 import { sql } from "drizzle-orm";
-import { db } from "./client";
+import { db, type Database } from "./client";
+
+/** A transaction carrying the same query surface as the tenant-scoped DB. */
+export type TenantTransaction = Parameters<
+	Parameters<typeof db.transaction>[0]
+>[0];
+
+/**
+ * Server-side adapter for packages that must run short actor-scoped database
+ * transactions without importing this module's process-global client.
+ */
+export interface ActorScopedTransactionExecutor {
+	withActorTransaction<T>(
+		actorUserId: string,
+		operation: (tx: TenantTransaction) => Promise<T>,
+	): Promise<T>;
+}
+
+export function createActorScopedTransactionExecutor(
+	database: Database,
+): ActorScopedTransactionExecutor {
+	return {
+		withActorTransaction(actorUserId, operation) {
+			return database.transaction(async (tx) => {
+				await tx.execute(
+					sql`SELECT set_config('app.current_user_id', ${actorUserId}, true)`,
+				);
+				await tx.execute(
+					sql`SELECT set_config('app.current_user_role', 'user', true)`,
+				);
+				await tx.execute(
+					sql`SELECT set_config('app.current_workspace_id', '', true)`,
+				);
+				return operation(tx);
+			});
+		},
+	};
+}
 
 export interface TenantContext {
 	userId: string;

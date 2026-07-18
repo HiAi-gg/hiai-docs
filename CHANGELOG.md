@@ -7,6 +7,16 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [0.3.6] - 2026-07-18
+
+### Fixed
+
+- Restored emitted persistent lifecycle and server-only browser-guard artifacts
+  for every declared public package export.
+- Bound workspace assertions to a 60-second lifetime and five-second skew.
+- Added typed attachment admission and an in-process launcher composition seam
+  so tenancy-enabled attachment writes can fail closed before presign.
+
 ### Added
 
 - Tables can now be edited after insertion: users can add or remove rows and

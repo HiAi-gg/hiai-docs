@@ -3,7 +3,9 @@ export const DOCSMINT_WORKSPACE_CONTEXT_HEADER = "x-docsmint-workspace-context";
 /** @deprecated Compatibility alias accepted during 0.3.x. */
 export const EXTERNAL_TENANT_CONTEXT_HEADER = "x-hiai-tenant-context";
 export const WORKSPACE_CONTEXT_MAX_LENGTH = 128;
-export const WORKSPACE_CONTEXT_MAX_TTL_SECONDS = 300;
+/** Canonical server-to-server assertion lifetime (one minute). */
+export const WORKSPACE_CONTEXT_MAX_TTL_SECONDS = 60;
+export const WORKSPACE_CONTEXT_CLOCK_SKEW_SECONDS = 5;
 
 export class ExternalTenantContextError extends Error {
 	readonly status = 401;
@@ -152,7 +154,10 @@ export async function verifyExternalTenantAssertion(
 	if (decoded.issuer !== options.issuer)
 		throw new Error("Invalid tenant assertion issuer");
 	const now = options.nowSeconds ?? Math.floor(Date.now() / 1000);
-	const skew = options.clockSkewSeconds ?? 5;
+	const skew = Math.min(
+		options.clockSkewSeconds ?? WORKSPACE_CONTEXT_CLOCK_SKEW_SECONDS,
+		WORKSPACE_CONTEXT_CLOCK_SKEW_SECONDS,
+	);
 	if (decoded.issuedAt > now + skew)
 		throw new Error("Tenant assertion is not yet valid");
 	if (decoded.expiresAt <= now - skew)
@@ -161,7 +166,10 @@ export async function verifyExternalTenantAssertion(
 		throw new Error("Invalid tenant assertion lifetime");
 	if (
 		decoded.expiresAt - decoded.issuedAt >
-		(options.maxTtlSeconds ?? WORKSPACE_CONTEXT_MAX_TTL_SECONDS)
+		Math.min(
+			options.maxTtlSeconds ?? WORKSPACE_CONTEXT_MAX_TTL_SECONDS,
+			WORKSPACE_CONTEXT_MAX_TTL_SECONDS,
+		)
 	)
 		throw new Error("Tenant assertion lifetime exceeds maximum TTL");
 	return decoded;

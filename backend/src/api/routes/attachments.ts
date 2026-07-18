@@ -19,6 +19,7 @@ import {
 } from "../../lib/content-access";
 import { logger } from "../../lib/logger";
 import { fetchRemoteImage } from "../../lib/remote-image";
+import { getDocsMintRuntimeOptions } from "../../lib/runtime-options";
 import {
 	documentReferencesRemoteImage,
 	resolveShareDocumentScope,
@@ -104,6 +105,53 @@ const INTEGRITY_PROBE_BYTES = 8;
 
 type BodyChunk = Uint8Array | Buffer | ArrayBuffer | ArrayBufferView | string;
 type AsyncBody = AsyncIterable<BodyChunk>;
+
+function attachmentQuotaContext(
+	ctx: { workspaceId?: string },
+	actorUserId: string,
+	documentId: string,
+	storageKey: string,
+	proposedSize: number,
+): Readonly<{
+	workspaceId: string;
+	actorUserId: string;
+	documentId: string;
+	storageKey: string;
+	proposedSize: number;
+	requestId: string;
+	idempotencyKey: string;
+}> | null {
+	if (!config.DOCSMINT_WORKSPACE_ENABLED) return null;
+	if (!ctx.workspaceId) return null;
+	return Object.freeze({
+		workspaceId: ctx.workspaceId,
+		actorUserId,
+		documentId,
+		storageKey,
+		proposedSize,
+		requestId: crypto.randomUUID(),
+		idempotencyKey: `attachment:${documentId}:${storageKey}`,
+	});
+}
+
+type AttachmentQuotaAdmission = NonNullable<
+	NonNullable<
+		ReturnType<typeof getDocsMintRuntimeOptions>
+	>["attachmentStorageQuotaAdmission"]
+>;
+
+function attachmentQuotaAdmission(set: {
+	status?: number | string;
+}): AttachmentQuotaAdmission | null | undefined {
+	if (!config.DOCSMINT_WORKSPACE_ENABLED) return null;
+	const admission =
+		getDocsMintRuntimeOptions()?.attachmentStorageQuotaAdmission;
+	if (!admission) {
+		set.status = 503;
+		return undefined;
+	}
+	return admission;
+}
 
 async function readStorageBody(body: unknown): Promise<Buffer> {
 	if (body == null) {
@@ -333,6 +381,36 @@ export const attachmentRoutes = new Elysia({ prefix: "/api" })
 			// any old records created before presign was introduced.
 			const ext = filename.split(".").pop() ?? "bin";
 			const key = `${attachmentKeyPrefix(ctx, userId, documentId)}/${nanoid()}.${ext}`;
+			const quotaContext = attachmentQuotaContext(
+				ctx,
+				userId,
+				documentId,
+				key,
+				size,
+			);
+			const admission = attachmentQuotaAdmission(set);
+			if (admission === undefined) {
+				return { error: "Attachment storage quota admission is unavailable" };
+			}
+			if (config.DOCSMINT_WORKSPACE_ENABLED && !quotaContext) {
+				set.status = 503;
+				return {
+					error: "Workspace context is required for attachment storage",
+				};
+			}
+			let reservationId: string | undefined;
+			if (admission && quotaContext) {
+				try {
+					reservationId = (await admission.reserve(quotaContext)).id;
+				} catch (error) {
+					logger.warn(
+						{ err: error, documentId },
+						"Attachment storage quota reservation rejected",
+					);
+					set.status = 413;
+					return { error: "Storage quota exceeded" };
+				}
+			}
 
 			try {
 				const url = await getSignedUrl(
@@ -343,10 +421,20 @@ export const attachmentRoutes = new Elysia({ prefix: "/api" })
 				return {
 					url,
 					key,
+					// This opaque value is created by the server-side admission
+					// provider. It must be returned unchanged to confirm so the
+					// original reservation, rather than a second reservation, is
+					// finalized after the storage HEAD check.
+					...(reservationId ? { quotaReservationId: reservationId } : {}),
 					maxSize: ATTACHMENT_MAX_SIZE_BYTES,
 					expiresIn: PRESIGN_EXPIRY_SECONDS,
 				};
 			} catch (err) {
+				if (admission && quotaContext && reservationId) {
+					await admission
+						.releaseReservation(quotaContext, reservationId)
+						.catch(() => undefined);
+				}
 				logger.error({ err, key }, "Failed to presign attachment upload");
 				set.status = 500;
 				return { error: "Failed to generate upload URL" };
@@ -400,6 +488,7 @@ export const attachmentRoutes = new Elysia({ prefix: "/api" })
 						filename?: unknown;
 						contentType?: unknown;
 						size?: unknown;
+						quotaReservationId?: unknown;
 				  }
 				| undefined;
 			const key = typeof payload?.key === "string" ? payload.key : "";
@@ -408,6 +497,10 @@ export const attachmentRoutes = new Elysia({ prefix: "/api" })
 			const contentType =
 				typeof payload?.contentType === "string" ? payload.contentType : "";
 			const size = typeof payload?.size === "number" ? payload.size : -1;
+			const quotaReservationId =
+				typeof payload?.quotaReservationId === "string"
+					? payload.quotaReservationId
+					: "";
 
 			if (!key) {
 				set.status = 400;
@@ -441,6 +534,27 @@ export const attachmentRoutes = new Elysia({ prefix: "/api" })
 					error: `File too large. Maximum size: ${ATTACHMENT_MAX_SIZE_BYTES / 1024 / 1024}MB`,
 				};
 			}
+			const quotaContext = attachmentQuotaContext(
+				ctx,
+				userId,
+				documentId,
+				key,
+				size,
+			);
+			const admission = attachmentQuotaAdmission(set);
+			if (admission === undefined) {
+				return { error: "Attachment storage quota admission is unavailable" };
+			}
+			if (config.DOCSMINT_WORKSPACE_ENABLED && !quotaContext) {
+				set.status = 503;
+				return {
+					error: "Workspace context is required for attachment storage",
+				};
+			}
+			if (admission && quotaContext && !quotaReservationId) {
+				set.status = 400;
+				return { error: "quotaReservationId is required" };
+			}
 
 			// Verify the object actually exists in SeaweedFS before we record
 			// a row for it. A successful presign + failed PUT (network
@@ -451,6 +565,11 @@ export const attachmentRoutes = new Elysia({ prefix: "/api" })
 					new HeadObjectCommand({ Bucket: BUCKET, Key: key }),
 				);
 			} catch (err) {
+				if (admission && quotaContext && quotaReservationId) {
+					await admission
+						.releaseReservation(quotaContext, quotaReservationId)
+						.catch(() => undefined);
+				}
 				logger.warn({ err, key }, "Confirm failed: object not in storage");
 				set.status = 409;
 				return { error: "Upload not found in storage — please retry upload" };
@@ -460,6 +579,25 @@ export const attachmentRoutes = new Elysia({ prefix: "/api" })
 			// observed. A client that lies about size gets corrected
 			// here so the DB row reflects what was actually stored.
 			const storedSize = headOutput.ContentLength ?? size;
+
+			if (admission && quotaContext && quotaReservationId) {
+				try {
+					await admission.finalize(quotaContext, {
+						reservationId: quotaReservationId,
+						actualSize: storedSize,
+					});
+				} catch (error) {
+					await admission
+						.releaseReservation(quotaContext, quotaReservationId)
+						.catch(() => undefined);
+					logger.error(
+						{ err: error, documentId },
+						"Attachment storage quota finalization failed",
+					);
+					set.status = 503;
+					return { error: "Attachment storage quota finalization failed" };
+				}
+			}
 
 			try {
 				const created = await withTenant(ctx, async (tx) => {
@@ -477,6 +615,11 @@ export const attachmentRoutes = new Elysia({ prefix: "/api" })
 				});
 
 				if (!created) {
+					if (admission && quotaContext && quotaReservationId) {
+						await admission
+							.releaseCommitted(quotaContext)
+							.catch(() => undefined);
+					}
 					set.status = 500;
 					return { error: "Failed to save attachment record" };
 				}
@@ -493,6 +636,9 @@ export const attachmentRoutes = new Elysia({ prefix: "/api" })
 					url: `/api/attachments/${created.id}/raw`,
 				};
 			} catch (err) {
+				if (admission && quotaContext && quotaReservationId) {
+					await admission.releaseCommitted(quotaContext).catch(() => undefined);
+				}
 				logger.error({ err, key }, "Confirm failed: DB insert error");
 				set.status = 500;
 				return { error: "Failed to save attachment record" };
@@ -528,6 +674,16 @@ export const attachmentRoutes = new Elysia({ prefix: "/api" })
 		}
 		const ctx = authorization.access.ctx;
 		const userId = authorization.access.userId;
+		// The legacy buffered path has no durable presign identity. Under
+		// workspace tenancy reject it rather than permit an unmetered bypass;
+		// clients must use the admission-aware presign/confirm lifecycle.
+		if (config.DOCSMINT_WORKSPACE_ENABLED) {
+			set.status = 503;
+			return {
+				error:
+					"Legacy attachment uploads are unavailable with workspace storage enforcement",
+			};
+		}
 
 		const documentId = params.id;
 
@@ -739,7 +895,9 @@ export const attachmentRoutes = new Elysia({ prefix: "/api" })
 			const [r] = await tx
 				.select({
 					id: attachments.id,
+					documentId: attachments.documentId,
 					storageKey: attachments.storageKey,
+					size: attachments.size,
 					ownerId: documents.ownerId,
 					categoryId: documents.categoryId,
 					folderCategoryId: folders.categoryId,
@@ -764,6 +922,21 @@ export const attachmentRoutes = new Elysia({ prefix: "/api" })
 			set.status = 403;
 			return { error: "Forbidden" };
 		}
+		const quotaContext = attachmentQuotaContext(
+			ctx,
+			userId,
+			row.documentId,
+			row.storageKey,
+			row.size,
+		);
+		const admission = attachmentQuotaAdmission(set);
+		if (admission === undefined) {
+			return { error: "Attachment storage quota admission is unavailable" };
+		}
+		if (config.DOCSMINT_WORKSPACE_ENABLED && !quotaContext) {
+			set.status = 503;
+			return { error: "Workspace context is required for attachment storage" };
+		}
 
 		// Best-effort object removal. A failure here is logged but does
 		// NOT block the DB delete — orphaned storage is cheaper to clean
@@ -783,6 +956,16 @@ export const attachmentRoutes = new Elysia({ prefix: "/api" })
 		await withTenant(ctx, async (tx) => {
 			await tx.delete(attachments).where(eq(attachments.id, attachmentId));
 		});
+		if (admission && quotaContext) {
+			try {
+				await admission.releaseCommitted(quotaContext);
+			} catch (error) {
+				logger.error(
+					{ err: error, attachmentId },
+					"Attachment storage quota release failed after delete",
+				);
+			}
+		}
 
 		return { success: true };
 	})

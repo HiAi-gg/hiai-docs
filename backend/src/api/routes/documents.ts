@@ -1,6 +1,7 @@
 import { CopyObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
 import {
 	attachments,
+	documentCreateOperations,
 	documentPipelineRuns,
 	documents,
 	documentTags,
@@ -28,6 +29,10 @@ import {
 	invalidateDocCache,
 	invalidateDocListCache,
 } from "../../lib/doc-cache";
+import {
+	documentCreateIdempotencyKey,
+	documentCreateWorkspaceIdentity,
+} from "../../lib/document-create-idempotency";
 import { DocxParseError, docxToMarkdown } from "../../lib/docx-parser";
 import {
 	encodeS3CopySource,
@@ -544,18 +549,6 @@ export const documentRoutes = new Elysia({ prefix: "/api" })
 
 	// POST /api/documents — Create document + initial version
 	.post("/documents", async ({ request, set }) => {
-		const ip =
-			request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
-			request.headers.get("x-real-ip") ??
-			"unknown";
-		const rl = await writeRateLimiter(ip, request);
-		if (!rl.allowed) {
-			set.status = 429;
-			set.headers = rateLimitHeaders(0, rl.retryAfter);
-			return { error: "Too many requests" };
-		}
-		set.headers = rateLimitHeaders(rl.remaining);
-
 		const access = await resolveContentAccess(request);
 		const ctx = access.ctx;
 		if (ctx.role === "none") {
@@ -567,6 +560,51 @@ export const documentRoutes = new Elysia({ prefix: "/api" })
 			return { error: "Forbidden" };
 		}
 		const userId = ctx.userId;
+		const idempotencyKey = documentCreateIdempotencyKey(request);
+		if (idempotencyKey === "invalid") {
+			set.status = 400;
+			return { error: "Invalid Idempotency-Key" };
+		}
+		if (idempotencyKey) {
+			const workspaceIdentity = documentCreateWorkspaceIdentity(
+				userId,
+				ctx.workspaceId,
+			);
+			const replay = await withTenant(ctx, async (tx) => {
+				const [existing] = await tx
+					.select({ document: documents })
+					.from(documentCreateOperations)
+					.innerJoin(
+						documents,
+						eq(documentCreateOperations.documentId, documents.id),
+					)
+					.where(
+						and(
+							eq(documentCreateOperations.workspaceId, workspaceIdentity),
+							eq(documentCreateOperations.actorUserId, userId),
+							eq(documentCreateOperations.idempotencyKey, idempotencyKey),
+						),
+					)
+					.limit(1);
+				return existing?.document ?? null;
+			});
+			if (replay) {
+				set.status = 200;
+				return replay;
+			}
+		}
+
+		const ip =
+			request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
+			request.headers.get("x-real-ip") ??
+			"unknown";
+		const rl = await writeRateLimiter(ip, request);
+		if (!rl.allowed) {
+			set.status = 429;
+			set.headers = rateLimitHeaders(0, rl.retryAfter);
+			return { error: "Too many requests" };
+		}
+		set.headers = rateLimitHeaders(rl.remaining);
 		const body = createDocumentSchema.safeParse(await request.json());
 		if (!body.success) {
 			set.status = 400;
@@ -595,11 +633,44 @@ export const documentRoutes = new Elysia({ prefix: "/api" })
 				return { error: "Forbidden" };
 			}
 
-			const created = await withTenant(ctx, async (tx) => {
+			const createdResult = await withTenant(ctx, async (tx) => {
+				const workspaceIdentity = documentCreateWorkspaceIdentity(
+					userId,
+					ctx.workspaceId,
+				);
+				if (idempotencyKey) {
+					// Serialize the full create transaction for this verified actor,
+					// workspace and key. The operation row, document and first version
+					// therefore commit together; a rollback leaves no reservation.
+					await tx.execute(
+						sql`SELECT pg_advisory_xact_lock(hashtext(${`${workspaceIdentity}:${userId}:${idempotencyKey}`}))`,
+					);
+					const [existing] = await tx
+						.select({ document: documents })
+						.from(documentCreateOperations)
+						.innerJoin(
+							documents,
+							eq(documentCreateOperations.documentId, documents.id),
+						)
+						.where(
+							and(
+								eq(documentCreateOperations.workspaceId, workspaceIdentity),
+								eq(documentCreateOperations.actorUserId, userId),
+								eq(documentCreateOperations.idempotencyKey, idempotencyKey),
+							),
+						)
+						.limit(1);
+					if (existing) return { row: existing.document, replayed: true };
+				}
 				const [row] = await tx
 					.insert(documents)
 					.values({
 						ownerId: userId,
+						// Persist the verified tenant on the primary row as well as in
+						// the idempotency operation. The database default does the same
+						// for external contexts; stating it here makes the boundary
+						// explicit and keeps the operation/document pair coherent.
+						workspaceId: ctx.workspaceId ?? null,
 						title: body.data.title,
 						content: initialContent,
 						contentHash: initialHash,
@@ -618,8 +689,21 @@ export const documentRoutes = new Elysia({ prefix: "/api" })
 					contentJson: null,
 					createdBy: userId,
 				});
-				return row;
+				if (idempotencyKey) {
+					await tx.insert(documentCreateOperations).values({
+						workspaceId: workspaceIdentity,
+						actorUserId: userId,
+						idempotencyKey,
+						documentId: row.id,
+					});
+				}
+				return { row, replayed: false };
 			});
+			const created = createdResult.row;
+			if (createdResult.replayed) {
+				set.status = 200;
+				return created;
+			}
 
 			void enqueueDocumentPipeline({
 				documentId: created.id,

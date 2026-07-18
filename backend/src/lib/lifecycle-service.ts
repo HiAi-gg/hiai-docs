@@ -1,13 +1,13 @@
 import {
 	attachments,
 	auditLog,
-	db,
 	documentEmbeddings,
 	documents,
 	lifecycleOperations,
 	shareLinks,
 	versions,
-} from "@hiai-docs/db";
+} from "@hiai-docs/db/schema";
+import type { TenantTransaction } from "@hiai-docs/db/with-tenant";
 import type {
 	AssertPurgeAllowed,
 	ExportUserDataContext,
@@ -15,23 +15,33 @@ import type {
 	PurgeUserDataContext,
 	PurgeUserDataResult,
 	UserDataExportRecord,
+	UserDataLifecycle,
 } from "@hiai-docs/sdk";
 import { and, eq, inArray, lt, or, sql } from "drizzle-orm";
 
 const LEASE_MS = 60_000;
-const SAFE_ERROR_CODES = new Set([
-	"aborted",
-	"fence_rejected",
-	"lease_lost",
-	"object_storage_failed",
-	"queue_failed",
-	"redis_failed",
-	"graph_failed",
-	"host_step_failed",
-	"persistence_failed",
-]);
 
 type PersistentOperation = typeof lifecycleOperations.$inferSelect;
+
+/** A terminal host-fence denial. Never infer this from an Error message. */
+export class LifecycleFenceRejectedError extends Error {
+	readonly code = "fence_rejected";
+
+	constructor(message = "Purge fence rejected") {
+		super(message);
+		this.name = "LifecycleFenceRejectedError";
+	}
+}
+
+/** The durable operation was reclaimed or expired during this worker's run. */
+export class LifecycleLeaseLostError extends Error {
+	readonly code = "lease_lost";
+
+	constructor() {
+		super("Lifecycle operation lease was lost");
+		this.name = "LifecycleLeaseLostError";
+	}
+}
 
 export type LifecycleRuntimeAdapters = Readonly<{
 	/** Checks the host-owned fence immediately before the first mutation. */
@@ -61,6 +71,18 @@ export type LifecycleRuntimeAdapters = Readonly<{
 	) => Promise<number>;
 }>;
 
+/**
+ * The host supplies this executor so every persistent lifecycle query runs in
+ * a short transaction with transaction-local `app.current_user_id` GUCs.
+ * The lifecycle saga never imports or owns a process-global database client.
+ */
+export type LifecycleScopedDatabaseExecutor = Readonly<{
+	withActorTransaction<T>(
+		actorUserId: string,
+		operation: (tx: TenantTransaction) => Promise<T>,
+	): Promise<T>;
+}>;
+
 export type PersistentLifecycleService = Readonly<{
 	exportUserData(
 		ctx: ExportUserDataContext,
@@ -71,6 +93,13 @@ export type PersistentLifecycleService = Readonly<{
 	): Promise<PurgeUserDataResult>;
 }>;
 
+export type PersistentLifecycleRuntimeOptions = Readonly<{
+	runtime: LifecycleRuntimeAdapters;
+	database: LifecycleScopedDatabaseExecutor;
+	assertPurgeAllowed: AssertPurgeAllowed;
+	hostSteps?: readonly LifecycleHostStep[];
+}>;
+
 function throwIfAborted(signal: AbortSignal | undefined): void {
 	if (signal?.aborted)
 		throw signal.reason ?? new DOMException("Aborted", "AbortError");
@@ -79,13 +108,17 @@ function throwIfAborted(signal: AbortSignal | undefined): void {
 function safeErrorCode(error: unknown): string {
 	if (error instanceof DOMException && error.name === "AbortError")
 		return "aborted";
-	if (error instanceof Error && SAFE_ERROR_CODES.has(error.message))
-		return error.message;
+	if (error instanceof LifecycleFenceRejectedError) return error.code;
+	if (error instanceof LifecycleLeaseLostError) return error.code;
 	return "persistence_failed";
 }
 
 function tokenHash(token: string): string {
 	return new Bun.CryptoHasher("sha256").update(token).digest("hex");
+}
+
+function subjectHash(actorUserId: string): string {
+	return new Bun.CryptoHasher("sha256").update(actorUserId).digest("hex");
 }
 
 function checksumLine(
@@ -110,12 +143,20 @@ function operationCounts(
 	return counts(result?.deletedByDomain);
 }
 
+/** Throw on a zero-row lease-fenced write; a stale worker must stop immediately. */
+export function requireLeaseWrite<T extends { id: string }>(
+	rows: readonly T[],
+): void {
+	if (rows.length !== 1) throw new LifecycleLeaseLostError();
+}
+
 /**
- * Durable OSS-owned lifecycle saga. It does not know workspace membership or
- * billing policy: the caller supplies a host fence and optional host steps.
+ * Durable OSS-owned lifecycle saga. It knows only OSS-owned data; workspace
+ * membership and final-owner policy remain in the injected host fence.
  */
 export function createPersistentLifecycleService(
 	runtime: LifecycleRuntimeAdapters,
+	database: LifecycleScopedDatabaseExecutor,
 	hostSteps: readonly LifecycleHostStep[] = [],
 ): PersistentLifecycleService {
 	const orderedSteps = [...hostSteps].sort(
@@ -126,105 +167,119 @@ export function createPersistentLifecycleService(
 	) {
 		throw new Error("Lifecycle host step IDs must be globally unique");
 	}
+	const withActor = <T>(
+		actorUserId: string,
+		operation: (tx: TenantTransaction) => Promise<T>,
+	) => database.withActorTransaction(actorUserId, operation);
 
 	async function getOrCreateOperation(
 		ctx: PurgeUserDataContext,
 	): Promise<PersistentOperation> {
-		await db
-			.insert(lifecycleOperations)
-			.values({
-				actorUserId: ctx.actorUserId,
-				idempotencyKey: ctx.idempotencyKey,
-				operationKind: "purge",
-				status: "pending",
-			})
-			.onConflictDoNothing();
-		const operation = await db.query.lifecycleOperations.findFirst({
-			where: and(
-				eq(lifecycleOperations.actorUserId, ctx.actorUserId),
-				eq(lifecycleOperations.idempotencyKey, ctx.idempotencyKey),
-			),
+		return withActor(ctx.actorUserId, async (tx) => {
+			await tx
+				.insert(lifecycleOperations)
+				.values({
+					actorUserId: ctx.actorUserId,
+					actorSubjectHash: subjectHash(ctx.actorUserId),
+					idempotencyKey: ctx.idempotencyKey,
+					operationKind: "purge",
+					status: "pending",
+				})
+				.onConflictDoNothing();
+			const operation = await tx.query.lifecycleOperations.findFirst({
+				where: and(
+					eq(lifecycleOperations.actorUserId, ctx.actorUserId),
+					eq(lifecycleOperations.idempotencyKey, ctx.idempotencyKey),
+				),
+			});
+			if (operation?.operationKind !== "purge")
+				throw new Error("persistence_failed");
+			return operation;
 		});
-		if (!operation) throw new Error("persistence_failed");
-		if (operation.operationKind !== "purge")
-			throw new Error("persistence_failed");
-		return operation;
 	}
 
 	async function acquireLease(
 		operation: PersistentOperation,
+		actorUserId: string,
 		owner: string,
 	): Promise<boolean> {
-		const now = new Date();
-		const expiry = new Date(now.getTime() + LEASE_MS);
-		const updated = await db
-			.update(lifecycleOperations)
-			.set({
-				status: "running",
-				leaseOwner: owner,
-				leaseExpiresAt: expiry,
-				attemptCount: sql`${lifecycleOperations.attemptCount} + 1`,
-				updatedAt: now,
-			})
-			.where(
-				and(
-					eq(lifecycleOperations.id, operation.id),
-					or(
-						eq(lifecycleOperations.status, "pending"),
-						eq(lifecycleOperations.status, "retryable"),
-						and(
-							eq(lifecycleOperations.status, "running"),
-							lt(lifecycleOperations.leaseExpiresAt, now),
+		return withActor(actorUserId, async (tx) => {
+			const now = new Date();
+			const expiry = new Date(now.getTime() + LEASE_MS);
+			const updated = await tx
+				.update(lifecycleOperations)
+				.set({
+					status: "running",
+					leaseOwner: owner,
+					leaseExpiresAt: expiry,
+					attemptCount: sql`${lifecycleOperations.attemptCount} + 1`,
+					updatedAt: now,
+				})
+				.where(
+					and(
+						eq(lifecycleOperations.id, operation.id),
+						or(
+							eq(lifecycleOperations.status, "pending"),
+							eq(lifecycleOperations.status, "retryable"),
+							and(
+								eq(lifecycleOperations.status, "running"),
+								lt(lifecycleOperations.leaseExpiresAt, now),
+							),
 						),
 					),
-				),
-			)
-			.returning({ id: lifecycleOperations.id });
-		return updated.length === 1;
+				)
+				.returning({ id: lifecycleOperations.id });
+			return updated.length === 1;
+		});
 	}
 
 	async function persistStep(
+		actorUserId: string,
 		operationId: string,
 		leaseOwner: string,
 		step: string,
 		deletedByDomain: Record<string, number>,
 	): Promise<void> {
-		const current = await db.query.lifecycleOperations.findFirst({
-			where: and(
-				eq(lifecycleOperations.id, operationId),
-				eq(lifecycleOperations.leaseOwner, leaseOwner),
-			),
-		});
-		if (!current) throw new Error("lease_lost");
-		if (
-			current.status !== "running" ||
-			(current.leaseExpiresAt && current.leaseExpiresAt < new Date())
-		) {
-			throw new Error("lease_lost");
-		}
-		const completed = Array.isArray(current.completedSteps)
-			? current.completedSteps.filter(
-					(value): value is string => typeof value === "string",
-				)
-			: [];
-		if (!completed.includes(step)) completed.push(step);
-		await db
-			.update(lifecycleOperations)
-			.set({
-				completedSteps: completed,
-				terminalResult: { deletedByDomain },
-				updatedAt: new Date(),
-			})
-			.where(
-				and(
+		await withActor(actorUserId, async (tx) => {
+			const current = await tx.query.lifecycleOperations.findFirst({
+				where: and(
 					eq(lifecycleOperations.id, operationId),
 					eq(lifecycleOperations.leaseOwner, leaseOwner),
 				),
-			);
+			});
+			if (
+				current?.status !== "running" ||
+				(current.leaseExpiresAt && current.leaseExpiresAt < new Date())
+			) {
+				throw new LifecycleLeaseLostError();
+			}
+			const completed = Array.isArray(current.completedSteps)
+				? current.completedSteps.filter(
+						(value): value is string => typeof value === "string",
+					)
+				: [];
+			if (!completed.includes(step)) completed.push(step);
+			const updated = await tx
+				.update(lifecycleOperations)
+				.set({
+					completedSteps: completed,
+					terminalResult: { deletedByDomain },
+					updatedAt: new Date(),
+				})
+				.where(
+					and(
+						eq(lifecycleOperations.id, operationId),
+						eq(lifecycleOperations.leaseOwner, leaseOwner),
+					),
+				)
+				.returning({ id: lifecycleOperations.id });
+			requireLeaseWrite(updated);
+		});
 	}
 
 	async function runStep(
 		operation: PersistentOperation,
+		actorUserId: string,
 		leaseOwner: string,
 		step: string,
 		deletedByDomain: Record<string, number>,
@@ -236,7 +291,13 @@ export function createPersistentLifecycleService(
 		if (completed.includes(step)) return;
 		const count = await action();
 		deletedByDomain[step] = count;
-		await persistStep(operation.id, leaseOwner, step, deletedByDomain);
+		await persistStep(
+			actorUserId,
+			operation.id,
+			leaseOwner,
+			step,
+			deletedByDomain,
+		);
 		operation.completedSteps = [...completed, step];
 	}
 
@@ -256,10 +317,12 @@ export function createPersistentLifecycleService(
 			checksumLine(hash, manifest);
 			recordCount += 1;
 			yield manifest;
-			const ownedDocuments = await db
-				.select()
-				.from(documents)
-				.where(eq(documents.ownerId, ctx.actorUserId));
+			const ownedDocuments = await withActor(ctx.actorUserId, (tx) =>
+				tx
+					.select()
+					.from(documents)
+					.where(eq(documents.ownerId, ctx.actorUserId)),
+			);
 			for (const document of ownedDocuments) {
 				throwIfAborted(ctx.signal);
 				const record: UserDataExportRecord = {
@@ -282,17 +345,19 @@ export function createPersistentLifecycleService(
 				recordCount += 1;
 				yield record;
 			}
-			const ownedAttachments = await db
-				.select({
-					id: attachments.id,
-					workspaceId: attachments.workspaceId,
-					filename: attachments.filename,
-					mimeType: attachments.mimeType,
-					size: attachments.size,
-				})
-				.from(attachments)
-				.innerJoin(documents, eq(attachments.documentId, documents.id))
-				.where(eq(documents.ownerId, ctx.actorUserId));
+			const ownedAttachments = await withActor(ctx.actorUserId, (tx) =>
+				tx
+					.select({
+						id: attachments.id,
+						workspaceId: attachments.workspaceId,
+						filename: attachments.filename,
+						mimeType: attachments.mimeType,
+						size: attachments.size,
+					})
+					.from(attachments)
+					.innerJoin(documents, eq(attachments.documentId, documents.id))
+					.where(eq(documents.ownerId, ctx.actorUserId)),
+			);
 			for (const attachment of ownedAttachments) {
 				throwIfAborted(ctx.signal);
 				const record: UserDataExportRecord = {
@@ -325,39 +390,48 @@ export function createPersistentLifecycleService(
 		async purgeUserData(ctx, gate) {
 			throwIfAborted(ctx.signal);
 			let operation = await getOrCreateOperation(ctx);
-			if (operation.status === "completed") {
+			if (operation.status === "completed")
 				return {
 					status: "already_completed",
 					operationId: operation.id,
 					deletedByDomain: operationCounts(operation),
 				};
-			}
 			const leaseOwner = crypto.randomUUID();
-			if (!(await acquireLease(operation, leaseOwner)))
-				throw new Error("lease_lost");
-			operation =
-				(await db.query.lifecycleOperations.findFirst({
-					where: eq(lifecycleOperations.id, operation.id),
-				})) ?? operation;
+			if (!(await acquireLease(operation, ctx.actorUserId, leaseOwner)))
+				throw new LifecycleLeaseLostError();
+			operation = await withActor(
+				ctx.actorUserId,
+				async (tx) =>
+					(await tx.query.lifecycleOperations.findFirst({
+						where: eq(lifecycleOperations.id, operation.id),
+					})) ?? operation,
+			);
 			const deletedByDomain = operationCounts(operation);
 			try {
 				throwIfAborted(ctx.signal);
-				await db
-					.update(lifecycleOperations)
-					.set({
-						fenceTokenHash: tokenHash(gate.fenceToken),
-						updatedAt: new Date(),
-					})
-					.where(
-						and(
-							eq(lifecycleOperations.id, operation.id),
-							eq(lifecycleOperations.leaseOwner, leaseOwner),
-						),
-					);
+				await withActor(ctx.actorUserId, async (tx) => {
+					const updated = await tx
+						.update(lifecycleOperations)
+						.set({
+							fenceTokenHash: tokenHash(gate.fenceToken),
+							updatedAt: new Date(),
+						})
+						.where(
+							and(
+								eq(lifecycleOperations.id, operation.id),
+								eq(lifecycleOperations.leaseOwner, leaseOwner),
+							),
+						)
+						.returning({ id: lifecycleOperations.id });
+					requireLeaseWrite(updated);
+				});
 				await runtime.verifyPurgeFence(ctx, gate.fenceToken);
-
+				const dbDelete = <T extends { id: string }>(
+					action: (tx: TenantTransaction) => Promise<T[]>,
+				) => withActor(ctx.actorUserId, action).then((rows) => rows.length);
 				await runStep(
 					operation,
+					ctx.actorUserId,
 					leaseOwner,
 					"cancel_account_jobs",
 					deletedByDomain,
@@ -365,6 +439,7 @@ export function createPersistentLifecycleService(
 				);
 				await runStep(
 					operation,
+					ctx.actorUserId,
 					leaseOwner,
 					"remove_collaboration_state",
 					deletedByDomain,
@@ -372,70 +447,79 @@ export function createPersistentLifecycleService(
 				);
 				await runStep(
 					operation,
+					ctx.actorUserId,
 					leaseOwner,
 					"remove_subject_created_shares",
 					deletedByDomain,
-					async () =>
-						(
-							await db
+					() =>
+						dbDelete((tx) =>
+							tx
 								.delete(shareLinks)
 								.where(eq(shareLinks.createdBy, ctx.actorUserId))
-								.returning({ id: shareLinks.id })
-						).length,
+								.returning({ id: shareLinks.id }),
+						),
 				);
-				const owned = await db
-					.select({ id: documents.id })
-					.from(documents)
-					.where(eq(documents.ownerId, ctx.actorUserId));
+				const owned = await withActor(ctx.actorUserId, (tx) =>
+					tx
+						.select({ id: documents.id })
+						.from(documents)
+						.where(eq(documents.ownerId, ctx.actorUserId)),
+				);
 				const documentIds = owned.map((row) => row.id);
 				await runStep(
 					operation,
+					ctx.actorUserId,
 					leaseOwner,
 					"remove_document_versions",
 					deletedByDomain,
-					async () =>
+					() =>
 						documentIds.length
-							? (
-									await db
+							? dbDelete((tx) =>
+									tx
 										.delete(versions)
 										.where(inArray(versions.documentId, documentIds))
-										.returning({ id: versions.id })
-								).length
-							: 0,
+										.returning({ id: versions.id }),
+								)
+							: Promise.resolve(0),
 				);
 				await runStep(
 					operation,
+					ctx.actorUserId,
 					leaseOwner,
 					"remove_chunks_and_embeddings",
 					deletedByDomain,
-					async () =>
+					() =>
 						documentIds.length
-							? (
-									await db
+							? dbDelete((tx) =>
+									tx
 										.delete(documentEmbeddings)
 										.where(inArray(documentEmbeddings.documentId, documentIds))
-										.returning({ id: documentEmbeddings.id })
-								).length
-							: 0,
+										.returning({ id: documentEmbeddings.id }),
+								)
+							: Promise.resolve(0),
 				);
 				await runStep(
 					operation,
+					ctx.actorUserId,
 					leaseOwner,
 					"remove_graph_state",
 					deletedByDomain,
 					() => runtime.removeGraphState(documentIds, ctx.signal),
 				);
 				const objectRows = documentIds.length
-					? await db
-							.select({
-								id: attachments.id,
-								storageKey: attachments.storageKey,
-							})
-							.from(attachments)
-							.where(inArray(attachments.documentId, documentIds))
+					? await withActor(ctx.actorUserId, (tx) =>
+							tx
+								.select({
+									id: attachments.id,
+									storageKey: attachments.storageKey,
+								})
+								.from(attachments)
+								.where(inArray(attachments.documentId, documentIds)),
+						)
 					: [];
 				await runStep(
 					operation,
+					ctx.actorUserId,
 					leaseOwner,
 					"delete_attachment_objects",
 					deletedByDomain,
@@ -447,13 +531,14 @@ export function createPersistentLifecycleService(
 				);
 				await runStep(
 					operation,
+					ctx.actorUserId,
 					leaseOwner,
 					"remove_attachment_rows",
 					deletedByDomain,
-					async () =>
+					() =>
 						objectRows.length
-							? (
-									await db
+							? dbDelete((tx) =>
+									tx
 										.delete(attachments)
 										.where(
 											inArray(
@@ -461,114 +546,144 @@ export function createPersistentLifecycleService(
 												objectRows.map((row) => row.id),
 											),
 										)
-										.returning({ id: attachments.id })
-								).length
-							: 0,
+										.returning({ id: attachments.id }),
+								)
+							: Promise.resolve(0),
 				);
 				await runStep(
 					operation,
+					ctx.actorUserId,
 					leaseOwner,
 					"remove_subject_documents",
 					deletedByDomain,
-					async () =>
-						(
-							await db
+					() =>
+						dbDelete((tx) =>
+							tx
 								.delete(documents)
 								.where(eq(documents.ownerId, ctx.actorUserId))
-								.returning({ id: documents.id })
-						).length,
+								.returning({ id: documents.id }),
+						),
 				);
 				await runStep(
 					operation,
+					ctx.actorUserId,
 					leaseOwner,
 					"clear_redis_state",
 					deletedByDomain,
 					() => runtime.clearAccountRedisState(ctx.actorUserId, ctx.signal),
 				);
-				for (const step of orderedSteps) {
-					if (!step.purge) continue;
-					await runStep(
-						operation,
-						leaseOwner,
-						`host:${step.id}`,
-						deletedByDomain,
-						async () => (await step.purge?.(ctx))?.deletedCount ?? 0,
-					);
-				}
+				for (const step of orderedSteps)
+					if (step.purge)
+						await runStep(
+							operation,
+							ctx.actorUserId,
+							leaseOwner,
+							`host:${step.id}`,
+							deletedByDomain,
+							async () => (await step.purge?.(ctx))?.deletedCount ?? 0,
+						);
 				await runStep(
 					operation,
+					ctx.actorUserId,
 					leaseOwner,
 					"write_deletion_audit",
 					deletedByDomain,
 					async () => {
-						await db.insert(auditLog).values({
-							actorId: ctx.actorUserId,
-							action: "account_data_purged",
-							resourceType: "lifecycle_operation",
-							details: {
-								operationId: operation.id,
-								outcome: "completed",
-								deletedByDomain,
-							},
-						});
+						await withActor(ctx.actorUserId, (tx) =>
+							tx.insert(auditLog).values({
+								actorId: ctx.actorUserId,
+								action: "account_data_purged",
+								resourceType: "lifecycle_operation",
+								details: {
+									operationId: operation.id,
+									outcome: "completed",
+									deletedByDomain,
+								},
+							}),
+						);
 						return 1;
 					},
 				);
-				await db
-					.update(lifecycleOperations)
-					.set({
-						status: "completed",
-						terminalResult: { deletedByDomain },
-						completedAt: new Date(),
-						leaseOwner: null,
-						leaseExpiresAt: null,
-						updatedAt: new Date(),
-					})
-					.where(
-						and(
-							eq(lifecycleOperations.id, operation.id),
-							eq(lifecycleOperations.leaseOwner, leaseOwner),
-						),
-					);
+				await withActor(ctx.actorUserId, async (tx) => {
+					const updated = await tx
+						.update(lifecycleOperations)
+						.set({
+							status: "completed",
+							terminalResult: { deletedByDomain },
+							completedAt: new Date(),
+							leaseOwner: null,
+							leaseExpiresAt: null,
+							updatedAt: new Date(),
+						})
+						.where(
+							and(
+								eq(lifecycleOperations.id, operation.id),
+								eq(lifecycleOperations.leaseOwner, leaseOwner),
+							),
+						)
+						.returning({ id: lifecycleOperations.id });
+					requireLeaseWrite(updated);
+				});
 				return {
 					status: "completed",
 					operationId: operation.id,
 					deletedByDomain,
 				};
 			} catch (error) {
+				if (error instanceof LifecycleLeaseLostError) throw error;
 				const code = safeErrorCode(error);
-				await db
-					.update(lifecycleOperations)
-					.set({
-						status: code === "fence_rejected" ? "rejected" : "retryable",
-						safeErrorCode: code,
-						leaseOwner: null,
-						leaseExpiresAt: null,
-						completedAt: code === "fence_rejected" ? new Date() : null,
-						updatedAt: new Date(),
-					})
-					.where(
-						and(
-							eq(lifecycleOperations.id, operation.id),
-							eq(lifecycleOperations.leaseOwner, leaseOwner),
-						),
-					);
+				await withActor(ctx.actorUserId, async (tx) => {
+					const updated = await tx
+						.update(lifecycleOperations)
+						.set({
+							status:
+								error instanceof LifecycleFenceRejectedError
+									? "rejected"
+									: "retryable",
+							safeErrorCode: code,
+							leaseOwner: null,
+							leaseExpiresAt: null,
+							completedAt:
+								error instanceof LifecycleFenceRejectedError
+									? new Date()
+									: null,
+							updatedAt: new Date(),
+						})
+						.where(
+							and(
+								eq(lifecycleOperations.id, operation.id),
+								eq(lifecycleOperations.leaseOwner, leaseOwner),
+							),
+						)
+						.returning({ id: lifecycleOperations.id });
+					requireLeaseWrite(updated);
+				});
 				throw error;
 			}
 		},
 	};
 }
 
-/** Builds the public facade without allowing the OSS service to own membership policy. */
 export function bindPersistentLifecycle(
 	service: PersistentLifecycleService,
 	assertPurgeAllowed: AssertPurgeAllowed,
-) {
+): UserDataLifecycle {
 	return {
 		exportUserData: service.exportUserData,
-		async purgeUserData(ctx: PurgeUserDataContext) {
+		async purgeUserData(ctx) {
 			const gate = await assertPurgeAllowed(ctx);
 			return service.purgeUserData(ctx, gate);
 		},
 	};
+}
+
+export function createPersistentLifecycleRuntime(
+	options: PersistentLifecycleRuntimeOptions,
+): UserDataLifecycle {
+	const service = createPersistentLifecycleService(
+		options.runtime,
+		options.database,
+		options.hostSteps ?? [],
+	);
+	return bindPersistentLifecycle(service, options.assertPurgeAllowed);
 }

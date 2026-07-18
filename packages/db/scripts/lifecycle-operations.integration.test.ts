@@ -11,27 +11,31 @@ describe("lifecycle operation persistence integration", () => {
 			const sql = postgres(databaseUrl as string, { max: 1 });
 			const actorA = crypto.randomUUID();
 			const actorB = crypto.randomUUID();
+			const actorDeleted = crypto.randomUUID();
 			const operationA = crypto.randomUUID();
 			const operationB = crypto.randomUUID();
+			const deletedOperation = crypto.randomUUID();
 
 			try {
 				await sql
 					.begin(async (tx) => {
 						await tx`INSERT INTO public.users (id, email) VALUES
 							(${actorA}::uuid, ${`${actorA}@lifecycle.invalid`}),
-							(${actorB}::uuid, ${`${actorB}@lifecycle.invalid`})`;
+							(${actorB}::uuid, ${`${actorB}@lifecycle.invalid`}),
+							(${actorDeleted}::uuid, ${`${actorDeleted}@lifecycle.invalid`})`;
 						await tx`INSERT INTO public.lifecycle_operations
-							(id, actor_user_id, idempotency_key, operation_kind)
+							(id, actor_user_id, actor_subject_hash, idempotency_key, operation_kind)
 							VALUES
-							(${operationA}::uuid, ${actorA}::uuid, 'same-key', 'purge'),
-							(${operationB}::uuid, ${actorB}::uuid, 'same-key', 'purge')`;
+							(${operationA}::uuid, ${actorA}::uuid, encode(digest(${actorA}, 'sha256'), 'hex'), 'same-key', 'purge'),
+							(${operationB}::uuid, ${actorB}::uuid, encode(digest(${actorB}, 'sha256'), 'hex'), 'same-key', 'purge'),
+							(${deletedOperation}::uuid, ${actorDeleted}::uuid, encode(digest(${actorDeleted}, 'sha256'), 'hex'), 'delete-key', 'purge')`;
 
 						let uniqueRejected = false;
 						await tx
 							.savepoint(async (savepoint) => {
 								await savepoint`INSERT INTO public.lifecycle_operations
-									(actor_user_id, idempotency_key, operation_kind)
-									VALUES (${actorA}::uuid, 'same-key', 'purge')`;
+									(actor_user_id, actor_subject_hash, idempotency_key, operation_kind)
+									VALUES (${actorA}::uuid, encode(digest(${actorA}, 'sha256'), 'hex'), 'same-key', 'purge')`;
 							})
 							.catch(() => {
 								uniqueRejected = true;
@@ -75,6 +79,16 @@ describe("lifecycle operation persistence integration", () => {
 								terminalMutationRejected = true;
 							});
 						expect(terminalMutationRejected).toBe(true);
+
+						await tx`UPDATE public.lifecycle_operations SET status = 'completed', completed_at = now(), lease_owner = NULL WHERE id = ${deletedOperation}::uuid`;
+						const beforeDelete = await tx`SELECT actor_subject_hash FROM public.lifecycle_operations WHERE id = ${deletedOperation}::uuid`;
+						await tx`DELETE FROM public.users WHERE id = ${actorDeleted}::uuid`;
+						const retained = await tx`SELECT actor_user_id, actor_subject_hash, status, completed_at FROM public.lifecycle_operations WHERE id = ${deletedOperation}::uuid`;
+						expect(retained).toHaveLength(1);
+						expect(retained[0]?.actor_user_id).toBeNull();
+						expect(retained[0]?.actor_subject_hash).toBe(beforeDelete[0]?.actor_subject_hash);
+						expect(retained[0]?.status).toBe("completed");
+						expect(retained[0]?.completed_at).not.toBeNull();
 
 						await tx.unsafe("SET LOCAL ROLE hiai_app");
 						await tx`SELECT set_config('app.current_user_id', ${actorA}, true)`;

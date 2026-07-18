@@ -5,6 +5,7 @@
   "browser": {
 	"./packages/sdk/dist/backend-launcher.js": false,
 	"./packages/sdk/dist/lifecycle.js": false,
+	"./packages/sdk/dist/lifecycle-persistent.js": false,
 	"./packages/sdk/dist/storage-quota.js": false,
 	"./packages/sdk/dist/workspace.js": false
   },
@@ -52,11 +53,16 @@
       "import": "./packages/sdk/dist/index.js",
       "types": "./packages/sdk/dist/index.d.ts"
     },
-    "./lifecycle": {
+	"./lifecycle": {
       "browser": "./packages/sdk/dist/server-only-browser-entry.js",
       "import": "./packages/sdk/dist/lifecycle.js",
       "types": "./packages/sdk/dist/lifecycle.d.ts"
-    },
+	},
+	"./lifecycle/persistent": {
+		"browser": "./packages/sdk/dist/server-only-browser-entry.js",
+		"import": "./packages/sdk/dist/lifecycle-persistent.js",
+		"types": "./packages/sdk/dist/lifecycle-persistent.d.ts"
+	},
     "./workspace": {
       "browser": "./packages/sdk/dist/server-only-browser-entry.js",
       "import": "./packages/sdk/dist/workspace.js",

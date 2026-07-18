@@ -45,6 +45,51 @@ export type DocsmintBackendLauncher = Readonly<{
 	launch(options?: LaunchDocsmintBackendOptions): DocsmintBackendHandle;
 }>;
 
+import type { AttachmentStorageQuotaAdmission } from "./storage-quota";
+
+export type { AttachmentStorageQuotaAdmission } from "./storage-quota";
+
+export type DocsMintRuntimeOptions = Readonly<{
+	attachmentStorageQuotaAdmission?: AttachmentStorageQuotaAdmission;
+}>;
+
+export type DocsMintInProcessHandle = Readonly<{
+	ready: Promise<void>;
+	stop(): Promise<void>;
+}>;
+
+const RUNTIME_OPTIONS = Symbol.for("@hiai-gg/docsmint/runtime-options");
+
+/**
+ * Starts the bundled OSS API in this Bun process. Runtime options are frozen
+ * and installed before importing the backend graph, so routes/workers cannot
+ * observe an unconfigured tenancy-enabled process.
+ */
+export async function launchDocsMintApi(
+	options: DocsMintRuntimeOptions = {},
+): Promise<DocsMintInProcessHandle> {
+	if (
+		process.env.DOCSMINT_WORKSPACE_ENABLED === "true" &&
+		!options.attachmentStorageQuotaAdmission
+	) {
+		throw new Error(
+			"Attachment storage quota admission is required when workspace tenancy is enabled",
+		);
+	}
+	const globals = globalThis as Record<PropertyKey, unknown>;
+	if (globals[RUNTIME_OPTIONS])
+		throw new Error("DocsMint runtime is already configured");
+	globals[RUNTIME_OPTIONS] = Object.freeze({ ...options });
+	const backendUrl = new URL("./backend/index.js", import.meta.url).href;
+	const backend = (await import(backendUrl)) as {
+		stopDocsMintApi?: () => Promise<void>;
+	};
+	return Object.freeze({
+		ready: Promise.resolve(),
+		stop: async () => backend.stopDocsMintApi?.(),
+	});
+}
+
 const DEFAULT_STARTUP_TIMEOUT_MS = 30_000;
 const DEFAULT_POLL_INTERVAL_MS = 200;
 const DEFAULT_API_PORT = "50700";
@@ -106,9 +151,7 @@ export function createDocsmintBackendLauncher(
 	const sleep = runtime.sleep ?? ((milliseconds) => Bun.sleep(milliseconds));
 
 	return Object.freeze({
-		launch(
-			options: LaunchDocsmintBackendOptions = {},
-		): DocsmintBackendHandle {
+		launch(options: LaunchDocsmintBackendOptions = {}): DocsmintBackendHandle {
 			const startupTimeoutMs =
 				options.startupTimeoutMs ?? DEFAULT_STARTUP_TIMEOUT_MS;
 			const pollIntervalMs = options.pollIntervalMs ?? DEFAULT_POLL_INTERVAL_MS;
@@ -120,7 +163,8 @@ export function createDocsmintBackendLauncher(
 
 			const env = immutableEnvironment(options.env);
 			const port = env.API_PORT ?? DEFAULT_API_PORT;
-			const healthUrl = options.healthUrl ?? `http://127.0.0.1:${port}/api/health`;
+			const healthUrl =
+				options.healthUrl ?? `http://127.0.0.1:${port}/api/health`;
 			const entrypoint = resolveDocsmintBackendEntrypoint(
 				runtime.launcherModuleUrl ?? import.meta.url,
 			);
