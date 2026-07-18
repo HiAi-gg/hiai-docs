@@ -284,6 +284,18 @@ const activeStates = $derived.by<ActiveStates>(() => {
 	};
 });
 
+const tableContext = $derived.by(() => {
+	void readEditorRevision;
+	if (!editor?.isActive("table")) {
+		return { insideTable: false, canMerge: false, canSplit: false };
+	}
+	return {
+		insideTable: true,
+		canMerge: editor.can().mergeCells(),
+		canSplit: editor.can().splitCell(),
+	};
+});
+
 // Resolve the current heading level (1/2/3) or null if the selection is in
 // a paragraph. Used to drive the Heading dropdown trigger label and icon.
 const activeHeadingLevel = $derived.by<1 | 2 | 3 | null>(() => {
@@ -376,6 +388,51 @@ function insertTable(rows: number, cols: number) {
 	if (!editor) return;
 	editor.chain().focus().insertTable({ rows, cols, withHeaderRow: true }).run();
 	tablePickerOpen = false;
+}
+
+type TableCommand =
+	| "addRowBefore"
+	| "addRowAfter"
+	| "deleteRow"
+	| "addColumnBefore"
+	| "addColumnAfter"
+	| "deleteColumn"
+	| "mergeCells"
+	| "splitCell"
+	| "deleteTable";
+
+function runTableCommand(command: TableCommand) {
+	if (!editor || !tableContext.insideTable) return;
+	const chain = editor.chain().focus();
+	switch (command) {
+		case "addRowBefore":
+			chain.addRowBefore().run();
+			break;
+		case "addRowAfter":
+			chain.addRowAfter().run();
+			break;
+		case "deleteRow":
+			chain.deleteRow().run();
+			break;
+		case "addColumnBefore":
+			chain.addColumnBefore().run();
+			break;
+		case "addColumnAfter":
+			chain.addColumnAfter().run();
+			break;
+		case "deleteColumn":
+			chain.deleteColumn().run();
+			break;
+		case "mergeCells":
+			if (tableContext.canMerge) chain.mergeCells().run();
+			break;
+		case "splitCell":
+			if (tableContext.canSplit) chain.splitCell().run();
+			break;
+		case "deleteTable":
+			chain.deleteTable().run();
+			break;
+	}
 }
 
 function toggleHeadingDropdown() {
@@ -1137,33 +1194,56 @@ $effect(() => {
 		</button>
 
 		{#if tablePickerOpen}
-			<div class="table-popover" class:open-up={tableOpenUp} class:open-left={tableOpenLeft} role="menu" aria-label="Insert table">
-				<div class="table-grid" role="presentation">
-					{#each Array(TABLE_GRID_MAX) as _, r}
-						{#each Array(TABLE_GRID_MAX) as _, c}
-							<button
-								type="button"
-								class="table-cell"
-								class:active={r < tableHoverRows && c < tableHoverCols}
-								onmouseenter={() => {
-									tableHoverRows = r + 1;
-									tableHoverCols = c + 1;
-								}}
-								onfocus={() => {
-									tableHoverRows = r + 1;
-									tableHoverCols = c + 1;
-								}}
-								onclick={() => insertTable(r + 1, c + 1)}
-								aria-label={`${r + 1} × ${c + 1}`}
-							></button>
+			<div class="table-popover" class:table-actions-popover={tableContext.insideTable} class:open-up={tableOpenUp} class:open-left={tableOpenLeft} role="menu" aria-label={tableContext.insideTable ? "Edit table" : "Insert table"}>
+				{#if tableContext.insideTable}
+					<div class="table-action-group" role="group" aria-label="Rows">
+						<span class="table-action-heading">Rows</span>
+						<button type="button" role="menuitem" class="table-action" onclick={() => runTableCommand("addRowBefore")}>Add row above</button>
+						<button type="button" role="menuitem" class="table-action" onclick={() => runTableCommand("addRowAfter")}>Add row below</button>
+						<button type="button" role="menuitem" class="table-action" onclick={() => runTableCommand("deleteRow")}>Delete row</button>
+					</div>
+					<div class="table-action-group" role="group" aria-label="Columns">
+						<span class="table-action-heading">Columns</span>
+						<button type="button" role="menuitem" class="table-action" onclick={() => runTableCommand("addColumnBefore")}>Add column left</button>
+						<button type="button" role="menuitem" class="table-action" onclick={() => runTableCommand("addColumnAfter")}>Add column right</button>
+						<button type="button" role="menuitem" class="table-action" onclick={() => runTableCommand("deleteColumn")}>Delete column</button>
+					</div>
+					<div class="table-action-group" role="group" aria-label="Cells">
+						<span class="table-action-heading">Cells</span>
+						<button type="button" role="menuitem" class="table-action" disabled={!tableContext.canMerge} onclick={() => runTableCommand("mergeCells")}>Merge selected cells</button>
+						<button type="button" role="menuitem" class="table-action" disabled={!tableContext.canSplit} onclick={() => runTableCommand("splitCell")}>Split cell</button>
+					</div>
+					<div class="table-action-group table-danger-group" role="group" aria-label="Table">
+						<button type="button" role="menuitem" class="table-action table-danger-action" onclick={() => runTableCommand("deleteTable")}>Delete table</button>
+					</div>
+				{:else}
+					<div class="table-grid" role="presentation">
+						{#each Array(TABLE_GRID_MAX) as _, r}
+							{#each Array(TABLE_GRID_MAX) as _, c}
+								<button
+									type="button"
+									class="table-cell"
+									class:active={r < tableHoverRows && c < tableHoverCols}
+									onmouseenter={() => {
+										tableHoverRows = r + 1;
+										tableHoverCols = c + 1;
+									}}
+									onfocus={() => {
+										tableHoverRows = r + 1;
+										tableHoverCols = c + 1;
+									}}
+									onclick={() => insertTable(r + 1, c + 1)}
+									aria-label={`${r + 1} × ${c + 1}`}
+								></button>
+							{/each}
 						{/each}
-					{/each}
-				</div>
-				<div class="table-grid-label">
-					{tableHoverRows > 0
-						? `${tableHoverRows} × ${tableHoverCols}`
-						: "Insert table"}
-				</div>
+					</div>
+					<div class="table-grid-label">
+						{tableHoverRows > 0
+							? `${tableHoverRows} × ${tableHoverCols}`
+							: "Insert table"}
+					</div>
+				{/if}
 			</div>
 		{/if}
 	</div>
@@ -1790,6 +1870,68 @@ $effect(() => {
 		text-align: center;
 		font-size: 0.75rem;
 		color: var(--muted-foreground);
+	}
+
+	.table-actions-popover {
+		width: min(280px, calc(100vw - 24px));
+		padding: 6px;
+	}
+
+	.table-action-group {
+		display: grid;
+		grid-template-columns: 1fr;
+		gap: 2px;
+		padding: 4px 0;
+	}
+
+	.table-action-group + .table-action-group {
+		border-top: 1px solid var(--border);
+	}
+
+	.table-action-heading {
+		padding: 4px 8px 2px;
+		font-size: 0.6875rem;
+		font-weight: 600;
+		letter-spacing: 0.04em;
+		text-transform: uppercase;
+		color: var(--muted-foreground);
+	}
+
+	.table-action {
+		width: 100%;
+		padding: 7px 8px;
+		border: 0;
+		border-radius: 5px;
+		background: transparent;
+		color: inherit;
+		font: inherit;
+		font-size: 0.8125rem;
+		text-align: left;
+		cursor: pointer;
+	}
+
+	.table-action:hover:not(:disabled),
+	.table-action:focus-visible {
+		background: var(--accent);
+		outline: none;
+	}
+
+	.table-action:focus-visible {
+		box-shadow: 0 0 0 2px var(--ring);
+	}
+
+	.table-action:disabled {
+		color: var(--muted-foreground);
+		opacity: 0.45;
+		cursor: not-allowed;
+	}
+
+	.table-danger-action {
+		color: var(--destructive);
+	}
+
+	.table-danger-action:hover:not(:disabled) {
+		background: color-mix(in srgb, var(--destructive) 12%, transparent);
 	}
 
 	/* Copy button — turn the icon green briefly when the clipboard write

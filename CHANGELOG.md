@@ -7,6 +7,12 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+### Added
+
+- Tables can now be edited after insertion: users can add or remove rows and
+  columns, merge a rectangular selection of cells, split merged cells, and
+  remove the table from the existing editor table menu.
+
 ## [0.3.5] - 2026-07-18
 
 ### Added

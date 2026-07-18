@@ -55,6 +55,29 @@ describe("responsive editor and settings UI", () => {
 		expect(source).toContain("{@render copyContentSnippet()}");
 	});
 
+	test("table popover exposes contextual row, column, merge, and split commands", () => {
+		const source = readFileSync(
+			resolve(import.meta.dir, "EditorToolbar.svelte"),
+			"utf8",
+		);
+		for (const command of [
+			"addRowBefore",
+			"addRowAfter",
+			"deleteRow",
+			"addColumnBefore",
+			"addColumnAfter",
+			"deleteColumn",
+			"mergeCells",
+			"splitCell",
+			"deleteTable",
+		]) {
+			expect(source).toContain(command);
+		}
+		expect(source).toContain("tableContext.canMerge");
+		expect(source).toContain("tableContext.canSplit");
+		expect(source).toContain("Merge selected cells");
+	});
+
 	test("editor preferences are collapsed switches rather than checkboxes", () => {
 		const source = readFileSync(
 			resolve(import.meta.dir, "../SettingsDialog.svelte"),
