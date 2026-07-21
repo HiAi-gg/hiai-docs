@@ -6,13 +6,16 @@ import { Label } from "@hiai-gg/hiai-ui/components/ui/label";
 import * as Tabs from "@hiai-gg/hiai-ui/components/ui/tabs";
 import { Loader2, LogOut, Save } from "lucide-svelte";
 import { onMount } from "svelte";
-import { goto } from "$app/navigation";
 import { page } from "$app/state";
 import { getProfile, updateProfile } from "$lib/api/settings";
 import { authClient, signOut } from "$lib/auth-client";
 import ApiAccessSettings from "$lib/components/settings/ApiAccessSettings.svelte";
 import { getFrontendExtensions } from "$lib/extensions/context";
 import { resolveExtensions } from "$lib/extensions/resolve";
+import {
+	getDocsmintRouteAdapter,
+	navigateDocsmintRoute,
+} from "$lib/hosts/route-context";
 import { cleanupOfflineData } from "$lib/offline/cleanup";
 import * as m from "$lib/paraglide/messages.js";
 import { editorPreferences } from "$lib/stores/editor-preferences.svelte";
@@ -142,6 +145,7 @@ const themeOptions: Array<{ value: Theme; label: string; key: string }> = [
 ];
 
 let loggingOut = $state(false);
+const route = getDocsmintRouteAdapter();
 
 async function handleLogout() {
 	loggingOut = true;
@@ -151,7 +155,7 @@ async function handleLogout() {
 		await cleanupOfflineData();
 		await signOut();
 		open = false;
-		goto("/login");
+		navigateDocsmintRoute(route, "/login");
 	} catch {
 		loggingOut = false;
 	}

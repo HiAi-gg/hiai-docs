@@ -14,8 +14,12 @@
      closes on selection or explicit click on the backdrop. -->
 <script lang="ts">
 import { FileText, Keyboard, Plus, Search, Settings } from "lucide-svelte";
-import { goto } from "$app/navigation";
 import { type SearchSuggestion, searchSuggest } from "$lib/api/search";
+import {
+	getDocsmintRequestAdapter,
+	getDocsmintRouteAdapter,
+	navigateDocsmintRoute,
+} from "$lib/hosts/route-context";
 import * as m from "$lib/paraglide/messages.js";
 import {
 	getIsQuickSearchOpen,
@@ -30,24 +34,27 @@ interface CommandItem {
 	run: () => void;
 }
 
+const route = getDocsmintRouteAdapter();
+const request = getDocsmintRequestAdapter();
+
 const COMMANDS: CommandItem[] = [
 	{
 		id: "new-doc",
 		label: m.quick_search_command_new_doc(),
 		icon: Plus,
-		run: () => goto("/?action=new"),
+		run: () => navigateDocsmintRoute(route, "/?action=new"),
 	},
 	{
 		id: "open-search",
 		label: m.quick_search_command_open_search(),
 		icon: Search,
-		run: () => goto("/search"),
+		run: () => navigateDocsmintRoute(route, "/search"),
 	},
 	{
 		id: "open-settings",
 		label: m.quick_search_command_open_settings(),
 		icon: Settings,
-		run: () => goto("/settings"),
+		run: () => navigateDocsmintRoute(route, "/settings"),
 	},
 	{
 		id: "show-shortcuts",
@@ -120,7 +127,7 @@ $effect(() => {
 		}
 		loading = true;
 		try {
-			suggestions = await searchSuggest(trimmed);
+			suggestions = await searchSuggest(trimmed, request.fetch);
 		} catch {
 			suggestions = [];
 		} finally {
@@ -137,7 +144,7 @@ function selectAt(idx: number) {
 	const item = items[idx];
 	if (!item) return;
 	if (item.kind === "doc") {
-		goto(`/docs/${item.suggestion.id}`);
+		navigateDocsmintRoute(route, `/docs/${item.suggestion.id}`);
 	} else {
 		item.command.run();
 	}

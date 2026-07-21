@@ -13,7 +13,10 @@ import {
 	X,
 	XCircle,
 } from "lucide-svelte";
-import { goto } from "$app/navigation";
+import {
+	getDocsmintRouteAdapter,
+	resolveDocsmintRoute,
+} from "$lib/hosts/route-context";
 import * as m from "$lib/paraglide/messages.js";
 
 export type ImportItemStatus = "uploading" | "processing" | "done" | "error";
@@ -34,6 +37,7 @@ const {
 	items: ImportItem[];
 	onClose?: () => void;
 } = $props();
+const route = getDocsmintRouteAdapter();
 
 const total = $derived(items.length);
 const done = $derived(items.filter((i) => i.status === "done").length);
@@ -112,7 +116,7 @@ const settled = $derived(inFlight === 0);
                     <Check class="size-3.5 text-emerald-600 dark:text-emerald-400" />
                     {#if item.documentId}
                       <a
-                        href={`/docs/${item.documentId}`}
+                        href={resolveDocsmintRoute(route, `/docs/${item.documentId}`)}
                         class="inline-flex items-center gap-1 rounded bg-primary/10 px-2 py-0.5 text-xs font-semibold text-primary transition-colors hover:bg-primary/20"
                       >
                         <span>View</span>

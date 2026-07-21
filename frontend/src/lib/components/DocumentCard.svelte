@@ -24,9 +24,14 @@ import {
 	Share2,
 	Trash2,
 } from "lucide-svelte";
-import { goto, invalidateAll } from "$app/navigation";
+import { invalidateAll } from "$app/navigation";
 import { getDocument, updateDocument } from "$lib/api/documents";
 import MoveDialog from "$lib/components/MoveDialog.svelte";
+import {
+	getDocsmintRequestAdapter,
+	getDocsmintRouteAdapter,
+	navigateDocsmintRoute,
+} from "$lib/hosts/route-context";
 import * as m from "$lib/paraglide/messages.js";
 import type { Document } from "$lib/types.js";
 import { copyToClipboard } from "$lib/utils/clipboard.js";
@@ -46,15 +51,21 @@ const {
 	onShare?: (id: string, title: string) => void;
 	duplicateBusy?: boolean;
 } = $props();
+const route = getDocsmintRouteAdapter();
+const request = getDocsmintRequestAdapter();
 
 function navigateToDoc() {
-	goto(`/docs/${doc.id}`);
+	navigateDocsmintRoute(route, `/docs/${doc.id}`);
 }
 
 let showMoveDialog = $state(false);
 
 async function handleMove(parentId: string | null, categoryId: string | null) {
-	await updateDocument(doc.id, { folderId: parentId, categoryId });
+	await updateDocument(
+		doc.id,
+		{ folderId: parentId, categoryId },
+		request.fetch,
+	);
 	await invalidateAll();
 }
 
@@ -73,7 +84,7 @@ async function handleCopyContent(e: Event) {
 	let text = "";
 	contentCopying = true;
 	try {
-		const full = await getDocument(doc.id);
+		const full = await getDocument(doc.id, request.fetch);
 		text = full.content ?? "";
 	} catch (err) {
 		console.error("DocumentCard: failed to fetch full document for copy", err);
@@ -118,7 +129,7 @@ const preview = $derived(
         <span class="sr-only">{m.doc_open_menu()}</span>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
-        <DropdownMenuItem onclick={() => goto(`/docs/${doc.id}`)}>
+        <DropdownMenuItem onclick={() => navigateDocsmintRoute(route, `/docs/${doc.id}`)}>
           <ArrowUpRight class="size-4" />
           {m.doc_open()}
         </DropdownMenuItem>

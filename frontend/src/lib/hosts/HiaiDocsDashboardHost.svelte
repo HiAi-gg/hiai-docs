@@ -45,7 +45,7 @@ const Select = {
 };
 
 import { ConfirmDialog } from "@hiai-gg/hiai-ui/components/ui/confirm-dialog";
-import { goto, invalidateAll } from "$app/navigation";
+import { invalidateAll } from "$app/navigation";
 import { page } from "$app/state";
 import type { Category } from "$lib/api/categories";
 import { apiFetch } from "$lib/api/client";
@@ -63,6 +63,11 @@ import ShareDialog from "$lib/components/ShareDialog.svelte";
 import { getFrontendExtensions } from "$lib/extensions/context";
 import { resolveExtensions } from "$lib/extensions/resolve";
 import type { ExtensionVisibilityContext } from "$lib/extensions/types";
+import {
+	getDocsmintRequestAdapter,
+	getDocsmintRouteAdapter,
+	navigateDocsmintRoute,
+} from "$lib/hosts/route-context";
 import * as m from "$lib/paraglide/messages.js";
 import { refreshFolders } from "$lib/stores/subfolders-refresh-store.svelte.js";
 import { refreshDocs } from "$lib/stores/tag-store.svelte.js";
@@ -83,6 +88,8 @@ const { data, extensionContext = { pathname: "/" } } = $props<{
 }>();
 
 const frontendExtensions = getFrontendExtensions();
+const route = getDocsmintRouteAdapter();
+const request = getDocsmintRequestAdapter();
 const dashboardWidgets = $derived.by(() =>
 	resolveExtensions(frontendExtensions.dashboardWidgets, extensionContext),
 );
@@ -151,7 +158,7 @@ function handleNewDocument() {
 	if (activeCategoryId) params.set("category", activeCategoryId);
 	const qs = params.toString();
 	if (qs) url += `?${qs}`;
-	goto(url);
+	return navigateDocsmintRoute(route, url);
 }
 
 function handleRenameFolder(id: string) {
@@ -166,19 +173,27 @@ function handleRenameFolder(id: string) {
 
 async function saveFolder(name: string) {
 	if (folderDialogMode === "create") {
-		await apiFetch("/api/folders", {
-			method: "POST",
-			body: JSON.stringify({
-				name,
-				parentId: activeFolderId || null,
-				categoryId: activeFolderId ? null : activeCategoryId || null,
-			}),
-		});
+		await apiFetch(
+			"/api/folders",
+			{
+				method: "POST",
+				body: JSON.stringify({
+					name,
+					parentId: activeFolderId || null,
+					categoryId: activeFolderId ? null : activeCategoryId || null,
+				}),
+			},
+			request.fetch,
+		);
 	} else if (folderDialogMode === "edit" && folderDialogTarget) {
-		await apiFetch(`/api/folders/${folderDialogTarget.id}`, {
-			method: "PATCH",
-			body: JSON.stringify({ name }),
-		});
+		await apiFetch(
+			`/api/folders/${folderDialogTarget.id}`,
+			{
+				method: "PATCH",
+				body: JSON.stringify({ name }),
+			},
+			request.fetch,
+		);
 	}
 	showFolderDialog = false;
 	refreshFolders();
@@ -195,7 +210,7 @@ async function confirmDeleteFolder() {
 	if (!id || deleteFolderBusy) return;
 	deleteFolderBusy = true;
 	try {
-		await apiFetch(`/api/folders/${id}`, { method: "DELETE" });
+		await apiFetch(`/api/folders/${id}`, { method: "DELETE" }, request.fetch);
 		showDeleteFolderDialog = false;
 		deleteFolderTargetId = null;
 		await invalidateAll();
@@ -211,7 +226,7 @@ async function confirmDeleteFolder() {
 async function handleDeleteDocument(id: string) {
 	if (!confirm(`${m.action_delete()}?`)) return;
 	try {
-		await apiFetch(`/api/documents/${id}`, { method: "DELETE" });
+		await apiFetch(`/api/documents/${id}`, { method: "DELETE" }, request.fetch);
 		await invalidateAll();
 		refreshDocs();
 	} catch (e) {
@@ -223,7 +238,7 @@ async function handleDuplicateDocument(id: string) {
 	if (duplicatingDocumentId) return;
 	duplicatingDocumentId = id;
 	try {
-		const duplicate = await duplicateDocument(id);
+		const duplicate = await duplicateDocument(id, request.fetch);
 		optimisticDocuments = [
 			...optimisticDocuments.filter((doc) => doc.id !== duplicate.id),
 			duplicate,
@@ -259,7 +274,11 @@ async function handleImportFile(e: Event) {
 	importOpen = true;
 
 	try {
-		const results = await importDocuments(files, activeFolderId || undefined);
+		const results = await importDocuments(
+			files,
+			activeFolderId || undefined,
+			request.fetch,
+		);
 
 		importItems = importItems.map((item, idx) => {
 			const res = results.items[idx];
@@ -345,7 +364,7 @@ function clearFilters() {
 	params.delete("tag");
 	params.delete("dateFrom");
 	params.delete("dateTo");
-	goto(`/?${params.toString()}`);
+	return navigateDocsmintRoute(route, `/?${params.toString()}`);
 }
 
 function updateFilters() {
@@ -362,7 +381,7 @@ function updateFilters() {
 	if (dateTo) params.set("dateTo", dateTo);
 	else params.delete("dateTo");
 
-	goto(`/?${params.toString()}`, {
+	return navigateDocsmintRoute(route, `/?${params.toString()}`, {
 		replaceState: true,
 		keepFocus: true,
 		noScroll: true,
@@ -531,9 +550,9 @@ const isFolderEmpty = $derived(
           onclick={() => {
             const parentId = data.activeFolder?.parentId;
             if (parentId) {
-              goto(`/?folder=${parentId}`);
+				return navigateDocsmintRoute(route, `/?folder=${parentId}`);
             } else {
-              goto("/");
+				return navigateDocsmintRoute(route, "/");
             }
           }}
           title={m.action_back()}
@@ -556,7 +575,7 @@ const isFolderEmpty = $derived(
           variant="ghost"
           size="icon"
           class="size-8 shrink-0"
-          onclick={() => goto("/")}
+			onclick={() => navigateDocsmintRoute(route, "/")}
           title={m.action_back()}
         >
           <ArrowLeft class="size-4" />
@@ -681,7 +700,7 @@ const isFolderEmpty = $derived(
             const params = new URLSearchParams(page.url.searchParams);
             if (val && val !== "all") params.set("category", val);
             else params.delete("category");
-            goto(`/?${params.toString()}`);
+			return navigateDocsmintRoute(route, `/?${params.toString()}`);
           }}
         >
           <Select.Trigger class="w-full text-foreground flex items-center justify-between bg-background border border-input px-3 py-2 text-sm rounded-md shadow-sm h-9">

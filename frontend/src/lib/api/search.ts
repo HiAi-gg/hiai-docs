@@ -86,6 +86,7 @@ export async function search(
 		dateFrom?: string;
 		dateTo?: string;
 	},
+	fetcher?: typeof fetch,
 ): Promise<SearchResponse> {
 	if (!query.trim()) {
 		return { items: [], total: 0, page: 1, limit };
@@ -105,12 +106,16 @@ export async function search(
 	// Adaptive search may spend a bounded vector budget followed by query
 	// expansion. Keep this above the backend's default combined budget while
 	// leaving the global API timeout unchanged for ordinary CRUD requests.
-	return apiFetch(`/api/search?${params}`, {
-		timeout: 15_000,
-		headers: readSearchPreferences().graphSearchEnabled
-			? undefined
-			: { "X-Docsmint-Graph-Search": "disabled" },
-	});
+	return apiFetch(
+		`/api/search?${params}`,
+		{
+			timeout: 15_000,
+			headers: readSearchPreferences().graphSearchEnabled
+				? undefined
+				: { "X-Docsmint-Graph-Search": "disabled" },
+		},
+		fetcher,
+	);
 }
 
 /**
@@ -119,10 +124,11 @@ export async function search(
  */
 export async function searchSuggest(
 	query: string,
+	fetcher?: typeof fetch,
 ): Promise<SearchSuggestion[]> {
 	if (!query.trim()) return [];
 	const params = new URLSearchParams({ q: query });
-	return apiFetch(`/api/search/suggest?${params}`);
+	return apiFetch(`/api/search/suggest?${params}`, {}, fetcher);
 }
 
 /**
@@ -131,13 +137,21 @@ export async function searchSuggest(
  * sidebar — a missing endpoint does not break the others; an empty list is
  * returned in that case so the sidebar section simply renders nothing.
  */
-export async function getFilterOptions(): Promise<FilterOptions> {
+export async function getFilterOptions(
+	fetcher?: typeof fetch,
+): Promise<FilterOptions> {
 	const [foldersRes, tagsRes, categoriesRes] = await Promise.allSettled([
-		apiFetch<Array<{ id: string; name: string }>>("/api/folders"),
+		apiFetch<Array<{ id: string; name: string }>>("/api/folders", {}, fetcher),
 		apiFetch<Array<{ id: string; name: string; color: string | null }>>(
 			"/api/tags",
+			{},
+			fetcher,
 		),
-		apiFetch<Array<{ id: string; name: string }>>("/api/categories"),
+		apiFetch<Array<{ id: string; name: string }>>(
+			"/api/categories",
+			{},
+			fetcher,
+		),
 	]);
 	return {
 		folders:

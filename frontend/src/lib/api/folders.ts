@@ -171,11 +171,18 @@ export async function getFolderPath(
 }
 
 /** Create a new folder. Backend: `POST /api/folders`. */
-export async function createFolder(data: CreateFolderData): Promise<Folder> {
-	const created: FolderWire = await apiFetch<FolderWire>("/api/folders", {
-		method: "POST",
-		body: JSON.stringify(data),
-	});
+export async function createFolder(
+	data: CreateFolderData,
+	fetcher?: typeof fetch,
+): Promise<Folder> {
+	const created: FolderWire = await apiFetch<FolderWire>(
+		"/api/folders",
+		{
+			method: "POST",
+			body: JSON.stringify(data),
+		},
+		fetcher,
+	);
 	return toFolder(created);
 }
 
@@ -183,6 +190,7 @@ export async function createFolder(data: CreateFolderData): Promise<Folder> {
 export async function updateFolder(
 	id: string,
 	data: UpdateFolderData,
+	fetcher?: typeof fetch,
 ): Promise<Folder> {
 	const updated: FolderWire = await apiFetch<FolderWire>(
 		`/api/folders/${encodeURIComponent(id)}`,
@@ -190,34 +198,53 @@ export async function updateFolder(
 			method: "PATCH",
 			body: JSON.stringify(data),
 		},
+		fetcher,
 	);
 	return toFolder(updated);
 }
 
 /** Delete a folder. Backend: `DELETE /api/folders/:id`. */
-export async function deleteFolder(id: string): Promise<void> {
-	await apiFetch(`/api/folders/${encodeURIComponent(id)}`, {
-		method: "DELETE",
-	});
+export async function deleteFolder(
+	id: string,
+	fetcher?: typeof fetch,
+): Promise<void> {
+	await apiFetch(
+		`/api/folders/${encodeURIComponent(id)}`,
+		{
+			method: "DELETE",
+		},
+		fetcher,
+	);
 }
 
 /**
  * Duplicate a document. The new copy is suffixed with ` (Copy)` on the title.
  * Backend: `POST /api/documents/:id/duplicate`.
  */
-export async function duplicateDocument(docId: string): Promise<Document> {
+export async function duplicateDocument(
+	docId: string,
+	fetcher?: typeof fetch,
+): Promise<Document> {
 	const created: DocumentWire = await apiFetch<DocumentWire>(
 		`/api/documents/${encodeURIComponent(docId)}/duplicate`,
 		{
 			method: "POST",
 		},
+		fetcher,
 	);
 	return toDocument(created);
 }
 
 /** Delete a document. Backend: `DELETE /api/documents/:id`. */
-export async function deleteDocument(docId: string): Promise<void> {
-	await apiFetch(`/api/documents/${encodeURIComponent(docId)}`, {
-		method: "DELETE",
-	});
+export async function deleteDocument(
+	docId: string,
+	fetcher?: typeof fetch,
+): Promise<void> {
+	await apiFetch(
+		`/api/documents/${encodeURIComponent(docId)}`,
+		{
+			method: "DELETE",
+		},
+		fetcher,
+	);
 }

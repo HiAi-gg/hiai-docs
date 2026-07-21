@@ -1,7 +1,11 @@
 <script lang="ts">
 import { Calendar, Check, Folder, Tag } from "lucide-svelte";
-import { goto } from "$app/navigation";
 import type { SearchExplanation } from "$lib/api/search";
+import {
+	getDocsmintRouteAdapter,
+	navigateDocsmintRoute,
+	resolveDocsmintRoute,
+} from "$lib/hosts/route-context";
 import * as m from "$lib/paraglide/messages.js";
 
 interface Props {
@@ -42,6 +46,7 @@ const {
 	titleMatch = false,
 	explanations = [],
 }: Props = $props();
+const route = getDocsmintRouteAdapter();
 
 const highlightedSnippet = $derived(highlightText(snippet, query));
 
@@ -83,11 +88,11 @@ function highlightText(text: string, q: string): string {
 </script>
 
 <a
-  href="/docs/{id}"
+  href={resolveDocsmintRoute(route, `/docs/${id}`)}
   onclick={(e) => {
     if (e.button === 0 && !e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey) {
       e.preventDefault();
-      goto(`/docs/${id}`);
+      navigateDocsmintRoute(route, `/docs/${id}`);
     }
   }}
   class="group block min-w-0 overflow-hidden rounded-lg border border-border bg-card p-5 shadow-sm transition-all hover:border-primary/30 hover:shadow-md"

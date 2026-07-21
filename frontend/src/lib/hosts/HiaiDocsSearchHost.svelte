@@ -20,7 +20,6 @@ import {
 	Tag,
 	X,
 } from "lucide-svelte";
-import { goto } from "$app/navigation";
 import { type Category, listCategories } from "$lib/api/categories";
 import { type Document, listDocuments } from "$lib/api/documents";
 import { listFolders } from "$lib/api/folders";
@@ -30,6 +29,12 @@ import SearchResult from "$lib/components/SearchResult.svelte";
 import { getFrontendExtensions } from "$lib/extensions/context";
 import { resolveExtensions } from "$lib/extensions/resolve";
 import type { ExtensionVisibilityContext } from "$lib/extensions/types";
+import {
+	getDocsmintRequestAdapter,
+	getDocsmintRouteAdapter,
+	navigateDocsmintRoute,
+	resolveDocsmintRoute,
+} from "$lib/hosts/route-context";
 import * as m from "$lib/paraglide/messages.js";
 import {
 	normalizeSearchQuery,
@@ -65,6 +70,8 @@ const { data, extensionContext = { pathname: "/search" } } = $props<{
 }>();
 
 const frontendExtensions = getFrontendExtensions();
+const route = getDocsmintRouteAdapter();
+const request = getDocsmintRequestAdapter();
 
 // --- State -------------------------------------------------------------------
 let query = $state("");
@@ -139,19 +146,19 @@ const hasActiveFilters = $derived(
 
 // Load filter options and local search lists on mount
 $effect(() => {
-	getFilterOptions().then((opts) => {
+	getFilterOptions(request.fetch).then((opts) => {
 		folders = opts.folders;
 		tags = opts.tags;
 		categories = opts.categories;
 	});
 
-	listDocuments({ limit: 1000 }).then((res) => {
+	listDocuments({ limit: 1000 }, request.fetch).then((res) => {
 		allDocuments = res.items;
 	});
-	listFolders(null, true).then((res) => {
+	listFolders(null, true, request.fetch).then((res) => {
 		allFolders = res;
 	});
-	listCategories().then((res) => {
+	listCategories(request.fetch).then((res) => {
 		allCategories = res;
 	});
 });
@@ -210,13 +217,20 @@ $effect(() => {
 	searchResponse = null;
 	loading = true;
 
-	search(q, p, pageSize, sort, {
-		folder: folder || undefined,
-		tags: effectiveTags.length > 0 ? effectiveTags : undefined,
-		category: category || undefined,
-		dateFrom: from || undefined,
-		dateTo: to || undefined,
-	})
+	search(
+		q,
+		p,
+		pageSize,
+		sort,
+		{
+			folder: folder || undefined,
+			tags: effectiveTags.length > 0 ? effectiveTags : undefined,
+			category: category || undefined,
+			dateFrom: from || undefined,
+			dateTo: to || undefined,
+		},
+		request.fetch,
+	)
 		.then((res) => {
 			if (requestGeneration !== searchRequestGeneration) return;
 			searchResponse = res;
@@ -279,7 +293,9 @@ function handleSubmit(e: SubmitEvent) {
 	}
 
 	currentPage = 1;
-	goto(buildUrl({ q: submittedQuery, page: "1" }), { replaceState: true });
+	navigateDocsmintRoute(route, buildUrl({ q: submittedQuery, page: "1" }), {
+		replaceState: true,
+	});
 }
 
 function handleKeydown(e: KeyboardEvent) {
@@ -300,13 +316,15 @@ function clearSearch() {
 	dateFrom = "";
 	dateTo = "";
 	currentPage = 1;
-	goto("/search", { replaceState: true });
+	navigateDocsmintRoute(route, "/search", { replaceState: true });
 }
 
 function toggleFolder(folder: string) {
 	activeFolder = activeFolder === folder ? "" : folder;
 	currentPage = 1;
-	goto(buildUrl({ folder: activeFolder, page: "1" }), { replaceState: true });
+	navigateDocsmintRoute(route, buildUrl({ folder: activeFolder, page: "1" }), {
+		replaceState: true,
+	});
 }
 
 function toggleTag(tag: string) {
@@ -314,22 +332,32 @@ function toggleTag(tag: string) {
 		? activeTags.filter((t) => t !== tag)
 		: [...activeTags, tag];
 	currentPage = 1;
-	goto(buildUrl({ tags: activeTags.join(","), page: "1" }), {
-		replaceState: true,
-	});
+	navigateDocsmintRoute(
+		route,
+		buildUrl({ tags: activeTags.join(","), page: "1" }),
+		{
+			replaceState: true,
+		},
+	);
 }
 
 function toggleCategory(categoryId: string) {
 	activeCategoryId = activeCategoryId === categoryId ? "" : categoryId;
 	currentPage = 1;
-	goto(buildUrl({ category: activeCategoryId, page: "1" }), {
-		replaceState: true,
-	});
+	navigateDocsmintRoute(
+		route,
+		buildUrl({ category: activeCategoryId, page: "1" }),
+		{
+			replaceState: true,
+		},
+	);
 }
 
 function applyDateRange() {
 	currentPage = 1;
-	goto(buildUrl({ dateFrom, dateTo, page: "1" }), { replaceState: true });
+	navigateDocsmintRoute(route, buildUrl({ dateFrom, dateTo, page: "1" }), {
+		replaceState: true,
+	});
 }
 
 function clearFilters() {
@@ -339,7 +367,8 @@ function clearFilters() {
 	dateFrom = "";
 	dateTo = "";
 	currentPage = 1;
-	goto(
+	navigateDocsmintRoute(
+		route,
 		buildUrl({
 			folder: undefined,
 			tags: undefined,
@@ -356,7 +385,9 @@ function clearFilters() {
 
 function goToPage(page: number) {
 	currentPage = page;
-	goto(buildUrl({ page: String(page) }), { replaceState: true });
+	navigateDocsmintRoute(route, buildUrl({ page: String(page) }), {
+		replaceState: true,
+	});
 }
 </script>
 
@@ -456,11 +487,11 @@ function goToPage(page: number) {
               <div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
                 {#each matchingDocs as doc (doc.id)}
                   <a
-                    href="/docs/{doc.id}"
+                    href={resolveDocsmintRoute(route, `/docs/${doc.id}`)}
                     onclick={(e) => {
                       if (e.button === 0 && !e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey) {
                         e.preventDefault();
-                        goto(`/docs/${doc.id}`);
+                        navigateDocsmintRoute(route, `/docs/${doc.id}`);
                       }
                     }}
                     class="flex items-center gap-3 rounded-lg border border-border bg-card px-4 py-3 transition-colors hover:bg-accent"
@@ -485,7 +516,7 @@ function goToPage(page: number) {
                     onclick={(e) => {
                       if (e.button === 0 && !e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey) {
                         e.preventDefault();
-                        goto(`/folders/${folder.id}`);
+                        navigateDocsmintRoute(route, `/folders/${folder.id}`);
                       }
                     }}
                     class="flex items-center gap-3 rounded-lg border border-border bg-card px-4 py-3 transition-colors hover:bg-accent"
@@ -510,7 +541,7 @@ function goToPage(page: number) {
                     onclick={(e) => {
                       if (e.button === 0 && !e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey) {
                         e.preventDefault();
-                        goto(`/folders#category-${category.id}`);
+                        navigateDocsmintRoute(route, `/folders#category-${category.id}`);
                       }
                     }}
                     class="flex items-center gap-3 rounded-lg border border-border bg-card px-4 py-3 transition-colors hover:bg-accent"
@@ -792,7 +823,7 @@ function goToPage(page: number) {
                 const numVal = Number(val);
                 pageSize = numVal;
                 currentPage = 1;
-                goto(buildUrl({ page: "1", limit: val }), { replaceState: true });
+                navigateDocsmintRoute(route, buildUrl({ page: "1", limit: val }), { replaceState: true });
               }
             }}
           >
@@ -819,7 +850,7 @@ function goToPage(page: number) {
               sortOrder = val as any;
               if (prev !== val) {
                 currentPage = 1;
-                goto(buildUrl({ page: "1" }), { replaceState: true });
+                navigateDocsmintRoute(route, buildUrl({ page: "1" }), { replaceState: true });
               }
             }
           }}
@@ -947,7 +978,7 @@ function goToPage(page: number) {
           <button
             onclick={() => {
               query = suggestion;
-              goto(buildUrl({ q: suggestion, page: "1" }), {
+              navigateDocsmintRoute(route, buildUrl({ q: suggestion, page: "1" }), {
                 replaceState: true,
               });
             }}
@@ -981,7 +1012,7 @@ function goToPage(page: number) {
           <button
             onclick={() => {
               query = suggestion;
-              goto(buildUrl({ q: suggestion, page: "1" }), {
+              navigateDocsmintRoute(route, buildUrl({ q: suggestion, page: "1" }), {
                 replaceState: true,
               });
             }}

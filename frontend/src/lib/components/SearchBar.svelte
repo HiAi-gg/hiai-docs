@@ -1,12 +1,16 @@
 <script lang="ts">
 import { Search, X } from "lucide-svelte";
-import { goto } from "$app/navigation";
+import {
+	getDocsmintRouteAdapter,
+	navigateDocsmintRoute,
+} from "$lib/hosts/route-context";
 import * as m from "$lib/paraglide/messages.js";
 import { cn } from "$lib/utils.js";
 
 const { class: className }: { class?: string } = $props();
 let query = $state("");
 let inputEl = $state<HTMLInputElement | null>(null);
+const route = getDocsmintRouteAdapter();
 
 function clearQuery() {
 	query = "";
@@ -20,7 +24,7 @@ function clearQuery() {
     bind:this={inputEl}
     type="text"
     bind:value={query}
-    onkeydown={(e: KeyboardEvent) => { if (e.key === "Enter" && query.trim()) goto(`/search?q=${encodeURIComponent(query.trim())}`); }}
+    onkeydown={(e: KeyboardEvent) => { if (e.key === "Enter" && query.trim()) navigateDocsmintRoute(route, `/search?q=${encodeURIComponent(query.trim())}`); }}
     placeholder={m.search_placeholder()}
     class={cn(
       "flex h-9 w-full rounded-md border border-input bg-transparent pl-9 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",

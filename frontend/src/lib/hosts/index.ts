@@ -24,4 +24,8 @@ export {
 	default as HiaiDocsSearchHost,
 	default as DocsmintSearchHost,
 } from "./HiaiDocsSearchHost.svelte";
-export type { DocsmintRouteAdapter } from "./types";
+export type {
+	DocsmintNavigationOptions,
+	DocsmintRequestAdapter,
+	DocsmintRouteAdapter,
+} from "./types";

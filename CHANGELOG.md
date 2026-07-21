@@ -7,6 +7,15 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-07-21
+
+### Fixed
+
+- Public application hosts now propagate typed route and request adapters through
+  the dashboard, search, sidebar, cards, import, share, and command surfaces.
+  Embedded consumers can preserve route prefixes and tenant headers without
+  rewriting global `window.fetch` or relying on standalone hard-coded routes.
+
 ## [0.3.9] - 2026-07-21
 
 ### Added

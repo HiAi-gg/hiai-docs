@@ -30,10 +30,14 @@ import {
 import { ChevronRight, Folder, MoreVertical } from "lucide-svelte";
 import type { Snippet } from "svelte";
 import { flip } from "svelte/animate";
-import { goto } from "$app/navigation";
 import { page } from "$app/state";
 import type { Document } from "$lib/api/documents";
 import { listFolders } from "$lib/api/folders";
+import {
+	getDocsmintRequestAdapter,
+	getDocsmintRouteAdapter,
+	navigateDocsmintRoute,
+} from "$lib/hosts/route-context";
 import * as m from "$lib/paraglide/messages.js";
 import {
 	bumpSubfoldersRefresh,
@@ -53,6 +57,8 @@ export interface FolderNodeItem {
 
 type FolderItem = FolderNodeItem;
 type DndDoc = Document & { id: string };
+const route = getDocsmintRouteAdapter();
+const request = getDocsmintRequestAdapter();
 
 let {
 	folder,
@@ -144,7 +150,7 @@ async function loadSubfolders() {
 		// folder as a flat array — the same shape each child FolderNode
 		// will recursively re-fetch. Using `getFolder(id)` would only
 		// return the folder's own row (no children).
-		const rows = await listFolders(folder.id);
+		const rows = await listFolders(folder.id, false, request.fetch);
 		subfolders = rows.map((c) => {
 			registerFolder(
 				c.id,
@@ -269,10 +275,10 @@ function handleSubfolderFinalizeProxy(e: CustomEvent<DndEvent<FolderItem>>) {
 				{/snippet}
 			</DropdownMenuTrigger>
 			<DropdownMenuContent align="end">
-				<DropdownMenuItem onSelect={() => goto("/folders/" + folder.id)}>
+				<DropdownMenuItem onSelect={() => navigateDocsmintRoute(route, "/folders/" + folder.id)}>
 					{m.action_go_to()}
 				</DropdownMenuItem>
-				<DropdownMenuItem onSelect={() => goto(`/docs/new?folder=${folder.id}`)}>
+				<DropdownMenuItem onSelect={() => navigateDocsmintRoute(route, `/docs/new?folder=${folder.id}`)}>
 					{m.dashboard_new_document()}
 				</DropdownMenuItem>
 				<DropdownMenuItem onSelect={() => onCreateSubfolder(folder.id)}>

@@ -48,7 +48,6 @@ import {
 import { onDestroy, onMount, untrack } from "svelte";
 import { flip } from "svelte/animate";
 import { SHADOW_ITEM_MARKER_PROPERTY_NAME } from "svelte-dnd-action";
-import { goto } from "$app/navigation";
 import { page } from "$app/state";
 import {
 	type Category,
@@ -81,6 +80,11 @@ import {
 	type SidebarDocumentPlacement,
 } from "$lib/components/sidebar/document-drop-coordinator";
 import FolderNode from "$lib/components/sidebar/FolderNode.svelte";
+import {
+	getDocsmintRequestAdapter,
+	getDocsmintRouteAdapter,
+	navigateDocsmintRoute,
+} from "$lib/hosts/route-context";
 import * as m from "$lib/paraglide/messages.js";
 import {
 	acknowledgeDocumentPlacement,
@@ -103,6 +107,9 @@ import {
 import { cn } from "$lib/utils";
 import { copyToClipboard } from "$lib/utils/clipboard.js";
 import { type DndEvent, dndzone } from "$lib/utils/dndzone";
+
+const route = getDocsmintRouteAdapter();
+const request = getDocsmintRequestAdapter();
 
 // Rename/delete target shared by folders and documents in the tree.
 type EntityKind = "folder" | "doc";
@@ -318,7 +325,7 @@ async function handleCopyContent(docId: string) {
 	let text = "";
 	copyLoadingDocId = docId;
 	try {
-		const full = await getDocument(docId);
+		const full = await getDocument(docId, request.fetch);
 		text = full.content ?? "";
 	} catch (err) {
 		console.error("FolderTree: failed to fetch full document for copy", err);
@@ -487,7 +494,7 @@ $effect(() => {
 
 async function loadFolders() {
 	try {
-		const result = await listFolders(null);
+		const result = await listFolders(null, false, request.fetch);
 		// `result` is `[syntheticRoot]` whose `children` are the top-level
 		// folders. The `toFolder` mapper preserves `categoryId` so we can
 		// group by category here without an extra round-trip. Subfolders
@@ -517,7 +524,9 @@ async function loadFolders() {
 
 async function loadCategories() {
 	try {
-		const loaded = (await listCategories()) as CategoryWithApiAccess[];
+		const loaded = (await listCategories(
+			request.fetch,
+		)) as CategoryWithApiAccess[];
 		const ids = new Set<string>();
 		for (const category of loaded) {
 			if (ids.has(category.id)) {
@@ -542,7 +551,10 @@ async function loadDocuments() {
 	const generation = ++documentsLoadGeneration;
 	try {
 		const tag = getSelectedTag();
-		const res = await listDocuments({ limit: 100, ...(tag ? { tag } : {}) });
+		const res = await listDocuments(
+			{ limit: 100, ...(tag ? { tag } : {}) },
+			request.fetch,
+		);
 		if (generation !== documentsLoadGeneration) return;
 		documents = (res.items as DndDoc[]).map((doc) =>
 			getPendingDocumentPlacement(doc.id)
@@ -596,7 +608,8 @@ function rollbackDocumentPlacement(
 }
 
 const writeDocumentPlacement = createDocumentPlacementWriter({
-	patch: (documentId, placement) => updateDocument(documentId, placement),
+	patch: (documentId, placement) =>
+		updateDocument(documentId, placement, request.fetch),
 	optimistic: (documentId, placement) =>
 		publishDocumentPlacement(
 			documentId,
@@ -784,11 +797,14 @@ function openNewSubfolder(parentId: string) {
 
 async function handleCreateFolder(name: string) {
 	const parentId = newFolderParentId;
-	const createdFolder = await createFolder({
-		name,
-		parentId,
-		categoryId: newFolderCategoryId,
-	});
+	const createdFolder = await createFolder(
+		{
+			name,
+			parentId,
+			categoryId: newFolderCategoryId,
+		},
+		request.fetch,
+	);
 	await loadFolders();
 	if (parentId) {
 		expandedFolderIds = new Set(expandedFolderIds).add(parentId);
@@ -1154,7 +1170,7 @@ async function persistFolderChanges(zoneKey: string, zoneItems: FolderItem[]) {
 		const results = await Promise.all(
 			updates.map((u) => {
 				const { folderId, ...patchBody } = u;
-				return updateFolder(folderId, patchBody);
+				return updateFolder(folderId, patchBody, request.fetch);
 			}),
 		);
 		debugLog("[DnD] updateFolder results:", results);
@@ -1305,7 +1321,7 @@ async function persistCategoryOrder(next: CategoryBucket[]) {
 	});
 	if (updates.length === 0) return;
 	for (const update of updates) {
-		await updateCategory(update.id, { order: update.order });
+		await updateCategory(update.id, { order: update.order }, request.fetch);
 	}
 }
 
@@ -1337,9 +1353,9 @@ async function submitRename(e?: Event) {
 	renameSubmitting = true;
 	try {
 		if (target.kind === "folder") {
-			await updateFolder(target.id, { name: trimmed });
+			await updateFolder(target.id, { name: trimmed }, request.fetch);
 		} else {
-			await updateDocument(target.id, { title: trimmed });
+			await updateDocument(target.id, { title: trimmed }, request.fetch);
 		}
 		closeRenameDialog();
 		await refresh();
@@ -1400,9 +1416,9 @@ async function confirmDelete() {
 		// Deleting a folder moves its documents back to the root: the
 		// documents.folder_id foreign key is ON DELETE SET NULL, so the
 		// documents survive and reappear at the top level.
-		await deleteFolder(target.id);
+		await deleteFolder(target.id, request.fetch);
 	} else {
-		await deleteDocument(target.id);
+		await deleteDocument(target.id, request.fetch);
 	}
 	await refresh();
 	refreshDocs();
@@ -1458,6 +1474,7 @@ async function handleCategorySave(payload: {
 					method: "PATCH",
 					body,
 				},
+				request.fetch,
 			);
 		} else {
 			savedCategory = await apiFetch<{ id: string; name: string }>(
@@ -1466,6 +1483,7 @@ async function handleCategorySave(payload: {
 					method: "POST",
 					body,
 				},
+				request.fetch,
 			);
 		}
 		await refresh();
@@ -1479,7 +1497,7 @@ async function handleCategoryDelete() {
 	if (!selectedCategory) return;
 	categoryBusy = true;
 	try {
-		await deleteCategory(selectedCategory.id);
+		await deleteCategory(selectedCategory.id, request.fetch);
 		await refresh();
 	} finally {
 		categoryBusy = false;
@@ -1730,10 +1748,10 @@ const buckets = $derived.by(() => {
               {/snippet}
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem onSelect={() => goto(`/?category=${bucket.category.id}`)}>
+              <DropdownMenuItem onSelect={() => navigateDocsmintRoute(route, `/?category=${bucket.category.id}`)}>
                 {m.action_go_to()}
               </DropdownMenuItem>
-              <DropdownMenuItem onSelect={() => goto(`/docs/new?category=${bucket.category.id}`)}>
+              <DropdownMenuItem onSelect={() => navigateDocsmintRoute(route, `/docs/new?category=${bucket.category.id}`)}>
                 {m.dashboard_new_document()}
               </DropdownMenuItem>
               <DropdownMenuItem onSelect={() => openNewFolderInCategory(bucket.category.id)}>

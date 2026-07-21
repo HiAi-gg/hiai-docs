@@ -15,9 +15,14 @@ import {
 	Share2,
 	Trash2,
 } from "lucide-svelte";
-import { goto, invalidateAll } from "$app/navigation";
+import { invalidateAll } from "$app/navigation";
 import { updateFolder } from "$lib/api/folders";
 import MoveDialog from "$lib/components/MoveDialog.svelte";
+import {
+	getDocsmintRequestAdapter,
+	getDocsmintRouteAdapter,
+	navigateDocsmintRoute,
+} from "$lib/hosts/route-context";
 import * as m from "$lib/paraglide/messages.js";
 import type { Folder as FolderType } from "$lib/types.js";
 import { formatRelativeTime } from "$lib/utils.js";
@@ -33,15 +38,17 @@ const {
 	onRename?: (id: string) => void;
 	onShare?: (id: string, name: string) => void;
 } = $props();
+const route = getDocsmintRouteAdapter();
+const request = getDocsmintRequestAdapter();
 
 function navigateToFolder() {
-	goto(`/folders/${folder.id}`);
+	navigateDocsmintRoute(route, `/folders/${folder.id}`);
 }
 
 let showMoveDialog = $state(false);
 
 async function handleMove(parentId: string | null, categoryId: string | null) {
-	await updateFolder(folder.id, { parentId, categoryId });
+	await updateFolder(folder.id, { parentId, categoryId }, request.fetch);
 	await invalidateAll();
 }
 </script>
@@ -72,7 +79,7 @@ async function handleMove(parentId: string | null, categoryId: string | null) {
         <span class="sr-only">{m.doc_open_menu()}</span>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
-        <DropdownMenuItem onclick={() => goto(`/folders/${folder.id}`)}>
+        <DropdownMenuItem onclick={() => navigateDocsmintRoute(route, `/folders/${folder.id}`)}>
           <Folder class="size-4" />
           {m.doc_open()}
         </DropdownMenuItem>

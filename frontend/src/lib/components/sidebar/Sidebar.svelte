@@ -8,7 +8,6 @@ import {
 	Settings as SettingsIcon,
 	Tag,
 } from "lucide-svelte";
-import { goto } from "$app/navigation";
 import { page } from "$app/state";
 import SearchBar from "$lib/components/SearchBar.svelte";
 import SettingsDialog from "$lib/components/SettingsDialog.svelte";
@@ -17,6 +16,11 @@ import RecentDocs from "$lib/components/sidebar/RecentDocs.svelte";
 import TagList from "$lib/components/sidebar/TagList.svelte";
 import { getFrontendExtensions } from "$lib/extensions/context";
 import { resolveExtensions } from "$lib/extensions/resolve";
+import {
+	getDocsmintRouteAdapter,
+	navigateDocsmintRoute,
+	resolveDocsmintRoute,
+} from "$lib/hosts/route-context";
 import * as m from "$lib/paraglide/messages.js";
 import { cn } from "$lib/utils";
 
@@ -31,6 +35,7 @@ let {
 } = $props();
 
 const SIDEBAR_COLLAPSED_KEY = "hiai_sidebar_collapsed";
+const route = getDocsmintRouteAdapter();
 let collapsed = $state(false);
 let showSettings = $state(false);
 type PanelMode = "all" | "recent" | "tags";
@@ -91,7 +96,7 @@ function stopResize() {
 }
 
 function openSearch() {
-	goto("/search");
+	return navigateDocsmintRoute(route, "/search");
 }
 
 function togglePanel(mode: PanelMode) {
@@ -203,7 +208,7 @@ function persistCollapsed() {
           {#each navigationExtensions as extension (extension.id)}
             {@const Icon = extension.icon}
             <a
-              href={extension.href ?? "#"}
+              href={extension.href ? resolveDocsmintRoute(route, extension.href) : "#"}
               aria-disabled={extension.disabled}
               class="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground aria-disabled:pointer-events-none aria-disabled:opacity-50"
             >
@@ -220,7 +225,7 @@ function persistCollapsed() {
   {:else}
     <div class="flex flex-1 flex-col items-center gap-1 pt-14">
       <button
-        onclick={() => goto("/")}
+        onclick={() => navigateDocsmintRoute(route, "/")}
         class="flex size-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
         title={m.sidebar_folders()}
         aria-label={m.sidebar_folders()}
@@ -254,7 +259,7 @@ function persistCollapsed() {
       {#each navigationExtensions as extension (extension.id)}
         {@const Icon = extension.icon}
         <a
-          href={extension.href ?? "#"}
+          href={extension.href ? resolveDocsmintRoute(route, extension.href) : "#"}
           aria-disabled={extension.disabled}
           class="flex size-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground aria-disabled:pointer-events-none aria-disabled:opacity-50"
           title={extension.label}

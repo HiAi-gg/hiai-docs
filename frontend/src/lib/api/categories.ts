@@ -63,34 +63,51 @@ export function listCategories(fetcher?: typeof fetch): Promise<Category[]> {
  */
 export function createCategory(
 	inputOrName: string | CreateCategoryInput,
+	fetcher?: typeof fetch,
 ): Promise<Category> {
 	const input = createCategoryInputSchema.parse(
 		typeof inputOrName === "string" ? { name: inputOrName } : inputOrName,
 	);
-	return apiFetch<Category>("/api/categories", {
-		method: "POST",
-		body: JSON.stringify(input),
-	});
+	return apiFetch<Category>(
+		"/api/categories",
+		{
+			method: "POST",
+			body: JSON.stringify(input),
+		},
+		fetcher,
+	);
 }
 
 /** Rename a category or update its order. */
 export function updateCategory(
 	id: string,
 	data: UpdateCategoryInput,
+	fetcher?: typeof fetch,
 ): Promise<Category> {
 	const input = updateCategoryInputSchema.parse(data);
-	return apiFetch<Category>(`/api/categories/${encodeURIComponent(id)}`, {
-		method: "PATCH",
-		body: JSON.stringify(input),
-	});
+	return apiFetch<Category>(
+		`/api/categories/${encodeURIComponent(id)}`,
+		{
+			method: "PATCH",
+			body: JSON.stringify(input),
+		},
+		fetcher,
+	);
 }
 
 /** Delete a category. The backend uses `ON DELETE SET NULL` to detach
  *  the category from any folders/documents. */
-export function deleteCategory(id: string): Promise<void> {
-	return apiFetch<void>(`/api/categories/${encodeURIComponent(id)}`, {
-		method: "DELETE",
-	});
+export function deleteCategory(
+	id: string,
+	fetcher?: typeof fetch,
+): Promise<void> {
+	return apiFetch<void>(
+		`/api/categories/${encodeURIComponent(id)}`,
+		{
+			method: "DELETE",
+		},
+		fetcher,
+	);
 }
 
 /** Assign (or clear) the category on a document. Uses the existing
@@ -100,20 +117,30 @@ export function deleteCategory(id: string): Promise<void> {
 export function setDocumentCategory(
 	docId: string,
 	categoryId: string | null,
+	fetcher?: typeof fetch,
 ): Promise<void> {
-	return apiFetch<void>(`/api/documents/${encodeURIComponent(docId)}`, {
-		method: "PATCH",
-		body: JSON.stringify({ categoryId }),
-	});
+	return apiFetch<void>(
+		`/api/documents/${encodeURIComponent(docId)}`,
+		{
+			method: "PATCH",
+			body: JSON.stringify({ categoryId }),
+		},
+		fetcher,
+	);
 }
 
 /** Assign (or clear) the category on a folder. Pass `null` to clear. */
 export function setFolderCategory(
 	folderId: string,
 	categoryId: string | null,
+	fetcher?: typeof fetch,
 ): Promise<void> {
-	return apiFetch<void>(`/api/folders/${encodeURIComponent(folderId)}`, {
-		method: "PATCH",
-		body: JSON.stringify({ categoryId }),
-	});
+	return apiFetch<void>(
+		`/api/folders/${encodeURIComponent(folderId)}`,
+		{
+			method: "PATCH",
+			body: JSON.stringify({ categoryId }),
+		},
+		fetcher,
+	);
 }

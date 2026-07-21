@@ -219,28 +219,41 @@ export interface UpdateDocumentInput {
 export function updateDocument(
 	id: string,
 	data: UpdateDocumentInput,
+	fetcher?: typeof fetch,
 ): Promise<Document> {
 	clearDocumentsCache();
-	return apiFetch(`/api/documents/${id}`, {
-		method: "PATCH",
-		body: JSON.stringify(data),
-	});
+	return apiFetch(
+		`/api/documents/${id}`,
+		{
+			method: "PATCH",
+			body: JSON.stringify(data),
+		},
+		fetcher,
+	);
 }
 
-export function deleteDocument(id: string): Promise<void> {
+export function deleteDocument(
+	id: string,
+	fetcher?: typeof fetch,
+): Promise<void> {
 	clearDocumentsCache();
-	return apiFetch(`/api/documents/${id}`, { method: "DELETE" });
+	return apiFetch(`/api/documents/${id}`, { method: "DELETE" }, fetcher);
 }
 
 export function importDocument(
 	file: File,
 	folderId?: string,
+	fetcher?: typeof fetch,
 ): Promise<Document> {
 	clearDocumentsCache();
 	const formData = new FormData();
 	formData.append("file", file);
 	if (folderId) formData.append("folderId", folderId);
-	return apiFetch("/api/documents/import", { method: "POST", body: formData });
+	return apiFetch(
+		"/api/documents/import",
+		{ method: "POST", body: formData },
+		fetcher,
+	);
 }
 
 /**
@@ -252,6 +265,7 @@ export function importDocument(
 export function importDocuments(
 	files: File[],
 	folderId?: string,
+	fetcher?: typeof fetch,
 ): Promise<ImportResponse> {
 	clearDocumentsCache();
 	const formData = new FormData();
@@ -259,8 +273,12 @@ export function importDocuments(
 		formData.append("file", file);
 	}
 	if (folderId) formData.append("folderId", folderId);
-	return apiFetch<ImportResponse>("/api/documents/import", {
-		method: "POST",
-		body: formData,
-	});
+	return apiFetch<ImportResponse>(
+		"/api/documents/import",
+		{
+			method: "POST",
+			body: formData,
+		},
+		fetcher,
+	);
 }

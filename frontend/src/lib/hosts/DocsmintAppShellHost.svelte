@@ -11,17 +11,35 @@ import {
 import { searchPreferences } from "$lib/stores/search-preferences.svelte";
 import type { DocsmintFrontendExtensions } from "../extensions/types";
 import HiaiDocsExtensionProvider from "./HiaiDocsExtensionProvider.svelte";
-import type { DocsmintRouteAdapter } from "./types";
+import {
+	provideDocsmintRequestAdapter,
+	provideDocsmintRouteAdapter,
+} from "./route-context";
+import type { DocsmintRequestAdapter, DocsmintRouteAdapter } from "./types";
 
 const {
 	route,
+	request = { fetch },
 	extensions = {},
 	children,
 }: {
 	route: DocsmintRouteAdapter;
+	request?: DocsmintRequestAdapter;
 	extensions?: Partial<DocsmintFrontendExtensions>;
 	children: Snippet;
 } = $props();
+
+provideDocsmintRouteAdapter({
+	get pathname() {
+		return route.pathname;
+	},
+	resolve: (path) => route.resolve(path),
+	navigate: (path, options) => route.navigate?.(path, options),
+});
+provideDocsmintRequestAdapter({
+	fetch: ((...args: Parameters<typeof fetch>) =>
+		request.fetch(...args)) as typeof fetch,
+});
 
 editorPreferences.init();
 searchPreferences.init();

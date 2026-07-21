@@ -1,5 +1,6 @@
 <script lang="ts">
 import { apiFetch } from "$lib/api/client";
+import { getDocsmintRequestAdapter } from "$lib/hosts/route-context";
 import * as m from "$lib/paraglide/messages.js";
 import { copyToClipboard } from "$lib/utils/clipboard";
 
@@ -18,6 +19,7 @@ const {
 	linkId?: string;
 	onRevoke?: () => void;
 } = $props();
+const request = getDocsmintRequestAdapter();
 
 let copied = $state(false);
 let confirmRevoke = $state(false);
@@ -47,9 +49,13 @@ function removeGuest(email: string) {
 		console.error("removeGuest called without linkId");
 		return;
 	}
-	apiFetch(`/api/share/${linkId}/guests/${encodeURIComponent(email)}`, {
-		method: "DELETE",
-	})
+	apiFetch(
+		`/api/share/${linkId}/guests/${encodeURIComponent(email)}`,
+		{
+			method: "DELETE",
+		},
+		request.fetch,
+	)
 		.then(() => {
 			// Backend already removed the row; consumer should re-fetch guest list
 		})
