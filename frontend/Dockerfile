@@ -44,11 +44,15 @@ RUN cd frontend && bun run build
 
 # Run
 FROM base AS runtime
+# Create the runtime identity before copying artifacts so BuildKit can assign
+# ownership directly instead of recursively walking the dependency tree.
+RUN addgroup -S app && adduser -S app -G app
+
 # Runtime deps only (no devDependencies) → smaller image, smaller attack surface.
-COPY --from=prod-deps /app/node_modules /app/node_modules
-COPY --from=prod-deps /app/frontend/node_modules /app/frontend/node_modules
-COPY --from=build /app/frontend/build /app/frontend/build
-COPY frontend/package.json /app/frontend/
+COPY --chown=app:app --from=prod-deps /app/node_modules /app/node_modules
+COPY --chown=app:app --from=prod-deps /app/frontend/node_modules /app/frontend/node_modules
+COPY --chown=app:app --from=build /app/frontend/build /app/frontend/build
+COPY --chown=app:app frontend/package.json /app/frontend/
 
 ENV NODE_ENV=production
 # adapter-node reads PORT at runtime; keep the standalone image aligned with
@@ -61,9 +65,6 @@ ENV WEB_PORT=50701
 # global 100 MiB envelope instead of rejecting valid uploads first.
 ENV BODY_SIZE_LIMIT=104857600
 WORKDIR /app/frontend
-
-RUN addgroup -S app && adduser -S app -G app \
-    && chown -R -h app:app /app/frontend /app/node_modules
 
 USER app
 

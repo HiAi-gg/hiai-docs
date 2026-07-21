@@ -33,6 +33,13 @@
 	header @images Cache-Control "public, max-age=86400"
 }
 
+# Public object-storage endpoint used by presigned import/download URLs. Keep
+# it on a separate host so S3 object paths never overlap application routes.
+storage.docs.{$DOMAIN:localhost} {
+	tls internal
+	reverse_proxy seaweedfs:8333
+}
+
 docs.{$DOMAIN:localhost} {
 	# For production — Caddy auto-provisions TLS
 	reverse_proxy /api/* api:50700

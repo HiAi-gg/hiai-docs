@@ -48,20 +48,20 @@ CMD ["bun", "run", "scripts/migrate.ts"]
 # --- Runtime ---
 # Slim image: only the compiled dist + the root workspace dependency graph.
 FROM base AS runtime
-COPY --from=deps /app/node_modules ./node_modules
-COPY --from=deps /app/backend/node_modules ./backend/node_modules
-COPY --from=build /app/backend/dist ./backend/dist
-COPY backend/package.json ./backend/
+
+# Create the runtime identity before copying artifacts so BuildKit can assign
+# ownership while materializing each layer. A recursive chown of the workspace
+# dependency tree is prohibitively slow on overlay filesystems.
+RUN addgroup -S app && adduser -S app -G app
+
+COPY --chown=app:app --from=deps /app/node_modules ./node_modules
+COPY --chown=app:app --from=deps /app/backend/node_modules ./backend/node_modules
+COPY --chown=app:app --from=build /app/backend/dist ./backend/dist
+COPY --chown=app:app backend/package.json ./backend/
 
 ENV NODE_ENV=production
 ENV API_PORT=50700
 WORKDIR /app/backend
-
-# Create non-root user and give it ownership of the app directory.
-# Files copied above are owned by root, so we chown to make them readable/writable
-# by the unprivileged `app` user that runs the runtime stage.
-RUN addgroup -S app && adduser -S app -G app \
-    && chown -R -h app:app /app/backend /app/node_modules  # COPY files are root-owned by default; chown is required for non-root USER
 
 USER app
 

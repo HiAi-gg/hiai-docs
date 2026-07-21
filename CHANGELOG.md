@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.4.2
+
+- Publish the server-only persistent lifecycle facade and packed lifecycle contract.
+- Preserve non-root Docker runtime ownership with `COPY --chown` and make Caddy ports configurable.
+- Route public object-storage TLS through the dedicated storage host.
+
 All notable changes to DocsMint are documented in this file.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
