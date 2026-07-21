@@ -2,6 +2,9 @@ import { type PipelineJob, summarizeJobSchema } from "../contracts";
 import type { GraphPipelineState, PipelineStageStatus } from "./graph.worker";
 
 export interface SummarizeWorkerDependencies {
+	isCancelled?(
+		job: ReturnType<typeof summarizeJobSchema.parse>,
+	): Promise<boolean>;
 	getRun(
 		job: ReturnType<typeof summarizeJobSchema.parse>,
 	): Promise<GraphPipelineState | null>;
@@ -21,6 +24,7 @@ export interface SummarizeWorkerDependencies {
 export function createSummarizeWorker(deps: SummarizeWorkerDependencies) {
 	return async function processSummarizeJob(input: PipelineJob): Promise<void> {
 		const job = summarizeJobSchema.parse(input);
+		if (await deps.isCancelled?.(job)) return;
 		const run = await deps.getRun(job);
 		if (!run) throw new Error("Pipeline run not found");
 		if (run.ownerId !== job.ownerId || run.documentId !== job.documentId) {
@@ -38,16 +42,21 @@ export function createSummarizeWorker(deps: SummarizeWorkerDependencies) {
 			return;
 		}
 		if (!deps.enabled()) {
+			if (await deps.isCancelled?.(job)) return;
 			await deps.setSummaryStatus(job.generationId, "skipped");
-			await deps.enqueueFinalize(job);
+			if (!(await deps.isCancelled?.(job))) await deps.enqueueFinalize(job);
 			return;
 		}
 
+		if (await deps.isCancelled?.(job)) return;
 		await deps.setSummaryStatus(job.generationId, "processing");
 		try {
+			if (await deps.isCancelled?.(job)) return;
 			await deps.summarize(job);
+			if (await deps.isCancelled?.(job)) return;
 			await deps.setSummaryStatus(job.generationId, "ready");
 		} catch (error) {
+			if (await deps.isCancelled?.(job)) return;
 			await deps.setSummaryStatus(
 				job.generationId,
 				"failed",
@@ -55,6 +64,6 @@ export function createSummarizeWorker(deps: SummarizeWorkerDependencies) {
 			);
 			throw error;
 		}
-		await deps.enqueueFinalize(job);
+		if (!(await deps.isCancelled?.(job))) await deps.enqueueFinalize(job);
 	};
 }

@@ -13,6 +13,7 @@ import { withOwnerSlot } from "../fair-scheduler";
 import { DEFAULT_JOB_OPTIONS, QUEUE_NAMES, SOURCE_PRIORITY } from "../names";
 
 export interface PrepareWorkerDependencies {
+	isCancelled?(job: PrepareJob): Promise<boolean>;
 	loadDocument(input: {
 		documentId: string;
 		ownerId: string;
@@ -49,8 +50,12 @@ export async function processPrepareJob(
 	deps: PrepareWorkerDependencies,
 	batchSize = DEFAULT_EMBED_CHUNKS_PER_JOB,
 	maxActiveBatches = 2,
-): Promise<{ status: "prepared" | "duplicate" | "stale"; batches: number }> {
+): Promise<{
+	status: "prepared" | "duplicate" | "stale" | "cancelled";
+	batches: number;
+}> {
 	const job = prepareJobSchema.parse(rawJob.data);
+	if (await deps.isCancelled?.(job)) return { status: "cancelled", batches: 0 };
 	const document = await deps.loadDocument(job);
 	if (!document || document.revision !== job.revision) {
 		await deps.markStale(job, "stale_revision");
@@ -65,6 +70,7 @@ export async function processPrepareJob(
 			chunkEnd: Math.min(chunks.length, (batchIndex + 1) * batchSize),
 		}),
 	);
+	if (await deps.isCancelled?.(job)) return { status: "cancelled", batches: 0 };
 	const state = await deps.prepareRun({
 		job,
 		totalChunks: chunks.length,
@@ -75,7 +81,11 @@ export async function processPrepareJob(
 		return { status: state, batches: batches.length };
 	}
 	if (batches.length === 0) {
+		if (await deps.isCancelled?.(job))
+			return { status: "cancelled", batches: 0 };
 		await deps.completeEmpty(job);
+		if (await deps.isCancelled?.(job))
+			return { status: "cancelled", batches: 0 };
 		await deps.enqueueGraph(
 			{ ...job, stage: "graph" },
 			{
@@ -87,6 +97,8 @@ export async function processPrepareJob(
 		return { status: "prepared", batches: 0 };
 	}
 	const initial = await deps.claimPendingBatches(job, maxActiveBatches);
+	if (await deps.isCancelled?.(job))
+		return { status: "cancelled", batches: batches.length };
 	await Promise.all(
 		initial.map((data) =>
 			deps.enqueueEmbed(data, {

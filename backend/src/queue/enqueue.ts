@@ -13,6 +13,11 @@ import { DEFAULT_JOB_OPTIONS, SOURCE_PRIORITY } from "./names";
 type ActiveRun = { generationId: string };
 
 export interface PipelineRunStore {
+	isCancelled(input: {
+		ownerId: string;
+		generationId: string;
+		workspaceId?: string;
+	}): Promise<boolean>;
 	findOrCreate(input: {
 		documentId: string;
 		ownerId: string;
@@ -36,7 +41,7 @@ export interface PrepareQueueWriter {
 			removeOnComplete: { count: number };
 			removeOnFail: { count: number };
 		},
-	): Promise<unknown>;
+	): Promise<{ remove(): Promise<void> }>;
 }
 
 export interface EnqueueDependencies {
@@ -47,6 +52,30 @@ export interface EnqueueDependencies {
 const ACTIVE_STATUSES = ["pending", "processing", "retrying"] as const;
 
 const postgresRunStore: PipelineRunStore = {
+	async isCancelled(input) {
+		return withTenant(
+			{ userId: input.ownerId, role: "user", workspaceId: input.workspaceId },
+			async (tx) => {
+				const boundary = input.workspaceId
+					? eq(documentPipelineRuns.workspaceId, input.workspaceId)
+					: and(
+							isNull(documentPipelineRuns.workspaceId),
+							eq(documentPipelineRuns.ownerId, input.ownerId),
+						);
+				const [run] = await tx
+					.select({ status: documentPipelineRuns.status })
+					.from(documentPipelineRuns)
+					.where(
+						and(
+							eq(documentPipelineRuns.generationId, input.generationId),
+							boundary,
+						),
+					)
+					.limit(1);
+				return run?.status === "cancelled";
+			},
+		);
+	},
 	async findOrCreate(input) {
 		const ownerBoundary = input.workspaceId
 			? eq(documents.workspaceId, input.workspaceId)
@@ -142,7 +171,7 @@ export async function enqueueDocumentPipeline(
 			requestedAt: requestedAt.toISOString(),
 			source: parsed.source,
 		};
-		await deps.prepareQueue.add("prepare", job, {
+		const queued = await deps.prepareQueue.add("prepare", job, {
 			...DEFAULT_JOB_OPTIONS,
 			jobId: JOB_IDS.prepare(
 				parsed.documentId,
@@ -151,6 +180,26 @@ export async function enqueueDocumentPipeline(
 			),
 			priority: SOURCE_PRIORITY[parsed.source],
 		});
+		if (
+			await deps.runs.isCancelled({
+				ownerId: parsed.ownerId,
+				generationId: run.generationId,
+				workspaceId: parsed.workspaceId,
+			})
+		) {
+			try {
+				await queued.remove();
+			} catch (error) {
+				const message =
+					error instanceof Error ? error.message.toLowerCase() : "";
+				if (
+					!message.includes("locked") &&
+					!message.includes("active") &&
+					!message.includes("not found")
+				)
+					throw error;
+			}
+		}
 	}
 	return { generationId: run.generationId, deduplicated: !created };
 }

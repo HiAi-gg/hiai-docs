@@ -18,10 +18,14 @@ export interface GraphPipelineState {
 }
 
 export interface GraphWorkerDependencies {
+	isCancelled?(job: ReturnType<typeof graphJobSchema.parse>): Promise<boolean>;
 	getRun(
 		job: ReturnType<typeof graphJobSchema.parse>,
 	): Promise<GraphPipelineState | null>;
 	extract(job: ReturnType<typeof graphJobSchema.parse>): Promise<void>;
+	compensateExtract?(
+		job: ReturnType<typeof graphJobSchema.parse>,
+	): Promise<void>;
 	setGraphStatus(
 		generationId: string,
 		status: PipelineStageStatus,
@@ -37,6 +41,7 @@ export interface GraphWorkerDependencies {
 export function createGraphWorker(deps: GraphWorkerDependencies) {
 	return async function processGraphJob(input: PipelineJob): Promise<void> {
 		const job = graphJobSchema.parse(input);
+		if (await deps.isCancelled?.(job)) return;
 		const run = await deps.getRun(job);
 		if (!run) throw new Error("Pipeline run not found");
 		if (run.ownerId !== job.ownerId || run.documentId !== job.documentId) {
@@ -54,21 +59,29 @@ export function createGraphWorker(deps: GraphWorkerDependencies) {
 			return;
 		}
 		if (run.embedStatus !== "ready") {
+			if (await deps.isCancelled?.(job)) return;
 			await deps.setGraphStatus(
 				job.generationId,
 				"skipped",
 				"embedding_not_ready",
 			);
-			await deps.enqueueSummarize(job);
+			if (!(await deps.isCancelled?.(job))) await deps.enqueueSummarize(job);
 			return;
 		}
 
+		if (await deps.isCancelled?.(job)) return;
 		await deps.setGraphStatus(job.generationId, "processing");
 		try {
+			if (await deps.isCancelled?.(job)) return;
 			await deps.extract(job);
+			if (await deps.isCancelled?.(job)) {
+				await deps.compensateExtract?.(job);
+				return;
+			}
 			await deps.setGraphStatus(job.generationId, "ready");
-			await deps.enqueueSummarize(job);
+			if (!(await deps.isCancelled?.(job))) await deps.enqueueSummarize(job);
 		} catch (error) {
+			if (await deps.isCancelled?.(job)) throw error;
 			await deps.setGraphStatus(
 				job.generationId,
 				"failed",
@@ -78,7 +91,7 @@ export function createGraphWorker(deps: GraphWorkerDependencies) {
 			// extraction failure so embeddings remain usable and finalize can
 			// publish ready_with_warnings. The deterministic summarize job id
 			// makes retries idempotent in BullMQ.
-			await deps.enqueueSummarize(job);
+			if (!(await deps.isCancelled?.(job))) await deps.enqueueSummarize(job);
 			throw error;
 		}
 	};

@@ -12,6 +12,7 @@ import { withOwnerSlot } from "../fair-scheduler";
 import { DEFAULT_JOB_OPTIONS, QUEUE_NAMES, SOURCE_PRIORITY } from "../names";
 
 export interface EmbedWorkerDependencies {
+	isCancelled?(job: EmbedBatchJob): Promise<boolean>;
 	loadDocument(input: {
 		documentId: string;
 		ownerId: string;
@@ -65,8 +66,13 @@ export interface EmbedWorkerDependencies {
 export async function processEmbedJob(
 	rawJob: Pick<Job<EmbedBatchJob>, "data">,
 	deps: EmbedWorkerDependencies,
-): Promise<{ status: "stored" | "duplicate" | "stale"; activated: boolean }> {
+): Promise<{
+	status: "stored" | "duplicate" | "stale" | "cancelled";
+	activated: boolean;
+}> {
 	const job = embedBatchJobSchema.parse(rawJob.data);
+	if (await deps.isCancelled?.(job))
+		return { status: "cancelled", activated: false };
 	const document = await deps.loadDocument(job);
 	if (
 		!document ||
@@ -104,6 +110,8 @@ export async function processEmbedJob(
 		)
 	)
 		throw new Error("mixed_embedding_profile");
+	if (await deps.isCancelled?.(job))
+		return { status: "cancelled", activated: false };
 	const stored = await deps.storeBatch({
 		job,
 		rows: results.map(({ index, chunk, result }) => ({
@@ -126,9 +134,13 @@ export async function processEmbedJob(
 		profile: first.profile,
 		dimensions: first.dimensions,
 	};
+	if (await deps.isCancelled?.(job))
+		return { status: "cancelled", activated: false };
 	const completion = await deps.completeBatch({ job, profile });
 	if (!completion.allBatchesComplete) {
 		const next = await deps.claimPendingBatches(job, 1);
+		if (await deps.isCancelled?.(job))
+			return { status: "cancelled", activated: false };
 		await Promise.all(
 			next.map((data) =>
 				deps.enqueueEmbed(data, {
@@ -144,12 +156,16 @@ export async function processEmbedJob(
 		);
 		return { status: "stored", activated: false };
 	}
+	if (await deps.isCancelled?.(job))
+		return { status: "cancelled", activated: false };
 	await deps.activateGeneration({
 		documentId: job.documentId,
 		generationId: job.generationId,
 		totalChunks: completion.totalChunks,
 		profile,
 	});
+	if (await deps.isCancelled?.(job))
+		return { status: "cancelled", activated: false };
 	await deps.enqueueGraph(
 		{ ...job, stage: "graph" },
 		{

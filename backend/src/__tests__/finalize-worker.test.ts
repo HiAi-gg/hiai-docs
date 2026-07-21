@@ -56,4 +56,25 @@ describe("finalize worker semantics", () => {
 		expect(statuses).toEqual(["skipped"]);
 		expect(enqueued).toBe(true);
 	});
+
+	it("does not persist or enqueue when cancellation wins after summarize", async () => {
+		const effects: string[] = [];
+		let checks = 0;
+		const worker = createSummarizeWorker({
+			isCancelled: async () => ++checks >= 4,
+			getRun: async () => ({ ...baseRun }),
+			enabled: () => true,
+			summarize: async () => {
+				effects.push("summarize");
+			},
+			setSummaryStatus: async (_id, status) => {
+				effects.push(status);
+			},
+			enqueueFinalize: async () => {
+				effects.push("enqueue");
+			},
+		});
+		await worker({ ...job, stage: "summarize" });
+		expect(effects).toEqual(["processing", "summarize"]);
+	});
 });

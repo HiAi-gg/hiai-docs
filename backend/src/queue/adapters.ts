@@ -15,6 +15,7 @@ import { getEmbedding } from "../embedding/index";
 import { chunkHash } from "../lib/chunk-hash";
 import { config } from "../lib/config";
 import { tenantOwnerCondition } from "../lib/content-access";
+import { deleteDocumentGraphState } from "../lib/graph/delete-document-state";
 import { extractEntities } from "../lib/graph/extract-entities";
 import type {
 	EmbedBatchJob,
@@ -99,7 +100,12 @@ async function setStageStatus(
 				...(errorCode ? { errorCode } : {}),
 				updatedAt: new Date(),
 			})
-			.where(eq(documentPipelineRuns.generationId, generationId)),
+			.where(
+				and(
+					eq(documentPipelineRuns.generationId, generationId),
+					ne(documentPipelineRuns.status, "cancelled"),
+				),
+			),
 	);
 }
 
@@ -117,7 +123,12 @@ async function markRunStale(
 				errorCode,
 				updatedAt: new Date(),
 			})
-			.where(eq(documentPipelineRuns.generationId, generationId)),
+			.where(
+				and(
+					eq(documentPipelineRuns.generationId, generationId),
+					ne(documentPipelineRuns.status, "cancelled"),
+				),
+			),
 	);
 }
 
@@ -127,11 +138,14 @@ async function claimPendingBatches(
 ): Promise<EmbedBatchJob[]> {
 	return withTenant({ ...admin, workspaceId: job.workspaceId }, async (tx) => {
 		const [run] = await tx
-			.select({ totalBatches: documentPipelineRuns.totalBatches })
+			.select({
+				totalBatches: documentPipelineRuns.totalBatches,
+				status: documentPipelineRuns.status,
+			})
 			.from(documentPipelineRuns)
 			.where(eq(documentPipelineRuns.generationId, job.generationId))
 			.limit(1);
-		if (!run || limit < 1) return [];
+		if (!run || run.status === "cancelled" || limit < 1) return [];
 		const candidates = await tx
 			.select({
 				batchIndex: documentPipelineBatches.batchIndex,
@@ -185,8 +199,33 @@ export function createPipelineStageDependencies(
 	redisUrl: string,
 ): PipelineStageDependencies {
 	const queue = (stage: PipelineStage) => getPipelineQueue(stage, redisUrl);
+	const enqueueIfActive = async (
+		stage: PipelineStage,
+		name: string,
+		data: PipelineJob,
+		options: typeof DEFAULT_JOB_OPTIONS & { jobId: string; priority: number },
+	) => {
+		if ((await getRun(data.generationId))?.status === "cancelled") return null;
+		const queued = await queue(stage).add(name, data, options);
+		if ((await getRun(data.generationId))?.status !== "cancelled")
+			return queued;
+		try {
+			await queued.remove();
+		} catch (error) {
+			const message = error instanceof Error ? error.message.toLowerCase() : "";
+			if (
+				!message.includes("locked") &&
+				!message.includes("active") &&
+				!message.includes("not found")
+			)
+				throw error;
+		}
+		return null;
+	};
 	return {
 		prepare: {
+			isCancelled: async (job) =>
+				(await getRun(job.generationId))?.status === "cancelled",
 			claimPendingBatches,
 			markStale: (job, errorCode) =>
 				markRunStale(job.generationId, "prepare", errorCode),
@@ -245,9 +284,11 @@ export function createPipelineStageDependencies(
 									eq(documentPipelineRuns.revision, job.revision),
 								),
 							)
-							.limit(1);
+							.limit(1)
+							.for("update");
 						if (!run) return "stale" as const;
 						if (run.status === "ready") return "duplicate" as const;
+						if (run.status === "cancelled") return "stale" as const;
 						await tx
 							.update(documents)
 							.set({
@@ -285,7 +326,12 @@ export function createPipelineStageDependencies(
 								totalBatches: batches.length,
 								updatedAt: new Date(),
 							})
-							.where(eq(documentPipelineRuns.generationId, job.generationId));
+							.where(
+								and(
+									eq(documentPipelineRuns.generationId, job.generationId),
+									ne(documentPipelineRuns.status, "cancelled"),
+								),
+							);
 						return "prepared" as const;
 					},
 				);
@@ -294,6 +340,18 @@ export function createPipelineStageDependencies(
 				await withTenant(
 					{ ...admin, workspaceId: job.workspaceId },
 					async (tx) => {
+						const [run] = await tx
+							.select({ status: documentPipelineRuns.status })
+							.from(documentPipelineRuns)
+							.where(
+								and(
+									eq(documentPipelineRuns.generationId, job.generationId),
+									eq(documentPipelineRuns.ownerId, job.ownerId),
+								),
+							)
+							.limit(1)
+							.for("update");
+						if (!run || run.status === "cancelled") return;
 						// A zero-chunk generation is still the newest source of truth.
 						// Activate it without inventing a vector/profile, remove any
 						// previous generation rows, and leave downstream optional stages
@@ -337,16 +395,18 @@ export function createPipelineStageDependencies(
 				);
 			},
 			enqueueEmbed(data, options) {
-				return queue("embed").add("embed", data, options);
+				return enqueueIfActive("embed", "embed", data, options);
 			},
 			enqueueGraph(data, options) {
-				return queue("graph").add("graph", data, options);
+				return enqueueIfActive("graph", "graph", data, options);
 			},
 		},
 		embed: {
+			isCancelled: async (job) =>
+				(await getRun(job.generationId))?.status === "cancelled",
 			claimPendingBatches,
 			enqueueEmbed(data, options) {
-				return queue("embed").add("embed", data, options);
+				return enqueueIfActive("embed", "embed", data, options);
 			},
 			markStale: (job, errorCode) =>
 				markRunStale(job.generationId, "embed", errorCode),
@@ -397,6 +457,12 @@ export function createPipelineStageDependencies(
 				return withTenant(
 					{ ...admin, workspaceId: job.workspaceId },
 					async (tx) => {
+						const [run] = await tx
+							.select({ status: documentPipelineRuns.status })
+							.from(documentPipelineRuns)
+							.where(eq(documentPipelineRuns.generationId, job.generationId))
+							.limit(1)
+							.for("update");
 						const [batch] = await tx
 							.select({ status: documentPipelineBatches.status })
 							.from(documentPipelineBatches)
@@ -407,7 +473,7 @@ export function createPipelineStageDependencies(
 								),
 							)
 							.limit(1);
-						if (!batch) return "stale" as const;
+						if (!batch || run?.status === "cancelled") return "stale" as const;
 						if (batch.status === "ready") return "duplicate" as const;
 						await tx
 							.insert(documentEmbeddings)
@@ -435,6 +501,19 @@ export function createPipelineStageDependencies(
 			},
 			async completeBatch({ job, profile }) {
 				return withTenant(admin, async (tx) => {
+					const [run] = await tx
+						.select({ status: documentPipelineRuns.status })
+						.from(documentPipelineRuns)
+						.where(
+							and(
+								eq(documentPipelineRuns.generationId, job.generationId),
+								eq(documentPipelineRuns.ownerId, job.ownerId),
+							),
+						)
+						.limit(1)
+						.for("update");
+					if (!run || run.status === "cancelled")
+						return { allBatchesComplete: false, totalChunks: 0 };
 					await tx
 						.update(documentPipelineBatches)
 						.set({
@@ -470,7 +549,12 @@ export function createPipelineStageDependencies(
 									: "processing",
 							updatedAt: new Date(),
 						})
-						.where(eq(documentPipelineRuns.generationId, job.generationId));
+						.where(
+							and(
+								eq(documentPipelineRuns.generationId, job.generationId),
+								ne(documentPipelineRuns.status, "cancelled"),
+							),
+						);
 					return {
 						allBatchesComplete:
 							(counts?.total ?? 0) > 0 && counts?.ready === counts?.total,
@@ -488,10 +572,12 @@ export function createPipelineStageDependencies(
 				await setStageStatus(input.generationId, "embed", "ready");
 			},
 			enqueueGraph(data, options) {
-				return queue("graph").add("graph", data, options);
+				return enqueueIfActive("graph", "graph", data, options);
 			},
 		},
 		graph: {
+			isCancelled: async (job) =>
+				(await getRun(job.generationId))?.status === "cancelled",
 			async getRun(job) {
 				const run = await getRun(job.generationId);
 				return run
@@ -529,11 +615,32 @@ export function createPipelineStageDependencies(
 					() => extractEntities(doc.content ?? "", job.documentId),
 				);
 			},
+			async compensateExtract(job) {
+				const owned = await withTenant(
+					{ ...admin, workspaceId: job.workspaceId },
+					async (tx) =>
+						tx
+							.select({ id: documents.id })
+							.from(documents)
+							.where(
+								and(
+									eq(documents.id, job.documentId),
+									tenantOwnerCondition(
+										documents.ownerId,
+										documents.workspaceId,
+										jobTenant(job),
+									),
+								),
+							)
+							.limit(1),
+				);
+				if (owned.length === 1) await deleteDocumentGraphState(job.documentId);
+			},
 			setGraphStatus: (generationId, status, errorCode) =>
 				setStageStatus(generationId, "graph", status, errorCode),
 			async enqueueSummarize(job) {
 				const data: PipelineJob = { ...job, stage: "summarize" };
-				await queue("summarize").add("summarize", data, {
+				await enqueueIfActive("summarize", "summarize", data, {
 					...DEFAULT_JOB_OPTIONS,
 					jobId: JOB_IDS.summarize(job.generationId, job.workspaceId),
 					priority: SOURCE_PRIORITY[job.source],
@@ -541,6 +648,8 @@ export function createPipelineStageDependencies(
 			},
 		},
 		summarize: {
+			isCancelled: async (job) =>
+				(await getRun(job.generationId))?.status === "cancelled",
 			async getRun(job) {
 				const run = await getRun(job.generationId);
 				return run
@@ -559,7 +668,7 @@ export function createPipelineStageDependencies(
 				setStageStatus(generationId, "summarize", status, errorCode),
 			async enqueueFinalize(job) {
 				const data: PipelineJob = { ...job, stage: "finalize" };
-				await queue("finalize").add("finalize", data, {
+				await enqueueIfActive("finalize", "finalize", data, {
 					...DEFAULT_JOB_OPTIONS,
 					jobId: JOB_IDS.finalize(job.generationId, job.workspaceId),
 					priority: SOURCE_PRIORITY[job.source],
@@ -593,7 +702,12 @@ export function createPipelineStageDependencies(
 							completedAt: new Date(),
 							updatedAt: new Date(),
 						})
-						.where(eq(documentPipelineRuns.generationId, generationId)),
+						.where(
+							and(
+								eq(documentPipelineRuns.generationId, generationId),
+								ne(documentPipelineRuns.status, "cancelled"),
+							),
+						),
 				);
 			},
 		},

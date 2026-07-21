@@ -1,17 +1,19 @@
 {
   "name": "@hiai-gg/docsmint",
-  "version": "0.4.3",
+  "version": "0.4.4",
   "type": "module",
   "browser": {
     "./dist/backend-launcher.js": false,
     "./dist/lifecycle.js": false,
     "./dist/lifecycle-persistent.js": false,
     "./dist/lifecycle-runtime.js": false,
+    "./dist/pipeline-cancellation.js": false,
     "./dist/storage-quota.js": false,
-    "./dist/workspace.js": false
+    "./dist/workspace.js": false,
+    "./dist/backend-pipeline-cancellation.js": false
   },
   "license": "Apache-2.0",
-  "description": "The lightweight, AI-native self-hosted knowledge base — built-in RAG, hybrid semantic search, and a clean REST API for AI agents.",
+  "description": "The lightweight, AI-native self-hosted knowledge base \u2014 built-in RAG, hybrid semantic search, and a clean REST API for AI agents.",
   "repository": {
     "type": "git",
     "url": "https://github.com/HiAi-gg/docsmint"
@@ -64,6 +66,11 @@
       "browser": "./dist/server-only-browser-entry.js",
       "import": "./dist/lifecycle-runtime.js",
       "types": "./dist/lifecycle-runtime.d.ts"
+    },
+    "./pipeline/cancellation": {
+      "browser": "./dist/server-only-browser-entry.js",
+      "import": "./dist/pipeline-cancellation.js",
+      "types": "./dist/pipeline-cancellation.d.ts"
     },
     "./workspace": {
       "browser": "./dist/server-only-browser-entry.js",
@@ -294,6 +301,11 @@
     "./backend/lib/logger": {
       "import": "./backend/src/lib/logger.ts",
       "types": "./backend/src/lib/logger.ts"
+    },
+    "./backend/pipeline-cancellation": {
+      "browser": "./dist/server-only-browser-entry.js",
+      "import": "./dist/backend-pipeline-cancellation.js",
+      "types": "./dist/backend-pipeline-cancellation.d.ts"
     }
   },
   "bin": {
@@ -338,6 +350,7 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.12.1",
+    "bullmq": "^5.80.2",
     "commander": "^13.1.0",
     "zod": "^4.0.0"
   },

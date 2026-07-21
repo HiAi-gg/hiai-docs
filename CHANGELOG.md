@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.4.4
+
+- Add the server-only `@hiai-gg/docsmint/pipeline/cancellation` API for exact-owner BullMQ cancellation without Redis namespace deletion.
+- Durably fence active pipeline runs before removing waiting, delayed, paused, or prioritized jobs; repeated cancellation is safe and cross-account jobs are preserved.
+- Make prepare and embed workers observe the cancelled run immediately before document, batch, activation, status, and downstream queue writes, with compensation support for raced external creation.
+
 ## 0.4.3
 
 - Ship the concrete server-only durable PostgreSQL lifecycle saga as `@hiai-gg/docsmint/lifecycle/runtime`.

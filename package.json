@@ -3,12 +3,14 @@
   "private": true,
   "type": "module",
   "browser": {
-	"./packages/sdk/dist/backend-launcher.js": false,
-	"./packages/sdk/dist/lifecycle.js": false,
-	"./packages/sdk/dist/lifecycle-persistent.js": false,
-	"./packages/sdk/dist/lifecycle-runtime.js": false,
-	"./packages/sdk/dist/storage-quota.js": false,
-	"./packages/sdk/dist/workspace.js": false
+    "./packages/sdk/dist/backend-launcher.js": false,
+    "./packages/sdk/dist/lifecycle.js": false,
+    "./packages/sdk/dist/lifecycle-persistent.js": false,
+    "./packages/sdk/dist/lifecycle-runtime.js": false,
+    "./packages/sdk/dist/pipeline-cancellation.js": false,
+    "./packages/sdk/dist/storage-quota.js": false,
+    "./packages/sdk/dist/workspace.js": false,
+    "./packages/sdk/dist/backend-pipeline-cancellation.js": false
   },
   "workspaces": [
     "backend",
@@ -54,21 +56,26 @@
       "import": "./packages/sdk/dist/index.js",
       "types": "./packages/sdk/dist/index.d.ts"
     },
-	"./lifecycle": {
+    "./lifecycle": {
       "browser": "./packages/sdk/dist/server-only-browser-entry.js",
       "import": "./packages/sdk/dist/lifecycle.js",
       "types": "./packages/sdk/dist/lifecycle.d.ts"
-	},
-	"./lifecycle/persistent": {
-		"browser": "./packages/sdk/dist/server-only-browser-entry.js",
-		"import": "./packages/sdk/dist/lifecycle-persistent.js",
-		"types": "./packages/sdk/dist/lifecycle-persistent.d.ts"
-	},
-	"./lifecycle/runtime": {
-		"browser": "./packages/sdk/dist/server-only-browser-entry.js",
-		"import": "./packages/sdk/dist/lifecycle-runtime.js",
-		"types": "./packages/sdk/dist/lifecycle-runtime.d.ts"
-	},
+    },
+    "./lifecycle/persistent": {
+      "browser": "./packages/sdk/dist/server-only-browser-entry.js",
+      "import": "./packages/sdk/dist/lifecycle-persistent.js",
+      "types": "./packages/sdk/dist/lifecycle-persistent.d.ts"
+    },
+    "./lifecycle/runtime": {
+      "browser": "./packages/sdk/dist/server-only-browser-entry.js",
+      "import": "./packages/sdk/dist/lifecycle-runtime.js",
+      "types": "./packages/sdk/dist/lifecycle-runtime.d.ts"
+    },
+    "./pipeline/cancellation": {
+      "browser": "./packages/sdk/dist/server-only-browser-entry.js",
+      "import": "./packages/sdk/dist/pipeline-cancellation.js",
+      "types": "./packages/sdk/dist/pipeline-cancellation.d.ts"
+    },
     "./workspace": {
       "browser": "./packages/sdk/dist/server-only-browser-entry.js",
       "import": "./packages/sdk/dist/workspace.js",
@@ -84,19 +91,64 @@
       "import": "./packages/sdk/dist/storage-quota.js",
       "types": "./packages/sdk/dist/storage-quota.d.ts"
     },
-    "./frontend/dashboard": { "node": "./packages/sdk/dist/frontend-ssr/dashboard.js", "import": "./packages/sdk/dist/frontend/dashboard.js", "types": "./packages/sdk/dist/frontend/dashboard.d.ts" },
-    "./frontend/search": { "node": "./packages/sdk/dist/frontend-ssr/search.js", "import": "./packages/sdk/dist/frontend/search.js", "types": "./packages/sdk/dist/frontend/search.d.ts" },
-    "./frontend/shared-document": { "node": "./packages/sdk/dist/frontend-ssr/shared-document.js", "import": "./packages/sdk/dist/frontend/shared-document.js", "types": "./packages/sdk/dist/frontend/shared-document.d.ts" },
-    "./frontend/extension": { "node": "./packages/sdk/dist/frontend-ssr/extension.js", "import": "./packages/sdk/dist/frontend/extension.js", "types": "./packages/sdk/dist/frontend/extension.d.ts" },
-    "./frontend/api/categories": { "import": "./packages/sdk/dist/frontend/api/categories.js", "types": "./packages/sdk/dist/frontend/api/categories.d.ts" },
-    "./frontend/api/documents": { "import": "./packages/sdk/dist/frontend/api/documents.js", "types": "./packages/sdk/dist/frontend/api/documents.d.ts" },
-    "./frontend/api/folders": { "import": "./packages/sdk/dist/frontend/api/folders.js", "types": "./packages/sdk/dist/frontend/api/folders.d.ts" },
-    "./frontend/api/tags": { "import": "./packages/sdk/dist/frontend/api/tags.js", "types": "./packages/sdk/dist/frontend/api/tags.d.ts" },
-    "./frontend/api/settings": { "import": "./packages/sdk/dist/frontend/api/settings.js", "types": "./packages/sdk/dist/frontend/api/settings.d.ts" },
-    "./frontend/components/sidebar": { "node": "./packages/sdk/dist/frontend-ssr/components/sidebar.js", "import": "./packages/sdk/dist/frontend/components/sidebar.js", "types": "./packages/sdk/dist/frontend/components/sidebar.d.ts" },
-    "./frontend/components/settings": { "node": "./packages/sdk/dist/frontend-ssr/components/settings.js", "import": "./packages/sdk/dist/frontend/components/settings.js", "types": "./packages/sdk/dist/frontend/components/settings.d.ts" },
-    "./frontend/theme": { "import": "./packages/sdk/dist/frontend/theme.js", "types": "./packages/sdk/dist/frontend/theme.d.ts" },
-    "./frontend/i18n": { "import": "./packages/sdk/dist/frontend/i18n.js", "types": "./packages/sdk/dist/frontend/i18n.d.ts" },
+    "./frontend/dashboard": {
+      "node": "./packages/sdk/dist/frontend-ssr/dashboard.js",
+      "import": "./packages/sdk/dist/frontend/dashboard.js",
+      "types": "./packages/sdk/dist/frontend/dashboard.d.ts"
+    },
+    "./frontend/search": {
+      "node": "./packages/sdk/dist/frontend-ssr/search.js",
+      "import": "./packages/sdk/dist/frontend/search.js",
+      "types": "./packages/sdk/dist/frontend/search.d.ts"
+    },
+    "./frontend/shared-document": {
+      "node": "./packages/sdk/dist/frontend-ssr/shared-document.js",
+      "import": "./packages/sdk/dist/frontend/shared-document.js",
+      "types": "./packages/sdk/dist/frontend/shared-document.d.ts"
+    },
+    "./frontend/extension": {
+      "node": "./packages/sdk/dist/frontend-ssr/extension.js",
+      "import": "./packages/sdk/dist/frontend/extension.js",
+      "types": "./packages/sdk/dist/frontend/extension.d.ts"
+    },
+    "./frontend/api/categories": {
+      "import": "./packages/sdk/dist/frontend/api/categories.js",
+      "types": "./packages/sdk/dist/frontend/api/categories.d.ts"
+    },
+    "./frontend/api/documents": {
+      "import": "./packages/sdk/dist/frontend/api/documents.js",
+      "types": "./packages/sdk/dist/frontend/api/documents.d.ts"
+    },
+    "./frontend/api/folders": {
+      "import": "./packages/sdk/dist/frontend/api/folders.js",
+      "types": "./packages/sdk/dist/frontend/api/folders.d.ts"
+    },
+    "./frontend/api/tags": {
+      "import": "./packages/sdk/dist/frontend/api/tags.js",
+      "types": "./packages/sdk/dist/frontend/api/tags.d.ts"
+    },
+    "./frontend/api/settings": {
+      "import": "./packages/sdk/dist/frontend/api/settings.js",
+      "types": "./packages/sdk/dist/frontend/api/settings.d.ts"
+    },
+    "./frontend/components/sidebar": {
+      "node": "./packages/sdk/dist/frontend-ssr/components/sidebar.js",
+      "import": "./packages/sdk/dist/frontend/components/sidebar.js",
+      "types": "./packages/sdk/dist/frontend/components/sidebar.d.ts"
+    },
+    "./frontend/components/settings": {
+      "node": "./packages/sdk/dist/frontend-ssr/components/settings.js",
+      "import": "./packages/sdk/dist/frontend/components/settings.js",
+      "types": "./packages/sdk/dist/frontend/components/settings.d.ts"
+    },
+    "./frontend/theme": {
+      "import": "./packages/sdk/dist/frontend/theme.js",
+      "types": "./packages/sdk/dist/frontend/theme.d.ts"
+    },
+    "./frontend/i18n": {
+      "import": "./packages/sdk/dist/frontend/i18n.js",
+      "types": "./packages/sdk/dist/frontend/i18n.d.ts"
+    },
     "./schema": {
       "import": "./packages/db/src/schema.ts",
       "types": "./packages/db/src/schema.ts"
@@ -136,6 +188,11 @@
     "./backend/lib/audit": {
       "import": "./backend/src/lib/audit.ts",
       "types": "./backend/src/lib/audit.ts"
+    },
+    "./backend/pipeline-cancellation": {
+      "browser": "./packages/sdk/dist/server-only-browser-entry.js",
+      "import": "./packages/sdk/dist/backend-pipeline-cancellation.js",
+      "types": "./packages/sdk/dist/backend-pipeline-cancellation.d.ts"
     }
   },
   "bin": {
@@ -152,7 +209,7 @@
     "backend/src",
     "frontend/src/lib/index.ts",
     "frontend/src/lib/extensions",
-	"frontend/src/lib/hosts",
+    "frontend/src/lib/hosts",
     "frontend/src/lib/stores/doc-tab-registry.svelte.ts",
     "frontend/src/lib/components/editor/shared-document.ts",
     "README.md",
@@ -170,13 +227,14 @@
     "start": "docker compose up -d",
     "stop": "docker compose down",
     "build:sdk": "cd packages/sdk && bun run build",
-	"test:package": "bun run build:sdk && bun run scripts/verify-packed-package.ts",
-	"test:lifecycle:integration": "bun test packages/db/scripts/lifecycle-operations.integration.test.ts",
-	"test:release": "bun run lint && bun run typecheck && bun run test && bun run test:package && git diff --check",
+    "test:package": "bun run build:sdk && bun run scripts/verify-packed-package.ts",
+    "test:lifecycle:integration": "bun test packages/db/scripts/lifecycle-operations.integration.test.ts",
+    "test:release": "bun run lint && bun run typecheck && bun run test && bun run test:package && git diff --check",
     "prepublishOnly": "cd packages/sdk && bun run build"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.12.1",
+    "bullmq": "^5.80.2",
     "commander": "^13.1.0",
     "zod": "^4.0.0"
   },

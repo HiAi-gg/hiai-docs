@@ -96,6 +96,9 @@ describe("pipeline recovery", () => {
 	test("recovers a durable pending run exactly once after Queue.add failure", async () => {
 		let committed: Parameters<PipelineRunStore["findOrCreate"]>[0] | undefined;
 		const runs: PipelineRunStore = {
+			async isCancelled() {
+				return false;
+			},
 			async findOrCreate(input) {
 				committed = input;
 				return { run: { generationId: input.generationId }, created: true };

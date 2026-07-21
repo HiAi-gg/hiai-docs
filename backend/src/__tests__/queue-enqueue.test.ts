@@ -21,6 +21,9 @@ function harness(): {
 } {
 	const active = new Map<string, string>();
 	const runs: PipelineRunStore = {
+		async isCancelled() {
+			return false;
+		},
 		async findOrCreate(input) {
 			const key = `${input.ownerId}:${input.documentId}:${input.revision}`;
 			const existing = active.get(key);
@@ -33,6 +36,11 @@ function harness(): {
 	const prepareQueue: PrepareQueueWriter = {
 		async add(_name, data, options) {
 			jobs.push({ data, jobId: options.jobId });
+			return {
+				async remove() {
+					jobs.pop();
+				},
+			};
 		},
 	};
 	return { deps: { runs, prepareQueue }, jobs };
@@ -90,6 +98,32 @@ describe("document pipeline enqueue", () => {
 					revision: "revision-2",
 					source: "import",
 				},
+				deps,
+			),
+		).rejects.toThrow("redis unavailable");
+	});
+
+	test("removes prepare job when cancellation wins after add", async () => {
+		const { deps, jobs } = harness();
+		deps.runs.isCancelled = async () => true;
+		await enqueueDocumentPipeline(
+			{ documentId, ownerId: ownerA, revision: "race", source: "api" },
+			deps,
+		);
+		expect(jobs).toHaveLength(0);
+	});
+
+	test("propagates unexpected prepare removal failures", async () => {
+		const { deps } = harness();
+		deps.runs.isCancelled = async () => true;
+		deps.prepareQueue.add = async () => ({
+			remove: async () => {
+				throw new Error("redis unavailable");
+			},
+		});
+		await expect(
+			enqueueDocumentPipeline(
+				{ documentId, ownerId: ownerA, revision: "race-error", source: "api" },
 				deps,
 			),
 		).rejects.toThrow("redis unavailable");

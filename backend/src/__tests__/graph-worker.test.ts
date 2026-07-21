@@ -32,6 +32,49 @@ function deps(
 }
 
 describe("graph worker isolation", () => {
+	it("cancellation after extraction prevents ready status and downstream enqueue", async () => {
+		const effects: string[] = [];
+		let checks = 0;
+		const worker = createGraphWorker({
+			isCancelled: async () => ++checks >= 4,
+			getRun: async () => ({
+				ownerId: job.ownerId,
+				documentId: job.documentId,
+				generationId: job.generationId,
+				revision: job.revision,
+				embedStatus: "ready",
+			}),
+			extract: async () => {
+				effects.push("extract");
+			},
+			compensateExtract: async () => {
+				effects.push("compensate");
+			},
+			setGraphStatus: async (_id, status) => {
+				effects.push(status);
+			},
+			enqueueSummarize: async () => {
+				effects.push("enqueue");
+			},
+		});
+		await worker(job);
+		expect(effects).toEqual(["processing", "extract", "compensate"]);
+	});
+
+	it("propagates graph compensation failure without writing success", async () => {
+		let checks = 0;
+		const worker = createGraphWorker({
+			isCancelled: async () => ++checks >= 4,
+			getRun: async () => ({ ...job, embedStatus: "ready" }),
+			extract: async () => {},
+			compensateExtract: async () => {
+				throw new Error("graph cleanup failed");
+			},
+			setGraphStatus: async () => {},
+			enqueueSummarize: async () => {},
+		});
+		await expect(worker(job)).rejects.toThrow("graph cleanup failed");
+	});
 	it("does not change ready embeddings when graph extraction fails", async () => {
 		let summaryEnqueues = 0;
 		const state = deps({

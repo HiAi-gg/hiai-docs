@@ -17,6 +17,39 @@ const base = {
 };
 
 describe("prepare pipeline worker", () => {
+	test("does not prepare or enqueue after an active run is cancelled", async () => {
+		let wrote = false;
+		const result = await processPrepareJob(
+			{ data: { ...base, stage: "prepare" } },
+			{
+				isCancelled: async () => true,
+				loadDocument: async () => ({
+					title: "x",
+					content: "y",
+					revision: base.revision,
+				}),
+				prepareRun: async () => {
+					wrote = true;
+					return "prepared";
+				},
+				completeEmpty: async () => {
+					wrote = true;
+				},
+				markStale: async () => {
+					wrote = true;
+				},
+				claimPendingBatches: async () => [],
+				enqueueEmbed: async () => {
+					wrote = true;
+				},
+				enqueueGraph: async () => {
+					wrote = true;
+				},
+			},
+		);
+		expect(result.status).toBe("cancelled");
+		expect(wrote).toBe(false);
+	});
 	test("creates deterministic bounded batches and is idempotent", async () => {
 		const jobs: EmbedBatchJob[] = [];
 		let preparedBatches: Array<{
@@ -121,6 +154,30 @@ describe("prepare pipeline worker", () => {
 });
 
 describe("embed pipeline worker", () => {
+	test("checks cancellation immediately before the batch write", async () => {
+		const { deps } = harness();
+		let checks = 0;
+		let stored = false;
+		deps.isCancelled = async () => ++checks >= 2;
+		deps.storeBatch = async () => {
+			stored = true;
+			return "stored";
+		};
+		const result = await processEmbedJob(
+			{
+				data: {
+					...base,
+					stage: "embed",
+					batchIndex: 0,
+					totalBatches: 1,
+					chunkIndexes: [0],
+				},
+			},
+			deps,
+		);
+		expect(result.status).toBe("cancelled");
+		expect(stored).toBe(false);
+	});
 	function harness() {
 		const order: string[] = [];
 		const deps: EmbedWorkerDependencies = {

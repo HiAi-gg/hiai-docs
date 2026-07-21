@@ -1,4 +1,8 @@
-import { documentEmbeddings, documents } from "@hiai-docs/db/schema";
+import {
+	documentEmbeddings,
+	documentPipelineRuns,
+	documents,
+} from "@hiai-docs/db/schema";
 import {
 	adminTenantContext,
 	withTenant,
@@ -81,6 +85,13 @@ export async function activateEmbeddingGeneration(
 	profile?: EmbeddingGenerationProfile | string,
 ): Promise<void> {
 	await withTenant(WORKER_TENANT, async (tx) => {
+		const run = await tx
+			.select({ status: documentPipelineRuns.status })
+			.from(documentPipelineRuns)
+			.where(eq(documentPipelineRuns.generationId, generationId))
+			.limit(1)
+			.for("update");
+		if (run[0]?.status === "cancelled") throw new Error("pipeline_cancelled");
 		const documentRows = await tx
 			.select({ pending: documents.pendingEmbeddingGeneration })
 			.from(documents)

@@ -1,5 +1,21 @@
 # Architecture
 
+## Account pipeline cancellation
+
+Server hosts compose `cancelAccountPipelineJobs` from
+`@hiai-gg/docsmint/pipeline/cancellation` into the persistent lifecycle
+runtime's `cancelAccountJobs` adapter. The supplied `cancelRuns` callback must
+run in the actor's request/RLS scope and atomically mark every non-terminal
+owned pipeline run `cancelled`. Only BullMQ jobs whose payload contains the
+exact matching `ownerId` are removed, and only while waiting, delayed, paused,
+or prioritized. Active jobs are never force-removed: prepare/embed adapters
+check the durable cancellation fence immediately before each write. Redis
+queue namespaces must never be deleted as an account-cancellation shortcut.
+
+The packaged backend composition accepts `{ redisUrl, databaseUrl }`. Each
+instance owns its BullMQ handles and postgres-js pool; `close()` releases only
+those owned resources, so a new instance can be created safely afterward.
+
 ## Monorepo Structure
 
 ```
