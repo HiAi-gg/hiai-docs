@@ -7,6 +7,12 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-07-21
+
+### Fixed
+
+- Include the request-scoped app-shell adapter and navigation options in the published frontend declaration artifact, so packed SvelteKit consumers receive the same typed contract as the runtime bundle.
+
 ## [0.4.0] - 2026-07-21
 
 ### Fixed

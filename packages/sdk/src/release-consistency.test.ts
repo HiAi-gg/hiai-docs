@@ -2,13 +2,13 @@ import { expect, test } from "bun:test";
 import { readFile } from "node:fs/promises";
 
 const repositoryRoot = new URL("../../../", import.meta.url);
-const releaseVersion = "0.4.0";
+const releaseVersion = "0.4.1";
 
 async function json(path: string): Promise<Record<string, unknown>> {
 	return JSON.parse(await readFile(new URL(path, repositoryRoot), "utf8"));
 }
 
-test("all published and workspace release metadata reports 0.4.0", async () => {
+test("all published and workspace release metadata reports 0.4.1", async () => {
 	for (const path of [
 		"package.public.json",
 		"backend/package.json",
@@ -24,7 +24,7 @@ test("all published and workspace release metadata reports 0.4.0", async () => {
 	const lockfile = await readFile(new URL("bun.lock", repositoryRoot), "utf8");
 	const workspaceBlock = lockfile.slice(0, lockfile.indexOf('  "packages": {'));
 	expect(workspaceBlock).not.toContain('"version": "0.3.0"');
-	expect(workspaceBlock.match(/"version": "0\.4\.0"/g)).toHaveLength(6);
+	expect(workspaceBlock.match(/"version": "0\.4\.1"/g)).toHaveLength(6);
 
 	const publicManifest = await json("package.public.json");
 	expect(publicManifest.name).toBe("@hiai-gg/docsmint");
@@ -45,6 +45,12 @@ test("all published and workspace release metadata reports 0.4.0", async () => {
 	expect(publicExports["./frontend/styles.css"]).toBe(
 		"./dist/frontend/frontend.css",
 	);
+	const appShellDeclarationWriter = await readFile(
+		new URL("packages/sdk/scripts/write-frontend-declarations.ts", repositoryRoot),
+		"utf8",
+	);
+	expect(appShellDeclarationWriter).toContain("DocsmintRequestAdapter");
+	expect(appShellDeclarationWriter).toContain("options?: DocsmintNavigationOptions");
 	const openApi = await json("docs/openapi.json");
 	expect((openApi.info as { version: string }).version).toBe(releaseVersion);
 
