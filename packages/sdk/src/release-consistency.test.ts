@@ -2,13 +2,13 @@ import { expect, test } from "bun:test";
 import { readFile } from "node:fs/promises";
 
 const repositoryRoot = new URL("../../../", import.meta.url);
-const releaseVersion = "0.4.4";
+const releaseVersion = "0.4.5";
 
 async function json(path: string): Promise<Record<string, unknown>> {
 	return JSON.parse(await readFile(new URL(path, repositoryRoot), "utf8"));
 }
 
-test("all published and workspace release metadata reports 0.4.4", async () => {
+test("all published and workspace release metadata reports 0.4.5", async () => {
 	for (const path of [
 		"package.public.json",
 		"backend/package.json",
@@ -24,7 +24,7 @@ test("all published and workspace release metadata reports 0.4.4", async () => {
 	const lockfile = await readFile(new URL("bun.lock", repositoryRoot), "utf8");
 	const workspaceBlock = lockfile.slice(0, lockfile.indexOf('  "packages": {'));
 	expect(workspaceBlock).not.toContain('"version": "0.3.0"');
-	expect(workspaceBlock.match(/"version": "0\.4\.4"/g)).toHaveLength(6);
+	expect(workspaceBlock.match(/"version": "0\.4\.5"/g)).toHaveLength(6);
 
 	const publicManifest = await json("package.public.json");
 	expect(publicManifest.name).toBe("@hiai-gg/docsmint");
@@ -52,15 +52,28 @@ test("all published and workspace release metadata reports 0.4.4", async () => {
 		import: "./dist/pipeline-cancellation.js",
 		types: "./dist/pipeline-cancellation.d.ts",
 	});
+	expect(publicExports["./backend/account-runtime-cleanup"]).toEqual({
+		browser: "./dist/server-only-browser-entry.js",
+		import: "./dist/backend-account-runtime-cleanup.js",
+		types: "./dist/backend-account-runtime-cleanup.d.ts",
+	});
+	expect((publicManifest.dependencies as Record<string, string>).ioredis).toBe(
+		"^5.11.1",
+	);
 	expect(publicExports["./frontend/styles.css"]).toBe(
 		"./dist/frontend/frontend.css",
 	);
 	const appShellDeclarationWriter = await readFile(
-		new URL("packages/sdk/scripts/write-frontend-declarations.ts", repositoryRoot),
+		new URL(
+			"packages/sdk/scripts/write-frontend-declarations.ts",
+			repositoryRoot,
+		),
 		"utf8",
 	);
 	expect(appShellDeclarationWriter).toContain("DocsmintRequestAdapter");
-	expect(appShellDeclarationWriter).toContain("options?: DocsmintNavigationOptions");
+	expect(appShellDeclarationWriter).toContain(
+		"options?: DocsmintNavigationOptions",
+	);
 	const openApi = await json("docs/openapi.json");
 	expect((openApi.info as { version: string }).version).toBe(releaseVersion);
 

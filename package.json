@@ -10,7 +10,8 @@
     "./packages/sdk/dist/pipeline-cancellation.js": false,
     "./packages/sdk/dist/storage-quota.js": false,
     "./packages/sdk/dist/workspace.js": false,
-    "./packages/sdk/dist/backend-pipeline-cancellation.js": false
+    "./packages/sdk/dist/backend-pipeline-cancellation.js": false,
+    "./packages/sdk/dist/backend-account-runtime-cleanup.js": false
   },
   "workspaces": [
     "backend",
@@ -193,6 +194,11 @@
       "browser": "./packages/sdk/dist/server-only-browser-entry.js",
       "import": "./packages/sdk/dist/backend-pipeline-cancellation.js",
       "types": "./packages/sdk/dist/backend-pipeline-cancellation.d.ts"
+    },
+    "./backend/account-runtime-cleanup": {
+      "browser": "./packages/sdk/dist/server-only-browser-entry.js",
+      "import": "./packages/sdk/dist/backend-account-runtime-cleanup.js",
+      "types": "./packages/sdk/dist/backend-account-runtime-cleanup.d.ts"
     }
   },
   "bin": {
@@ -236,12 +242,12 @@
     "@modelcontextprotocol/sdk": "^1.12.1",
     "bullmq": "^5.80.2",
     "commander": "^13.1.0",
+    "ioredis": "^5.11.1",
     "zod": "^4.0.0"
   },
   "peerDependencies": {
     "drizzle-orm": "^0.45.2",
     "postgres": "^3.4.9",
-    "ioredis": "^5.4.0",
     "@aws-sdk/client-s3": "^3.0.0",
     "pino": "^10.0.0",
     "@sveltejs/kit": "^2.68.0",
@@ -252,9 +258,6 @@
       "optional": true
     },
     "postgres": {
-      "optional": true
-    },
-    "ioredis": {
       "optional": true
     },
     "@aws-sdk/client-s3": {

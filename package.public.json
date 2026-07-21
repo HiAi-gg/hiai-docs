@@ -1,6 +1,6 @@
 {
   "name": "@hiai-gg/docsmint",
-  "version": "0.4.4",
+  "version": "0.4.5",
   "type": "module",
   "browser": {
     "./dist/backend-launcher.js": false,
@@ -10,7 +10,8 @@
     "./dist/pipeline-cancellation.js": false,
     "./dist/storage-quota.js": false,
     "./dist/workspace.js": false,
-    "./dist/backend-pipeline-cancellation.js": false
+    "./dist/backend-pipeline-cancellation.js": false,
+    "./dist/backend-account-runtime-cleanup.js": false
   },
   "license": "Apache-2.0",
   "description": "The lightweight, AI-native self-hosted knowledge base \u2014 built-in RAG, hybrid semantic search, and a clean REST API for AI agents.",
@@ -306,6 +307,11 @@
       "browser": "./dist/server-only-browser-entry.js",
       "import": "./dist/backend-pipeline-cancellation.js",
       "types": "./dist/backend-pipeline-cancellation.d.ts"
+    },
+    "./backend/account-runtime-cleanup": {
+      "browser": "./dist/server-only-browser-entry.js",
+      "import": "./dist/backend-account-runtime-cleanup.js",
+      "types": "./dist/backend-account-runtime-cleanup.d.ts"
     }
   },
   "bin": {
@@ -352,12 +358,12 @@
     "@modelcontextprotocol/sdk": "^1.12.1",
     "bullmq": "^5.80.2",
     "commander": "^13.1.0",
+    "ioredis": "^5.11.1",
     "zod": "^4.0.0"
   },
   "peerDependencies": {
     "drizzle-orm": "^0.45.2",
     "postgres": "^3.4.9",
-    "ioredis": "^5.4.0",
     "@aws-sdk/client-s3": "^3.0.0",
     "pino": "^10.0.0",
     "@sveltejs/kit": "^2.68.0",
@@ -368,9 +374,6 @@
       "optional": true
     },
     "postgres": {
-      "optional": true
-    },
-    "ioredis": {
       "optional": true
     },
     "@aws-sdk/client-s3": {

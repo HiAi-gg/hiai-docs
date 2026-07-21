@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.4.5
+
+- Add the server-only `@hiai-gg/docsmint/backend/account-runtime-cleanup` adapter so lifecycle hosts can clear OSS collaboration, cache, and dedup state without duplicating Redis namespaces or querying OSS tables.
+- Snapshot exact actor-owned document and workspace identifiers before deletion, then remove only namespace-scoped Redis state with abort fencing and one-shot snapshot consumption.
+
 ## 0.4.4
 
 - Add the server-only `@hiai-gg/docsmint/pipeline/cancellation` API for exact-owner BullMQ cancellation without Redis namespace deletion.
