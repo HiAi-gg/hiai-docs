@@ -7,6 +7,18 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [0.3.9] - 2026-07-21
+
+### Added
+
+- `DocsmintAppShellHost`, a request-scoped public application shell preserving
+  the standalone desktop/mobile sidebar, mobile focus trap, dialogs, editor
+  and search preferences, and scroll-to-top behavior for SvelteKit hosts.
+- Public `@hiai-gg/docsmint/frontend/styles.css` export, verified directly
+  from the packed npm artifact.
+- Typed `DocsClient.searchDocuments()` retrieval mode contract for explicit
+  GraphRAG (`graph`) or lexical/vector RAG (`rag`) server-side requests.
+
 ## [0.3.8] - 2026-07-19
 
 ### Added

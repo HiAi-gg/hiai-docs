@@ -1,6 +1,6 @@
 {
   "name": "@hiai-gg/docsmint",
-  "version": "0.3.8",
+  "version": "0.3.9",
   "type": "module",
   "browser": {
     "./dist/backend-launcher.js": false,
@@ -74,6 +74,11 @@
       "import": "./dist/storage-quota.js",
       "types": "./dist/storage-quota.d.ts"
     },
+    "./frontend/app-shell": {
+      "node": "./dist/frontend-ssr/app-shell.js",
+      "import": "./dist/frontend/app-shell.js",
+      "types": "./dist/frontend/app-shell.d.ts"
+    },
     "./frontend/dashboard": {
       "node": "./dist/frontend-ssr/dashboard.js",
       "import": "./dist/frontend/dashboard.js",
@@ -94,6 +99,7 @@
       "import": "./dist/frontend/extension.js",
       "types": "./dist/frontend/extension.d.ts"
     },
+    "./frontend/styles.css": "./dist/frontend/frontend.css",
     "./frontend/api/categories": {
       "import": "./dist/frontend/api/categories.js",
       "types": "./dist/frontend/api/categories.d.ts"

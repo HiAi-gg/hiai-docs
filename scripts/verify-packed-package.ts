@@ -90,6 +90,7 @@ await run(["tar", "-xzf", tarball, "-C", extracted], root);
 const packageRoot = join(extracted, "package");
 
 const frontendSubpaths = [
+	"app-shell",
 	"dashboard",
 	"search",
 	"shared-document",
@@ -137,6 +138,7 @@ const frontendSubpaths = [
 // `document is not defined` before the extension provider can establish
 // request-scoped context.
 const ssrComponentSubpaths = [
+	"app-shell",
 	"dashboard",
 	"search",
 	"shared-document",
@@ -175,6 +177,7 @@ const requiredTarEntries = [
 	"package/dist/backend/index.js",
 	"package/dist/storage-quota.js",
 	"package/dist/storage-quota.d.ts",
+	"package/dist/frontend/frontend.css",
 	...frontendSubpaths.flatMap((path) => [
 		`package/dist/frontend/${path}.js`,
 		`package/dist/frontend/${path}.d.ts`,
@@ -186,6 +189,15 @@ const requiredTarEntries = [
 for (const entry of requiredTarEntries) {
 	if (!listing.includes(entry))
 		throw new Error(`Packed artifact is missing ${entry}`);
+}
+const packagedFrontendStyles = await readFile(
+	join(packageRoot, "dist", "frontend", "frontend.css"),
+	"utf8",
+);
+if (!packagedFrontendStyles.includes("--layer-chrome")) {
+	throw new Error(
+		"Packed frontend stylesheet is missing DocsMint application layout utilities",
+	);
 }
 for (const [subpath, conditionMap] of Object.entries(manifest.exports)) {
 	if (typeof conditionMap !== "object" || conditionMap === null) continue;

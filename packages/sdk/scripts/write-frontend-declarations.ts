@@ -1,4 +1,13 @@
 const declarations: Record<string, string> = {
+	"app-shell.d.ts": `import type { Component, Snippet } from "svelte";
+export interface DocsmintRouteAdapter {
+  pathname: string;
+  resolve(path: string): string;
+  navigate?(path: string): void | Promise<void>;
+}
+export interface DocsmintAppShellHostProps { route: DocsmintRouteAdapter; extensions?: Record<string, unknown>; children: Snippet; }
+export declare const DocsmintAppShellHost: Component<DocsmintAppShellHostProps>;
+`,
 	"dashboard.d.ts": 'import type { Component } from "svelte";\nexport declare const DocsmintDashboardHost: Component;\n',
 	"search.d.ts": 'import type { Component } from "svelte";\nexport declare const DocsmintSearchHost: Component;\n',
 	"shared-document.d.ts": `import type { Component } from "svelte";

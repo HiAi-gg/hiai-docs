@@ -1,6 +1,6 @@
 {
   "name": "@hiai-docs/frontend",
-  "version": "0.3.8",
+  "version": "0.3.9",
   "private": true,
   "type": "module",
   "license": "Apache-2.0",
@@ -20,6 +20,10 @@
     "./hosts": {
       "types": "./src/lib/hosts/index.ts",
       "import": "./src/lib/hosts/index.ts"
+    },
+    "./app-shell": {
+      "types": "./src/lib/hosts/DocsmintAppShellHost.svelte",
+      "import": "./src/lib/hosts/DocsmintAppShellHost.svelte"
     },
     "./legacy/doc-tab-registry": {
       "types": "./src/lib/stores/doc-tab-registry.svelte.ts",

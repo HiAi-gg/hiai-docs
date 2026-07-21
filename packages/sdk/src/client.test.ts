@@ -191,6 +191,21 @@ describe("DocsClient public contract", () => {
 		expect(seenUrl).toContain("includeChunks=true");
 	});
 
+	it("maps the product retrieval mode to the public search contract", async () => {
+		let seenUrl = "";
+		const docs = client(async (input) => {
+			seenUrl = String(input);
+			return jsonResponse({ items: [], total: 0, page: 1, limit: 20 });
+		});
+
+		await docs.searchDocuments({ query: "project brief", retrievalMode: "rag" });
+		expect(seenUrl).toContain("q=project+brief");
+		expect(seenUrl).toContain("graph=false");
+
+		await docs.searchDocuments({ query: "project brief", retrievalMode: "graph" });
+		expect(seenUrl).toContain("graph=true");
+	});
+
 	it("uses the bounded cursor document-list contract", async () => {
 		let seenUrl = "";
 		const docs = client(async (input) => {

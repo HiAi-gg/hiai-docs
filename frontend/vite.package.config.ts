@@ -21,6 +21,7 @@ function isConsumerRuntimeImport(id: string): boolean {
 }
 
 const entries = {
+	"app-shell": "../packages/sdk/frontend-entries/app-shell.ts",
 	dashboard: "../packages/sdk/frontend-entries/dashboard.ts",
 	search: "../packages/sdk/frontend-entries/search.ts",
 	"shared-document": "../packages/sdk/frontend-entries/shared-document.ts",

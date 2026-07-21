@@ -5,6 +5,7 @@
  * typed, additive frontend extensions.
  */
 
+export { default as DocsmintAppShellHost } from "./DocsmintAppShellHost.svelte";
 export { default as DocsmintSharedDocumentHost } from "./DocsmintSharedDocumentHost.svelte";
 export type { HiaiDocsDashboardData } from "./HiaiDocsDashboardHost.svelte";
 /** @deprecated Use DocsmintDashboardHost. */
@@ -23,3 +24,4 @@ export {
 	default as HiaiDocsSearchHost,
 	default as DocsmintSearchHost,
 } from "./HiaiDocsSearchHost.svelte";
+export type { DocsmintRouteAdapter } from "./types";

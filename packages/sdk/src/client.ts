@@ -525,6 +525,27 @@ export class DocsClient {
 		}, context);
 	}
 
+	/**
+	 * Product-facing search contract. The retrieval choice is explicitly typed
+	 * so server-side callers do not need to synthesize browser-only headers.
+	 * `graph` retains hybrid lexical/vector retrieval and enables AGE expansion;
+	 * `rag` keeps the lexical/vector channels while disabling graph traversal.
+	 */
+	async searchDocuments(
+		input: {
+			query: string;
+			retrievalMode: "graph" | "rag";
+			options?: Omit<DocsSearchOptions, "graph">;
+		},
+		context?: DocsRequestContext,
+	): Promise<DocsSearchResponse> {
+		return this.search(
+			input.query,
+			{ ...input.options, graph: input.retrievalMode === "graph" },
+			context,
+		);
+	}
+
 	async suggest(query: string, context?: DocsRequestContext): Promise<DocsSearchSuggestItem[]> {
 		return this.request<DocsSearchSuggestItem[]>("GET", "/api/search/suggest", {
 			query: this.cleanQuery({ q: query }),
