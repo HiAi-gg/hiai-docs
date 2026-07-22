@@ -1,6 +1,6 @@
 {
   "name": "@hiai-gg/docsmint",
-  "version": "0.4.6",
+  "version": "0.4.7",
   "type": "module",
   "browser": {
     "./dist/backend-launcher.js": false,
@@ -88,6 +88,10 @@
       "import": "./dist/storage-quota.js",
       "types": "./dist/storage-quota.d.ts"
     },
+	"./backend/lib/api-key-facade": {
+		"import": "./backend/src/lib/api-key-facade.ts",
+		"types": "./backend/src/lib/api-key-facade.ts"
+	},
     "./frontend/app-shell": {
       "node": "./dist/frontend-ssr/app-shell.js",
       "import": "./dist/frontend/app-shell.js",
@@ -336,6 +340,7 @@
     "backend/src/lib/redis-factory.ts",
     "backend/src/lib/storage-factory.ts",
     "backend/src/lib/logger.ts",
+	"backend/src/lib/api-key-facade.ts",
     "backend/src/lib/lifecycle-service.ts",
     "README.md",
     "LICENSE"

@@ -46,6 +46,11 @@ let width = $state(256); // default is 256px
 let isResizing = $state(false);
 
 const frontendExtensions = getFrontendExtensions();
+const sidebarTopExtensions = $derived(
+	resolveExtensions(frontendExtensions.sidebarTop, {
+		pathname: page.url.pathname,
+	}),
+);
 const navigationExtensions = $derived(
 	resolveExtensions(frontendExtensions.navigation, {
 		pathname: page.url.pathname,
@@ -163,7 +168,7 @@ function persistCollapsed() {
   {#if !mobile}
     <button
       onclick={toggleCollapse}
-      class="absolute -right-3 top-4 z-40 flex size-6 items-center justify-center rounded-full border border-border bg-background shadow-sm hover:bg-accent"
+      class="sidebar-collapse-toggle absolute -right-3 top-4 z-40 flex size-6 items-center justify-center rounded-full border border-border bg-background shadow-sm hover:bg-accent"
     >
       {#if isCollapsed}
         <PanelLeftOpen class="size-3.5" />
@@ -175,6 +180,10 @@ function persistCollapsed() {
 
   {#if !isCollapsed}
     <div class="flex flex-1 flex-col gap-4 overflow-y-auto p-3">
+	  {#each sidebarTopExtensions as extension (extension.id)}
+		{@const SidebarTop = extension.component}
+		<SidebarTop collapsed={false} />
+	  {/each}
       <!-- Search — leave a right gap so the collapse toggle button
            (positioned at the panel's top-right edge) stays clear of it. -->
       <SearchBar class="mr-5" />
@@ -224,6 +233,10 @@ function persistCollapsed() {
     </div>
   {:else}
     <div class="flex flex-1 flex-col items-center gap-1 pt-14">
+	  {#each sidebarTopExtensions as extension (extension.id)}
+		{@const SidebarTop = extension.component}
+		<SidebarTop collapsed={true} />
+	  {/each}
       <button
         onclick={() => navigateDocsmintRoute(route, "/")}
         class="flex size-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"

@@ -186,6 +186,10 @@
       "import": "./backend/src/lib/api-keys.ts",
       "types": "./backend/src/lib/api-keys.ts"
     },
+	"./backend/lib/api-key-facade": {
+		"import": "./backend/src/lib/api-key-facade.ts",
+		"types": "./backend/src/lib/api-key-facade.ts"
+	},
     "./backend/lib/audit": {
       "import": "./backend/src/lib/audit.ts",
       "types": "./backend/src/lib/audit.ts"

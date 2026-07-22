@@ -37,6 +37,14 @@ export interface NavigationExtension {
 	visible?: ExtensionVisibility;
 }
 
+/** Optional host content rendered above the stock sidebar search control. */
+export interface SidebarTopExtension {
+	id: string;
+	component: Component<{ collapsed: boolean }>;
+	order?: number;
+	visible?: ExtensionVisibility;
+}
+
 export interface DashboardWidgetProps {
 	userId?: string;
 }
@@ -188,6 +196,7 @@ export interface SharedDocumentExtension {
  * and to prevent extensions mutating one another during SSR.
  */
 export interface DocsmintFrontendExtensions {
+	sidebarTop: readonly SidebarTopExtension[];
 	navigation: readonly NavigationExtension[];
 	dashboardWidgets: readonly DashboardWidgetExtension[];
 	searchWidgets: readonly SearchWidgetExtension[];

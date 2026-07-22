@@ -138,7 +138,7 @@ $effect(() => {
 			id="main-content"
 			bind:this={mainElement}
 			inert={isMobile && mobileSidebar.open}
-			class="relative z-0 flex-1 overflow-auto"
+			class="relative flex-1 overflow-auto"
 		>
 			{@render children()}
 		</main>

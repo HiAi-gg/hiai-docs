@@ -1,3 +1,8 @@
+## 0.4.7
+
+- Add the generic `sidebarTop` frontend extension zone for host-provided branding and workspace controls.
+- Add a server-only OSS API-key issuance and verification facade for product hosts.
+
 # Changelog
 
 ## 0.4.6

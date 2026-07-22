@@ -36,10 +36,15 @@
 	z-index: var(--layer-popover) !important;
 }
 
-/* Fixed mobile navigation is persistent chrome. Keep it beneath every modal
+/* Navigation controls are persistent chrome. Keep them beneath every modal
  * regardless of component mount order or local stacking contexts. */
 .mobile-sidebar-toggle {
 	z-index: var(--layer-chrome) !important;
+}
+
+html.nested-sidebar-modal-open .sidebar-collapse-toggle {
+	pointer-events: none !important;
+	opacity: 0 !important;
 }
 
 /* Tailwind's translate utility makes the mobile sidebar a containing block

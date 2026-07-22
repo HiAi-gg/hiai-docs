@@ -11,6 +11,7 @@ export function createFrontendExtensions(
 	initial: Partial<HiaiDocsFrontendExtensions> = {},
 ): HiaiDocsFrontendExtensions {
 	return {
+		sidebarTop: [...(initial.sidebarTop ?? [])],
 		navigation: [...(initial.navigation ?? [])],
 		dashboardWidgets: [...(initial.dashboardWidgets ?? [])],
 		searchWidgets: [...(initial.searchWidgets ?? [])],

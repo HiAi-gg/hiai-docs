@@ -8,6 +8,7 @@ describe("frontend extension manifest", () => {
 		const second = createFrontendExtensions();
 
 		expect(Object.keys(first)).toEqual([
+			"sidebarTop",
 			"navigation",
 			"dashboardWidgets",
 			"searchWidgets",
@@ -22,6 +23,7 @@ describe("frontend extension manifest", () => {
 			"sharedDocumentEditorModes",
 		]);
 		expect(first.navigation).not.toBe(second.navigation);
+		expect(first.sidebarTop).toEqual([]);
 		expect(first.documentTabs).not.toBe(second.documentTabs);
 		expect(first.searchWidgets).not.toBe(second.searchWidgets);
 		expect(first.sharedDocumentNotesModes).not.toBe(
