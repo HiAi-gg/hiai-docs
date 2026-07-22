@@ -1,4 +1,8 @@
 ## 0.4.8
+## 0.4.9
+
+- Publish the server-only API-key facade as a self-contained runtime bundle.
+
 ## 0.4.8
 
 - Fix the published API-key facade package contents.

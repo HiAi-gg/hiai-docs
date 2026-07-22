@@ -2,13 +2,13 @@ import { expect, test } from "bun:test";
 import { readFile } from "node:fs/promises";
 
 const repositoryRoot = new URL("../../../", import.meta.url);
-const releaseVersion = "0.4.8";
+const releaseVersion = "0.4.9";
 
 async function json(path: string): Promise<Record<string, unknown>> {
 	return JSON.parse(await readFile(new URL(path, repositoryRoot), "utf8"));
 }
 
-test("all published and workspace release metadata reports 0.4.8", async () => {
+test("all published and workspace release metadata reports 0.4.9", async () => {
 	for (const path of [
 		"package.public.json",
 		"backend/package.json",
@@ -24,7 +24,7 @@ test("all published and workspace release metadata reports 0.4.8", async () => {
 	const lockfile = await readFile(new URL("bun.lock", repositoryRoot), "utf8");
 	const workspaceBlock = lockfile.slice(0, lockfile.indexOf('  "packages": {'));
 	expect(workspaceBlock).not.toContain('"version": "0.3.0"');
-	expect(workspaceBlock.match(/"version": "0\.4\.8"/g)).toHaveLength(6);
+	expect(workspaceBlock.match(/"version": "0\.4\.9"/g)).toHaveLength(6);
 
 	const publicManifest = await json("package.public.json");
 	expect(publicManifest.name).toBe("@hiai-gg/docsmint");
@@ -43,7 +43,7 @@ test("all published and workspace release metadata reports 0.4.8", async () => {
 		types: "./dist/storage-quota.d.ts",
 	});
 	expect(publicExports["./backend/lib/api-key-facade"]).toEqual({
-		import: "./backend/src/lib/api-key-facade.ts",
+		import: "./dist/backend-api-key-facade.js",
 		types: "./backend/src/lib/api-key-facade.ts",
 	});
 	expect(publicExports["./lifecycle/runtime"]).toEqual({

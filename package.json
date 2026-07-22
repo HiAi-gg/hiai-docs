@@ -187,7 +187,7 @@
       "types": "./backend/src/lib/api-keys.ts"
     },
 	"./backend/lib/api-key-facade": {
-		"import": "./backend/src/lib/api-key-facade.ts",
+		"import": "./packages/sdk/dist/backend-api-key-facade.js",
 		"types": "./backend/src/lib/api-key-facade.ts"
 	},
     "./backend/lib/audit": {

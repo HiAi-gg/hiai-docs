@@ -1,6 +1,6 @@
 {
   "name": "@hiai-gg/docsmint",
-  "version": "0.4.8",
+  "version": "0.4.9",
   "type": "module",
   "browser": {
     "./dist/backend-launcher.js": false,
@@ -89,7 +89,7 @@
       "types": "./dist/storage-quota.d.ts"
     },
 	"./backend/lib/api-key-facade": {
-		"import": "./backend/src/lib/api-key-facade.ts",
+		"import": "./dist/backend-api-key-facade.js",
 		"types": "./backend/src/lib/api-key-facade.ts"
 	},
     "./frontend/app-shell": {

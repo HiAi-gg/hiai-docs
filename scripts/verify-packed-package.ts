@@ -179,6 +179,7 @@ const requiredTarEntries = [
 	"package/dist/storage-quota.d.ts",
 	"package/dist/backend-account-runtime-cleanup.js",
 	"package/dist/backend-account-runtime-cleanup.d.ts",
+	"package/dist/backend-api-key-facade.js",
 	"package/dist/frontend/frontend.css",
 	...frontendSubpaths.flatMap((path) => [
 		`package/dist/frontend/${path}.js`,
@@ -304,7 +305,8 @@ import { verifyDocsmintWorkspaceAssertion } from "${manifest.name}/workspace";
 import { launchDocsmintBackend, launchDocsMintApi, resolveDocsmintBackendEntrypoint } from "${manifest.name}/backend/launcher";
 import { createStorageQuotaService, StorageQuotaExceededError, requireAttachmentStorageQuotaAdmission } from "${manifest.name}/storage-quota";
 import { createAccountRuntimeCleanup } from "${manifest.name}/backend/account-runtime-cleanup";
-if (!DocsClient || !encodeUserDataExportNdjson || !createPersistentLifecycleRuntime || !createDurableLifecycleRuntime || !verifyDocsmintWorkspaceAssertion || !launchDocsmintBackend || !launchDocsMintApi || !resolveDocsmintBackendEntrypoint || !createStorageQuotaService || !StorageQuotaExceededError || !requireAttachmentStorageQuotaAdmission || !createAccountRuntimeCleanup) throw new Error("missing server export");
+import { issueApiKey, verifyApiKey } from "${manifest.name}/backend/lib/api-key-facade";
+if (!DocsClient || !encodeUserDataExportNdjson || !createPersistentLifecycleRuntime || !createDurableLifecycleRuntime || !verifyDocsmintWorkspaceAssertion || !launchDocsmintBackend || !launchDocsMintApi || !resolveDocsmintBackendEntrypoint || !createStorageQuotaService || !StorageQuotaExceededError || !requireAttachmentStorageQuotaAdmission || !createAccountRuntimeCleanup || !issueApiKey || !verifyApiKey) throw new Error("missing server export");
 console.log("server imports: pass");
 `,
 );
