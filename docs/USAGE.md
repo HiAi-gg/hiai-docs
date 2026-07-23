@@ -44,7 +44,7 @@ Open the dashboard import action and select one or more files. Supported types:
 
 | Type | Behavior |
 | --- | --- |
-| `.md`, `.markdown`, `.txt` | Imported as text; the filename becomes the title. |
+| `.md`, `.txt` | Imported as text; the filename becomes the title. |
 | `.json` | Accepts `title`, `content`, and optional `folderId`. |
 | `.docx` | Converted to Markdown while preserving supported document structure. |
 
@@ -55,11 +55,12 @@ Limits are enforced by the API:
 - 25 MB converted content per file
 - 100 MB at the same-origin web proxy boundary
 
-A batch is transactional: if one file cannot be parsed, none of the documents
-in that batch are committed. Successfully imported documents are queued for
-chunking, embeddings, and GraphRAG extraction automatically. Pipeline state is
-visible through the document API; provider failures are retried by the queue and
-do not block normal document access.
+Files are imported independently with bounded concurrency. A malformed or
+unsupported file is reported as an individual error and does not roll back
+documents that imported successfully. Successfully imported documents are
+queued for chunking, embeddings, and GraphRAG extraction automatically.
+Pipeline state is visible through the document API; provider failures are
+retried by the queue and do not block normal document access.
 
 ## Search
 

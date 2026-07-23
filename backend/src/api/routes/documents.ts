@@ -152,7 +152,7 @@ const MAX_EXTRACTED_CONTENT_SIZE = 25 * 1024 * 1024;
 class ImportInputError extends Error {
 	constructor(
 		message: string,
-		readonly status: 400 | 413 | 422,
+		readonly status: 400 | 413 | 415 | 422,
 	) {
 		super(message);
 		this.name = "ImportInputError";
@@ -1700,6 +1700,7 @@ export const documentRoutes = new Elysia({ prefix: "/api" })
 				content: string;
 			};
 			let items: ImportedItem[];
+			let multipartFiles: File[] | null = null;
 			let folderId: string | null = null;
 
 			if (contentType.includes("application/json")) {
@@ -1766,27 +1767,7 @@ export const documentRoutes = new Elysia({ prefix: "/api" })
 				}
 
 				items = [];
-				for (const file of files) {
-					if (file.size > MAX_IMPORT_SIZE) {
-						set.status = 413;
-						return {
-							error: `File "${file.name}" too large. Maximum size: ${MAX_IMPORT_SIZE / 1024 / 1024}MB`,
-						};
-					}
-					const ext = `.${file.name.split(".").pop()?.toLowerCase()}`;
-					if (!ALLOWED_IMPORT_EXTENSIONS.includes(ext)) {
-						set.status = 415;
-						return {
-							error: `Invalid file type for "${file.name}". Allowed: ${ALLOWED_IMPORT_EXTENSIONS.join(", ")}`,
-						};
-					}
-					const parsedItem = await importFileToItem(file);
-					items.push({
-						filename: file.name,
-						title: parsedItem.title,
-						content: parsedItem.content,
-					});
-				}
+				multipartFiles = files;
 			} else {
 				set.status = 415;
 				return {
@@ -1795,7 +1776,7 @@ export const documentRoutes = new Elysia({ prefix: "/api" })
 				};
 			}
 
-			if (items.length === 0) {
+			if (items.length === 0 && multipartFiles === null) {
 				set.status = 400;
 				return { error: "No importable items supplied" };
 			}
@@ -1809,20 +1790,13 @@ export const documentRoutes = new Elysia({ prefix: "/api" })
 				return { error: "Forbidden" };
 			}
 
-			// All-or-nothing batch create. If any insert fails, the whole
-			// transaction rolls back and the client can retry without
-			// worrying about partial imports leaving the DB inconsistent.
-			// We zip each created row with its source item so the response
-			// builder below never has to index into a parallel array
-			// (which would otherwise require non-null assertions under
-			// `noUncheckedIndexedAccess`).
 			type CreatedEntry = {
 				item: ImportedItem;
 				row: { id: string; title: string; revision: string };
 			};
-			const created = await withTenant(ctx, async (tx) => {
-				const out: CreatedEntry[] = [];
-				for (const item of items) {
+
+			const persistItem = (item: ImportedItem): Promise<CreatedEntry> =>
+				withTenant(ctx, async (tx) => {
 					const revision = contentHash(item.title, item.content);
 					const [row] = await tx
 						.insert(documents)
@@ -1843,19 +1817,13 @@ export const documentRoutes = new Elysia({ prefix: "/api" })
 						content: item.content,
 						createdBy: userId,
 					});
-					out.push({
+					return {
 						item,
 						row: { ...row, revision },
-					});
-				}
-				return out;
-			});
+					};
+				});
 
-			// Embedding enqueue happens AFTER the transaction commits so
-			// embeddings never get computed for documents that were rolled
-			// back. We deliberately don't await — embedding is a background
-			// job and shouldn't block the import response.
-			for (const { row } of created) {
+			const enqueueCreated = ({ row }: CreatedEntry): void => {
 				void enqueueDocumentPipeline({
 					documentId: row.id,
 					ownerId: userId,
@@ -1865,30 +1833,178 @@ export const documentRoutes = new Elysia({ prefix: "/api" })
 				}).catch((err) =>
 					logger.warn({ err, documentId: row.id }, "Pipeline enqueue failed"),
 				);
+			};
+
+			const createdResult = ({ item, row }: CreatedEntry) => {
+				const now = new Date().toISOString();
+				return {
+					filename: item.filename,
+					status: "ok" as const,
+					document: {
+						id: row.id,
+						title: row.title,
+						content: item.content,
+						folderId,
+						categoryId: resolvedCategoryId,
+						createdAt: now,
+						updatedAt: now,
+					},
+				};
+			};
+
+			if (multipartFiles !== null) {
+				type FailedImportResult = {
+					filename: string;
+					status: "error";
+					error: string;
+					failureStatus: number;
+				};
+				type SettledImportResult =
+					| ReturnType<typeof createdResult>
+					| FailedImportResult;
+
+				const processFile = async (
+					file: File,
+				): Promise<SettledImportResult> => {
+					try {
+						if (file.size > MAX_IMPORT_SIZE) {
+							throw new ImportInputError(
+								`File "${file.name}" too large. Maximum size: ${MAX_IMPORT_SIZE / 1024 / 1024}MB`,
+								413,
+							);
+						}
+						const ext = `.${file.name.split(".").pop()?.toLowerCase()}`;
+						if (!ALLOWED_IMPORT_EXTENSIONS.includes(ext)) {
+							throw new ImportInputError(
+								`Invalid file type for "${file.name}". Allowed: ${ALLOWED_IMPORT_EXTENSIONS.join(", ")}`,
+								415,
+							);
+						}
+						const parsedItem = await importFileToItem(file);
+						const created = await persistItem({
+							filename: file.name,
+							title: parsedItem.title,
+							content: parsedItem.content,
+						});
+						enqueueCreated(created);
+						return createdResult(created);
+					} catch (err: unknown) {
+						if (err instanceof ImportInputError) {
+							return {
+								filename: file.name,
+								status: "error",
+								error: err.message,
+								failureStatus: err.status,
+							};
+						}
+						if (err instanceof DocxParseError) {
+							logger.warn(
+								{
+									requestId: importRequestId,
+									filename: file.name,
+									kind: "docx_parse",
+									itemCount: importItemCount,
+									sizeBucket: byteSizeBucket(file.size),
+								},
+								"DOCX parse failure during import",
+							);
+							return {
+								filename: file.name,
+								status: "error",
+								error: err.message,
+								failureStatus: 422,
+							};
+						}
+						const telemetry = importErrorTelemetry(err);
+						logger.error(
+							{
+								requestId: importRequestId,
+								filename: file.name,
+								kind: telemetry.kind,
+								code: telemetry.code,
+								itemCount: importItemCount,
+								sizeBucket: byteSizeBucket(file.size),
+							},
+							"Failed to import document",
+						);
+						return {
+							filename: file.name,
+							status: "error",
+							error:
+								telemetry.code === "54000"
+									? "Document text is too large for the search index. Remove embedded data images or split the document."
+									: "Failed to import document",
+							failureStatus: telemetry.code === "54000" ? 422 : 500,
+						};
+					}
+				};
+
+				const settled = new Array<SettledImportResult>(multipartFiles.length);
+				let nextFileIndex = 0;
+				const worker = async (): Promise<void> => {
+					while (nextFileIndex < multipartFiles.length) {
+						const index = nextFileIndex;
+						nextFileIndex += 1;
+						const file = multipartFiles[index];
+						if (file) settled[index] = await processFile(file);
+					}
+				};
+				const concurrency = Math.min(3, multipartFiles.length);
+				await Promise.all(Array.from({ length: concurrency }, () => worker()));
+
+				const imported = settled.filter(
+					(result) => result.status === "ok",
+				).length;
+				const failed = settled.length - imported;
+				if (imported > 0) {
+					set.status = 201;
+				} else if (settled.length === 1) {
+					const onlyResult = settled[0];
+					set.status =
+						onlyResult?.status === "error" ? onlyResult.failureStatus : 500;
+					return {
+						error:
+							onlyResult?.status === "error"
+								? onlyResult.error
+								: "Failed to import document",
+					};
+				} else {
+					const failureStatuses = new Set(
+						settled.flatMap((result) =>
+							result.status === "error" ? [result.failureStatus] : [],
+						),
+					);
+					set.status =
+						failureStatuses.size === 1
+							? (failureStatuses.values().next().value ?? 422)
+							: 422;
+				}
+				return {
+					items: settled.map((result) => {
+						if (result.status === "ok") return result;
+						const { failureStatus: _, ...publicResult } = result;
+						return publicResult;
+					}),
+					imported,
+					failed,
+				};
 			}
 
+			const created: CreatedEntry[] = [];
+			for (const item of items) {
+				created.push(await persistItem(item));
+			}
+
+			// Embedding enqueue happens AFTER the transaction commits so
+			// embeddings never get computed for documents that were rolled
+			// back. We deliberately don't await — embedding is a background
+			// job and shouldn't block the import response.
+			for (const entry of created) enqueueCreated(entry);
+
 			set.status = 201;
-			// Per-file result envelope. The frontend reconciles its
-			// progress overlay by matching on `filename` (see
-			// `frontend/src/routes/(app)/+page.svelte` and
-			// `frontend/src/lib/api/documents.ts:ImportResponse`), so
-			// every accepted file must round-trip with the same name it
-			// had on disk (multipart path) or a stable synthesized
-			// fallback (JSON path). The all-or-nothing transaction above
-			// guarantees every result here is a success — any failure
-			// short-circuits to the catch block with a 4xx/5xx status.
-			const now = new Date().toISOString();
-			const results = created.map(({ item, row }) => ({
-				filename: item.filename,
-				status: "ok" as const,
-				document: {
-					id: row.id,
-					title: row.title,
-					content: item.content,
-					createdAt: now,
-					updatedAt: now,
-				},
-			}));
+			// The JSON path has one synthesized file result. Multipart imports
+			// return earlier with independently settled per-file results.
+			const results = created.map(createdResult);
 			return {
 				items: results,
 				imported: results.length,

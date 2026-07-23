@@ -489,8 +489,97 @@
     "/api/documents/import": {
       "post": {
         "operationId": "postApiDocumentsImport",
+        "summary": "Import one or more documents",
+        "description": "Multipart files are processed independently with bounded concurrency. Results remain in request order, and a failure for one file does not roll back successful files.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "file"
+                ],
+                "properties": {
+                  "file": {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 10,
+                    "items": {
+                      "type": "string",
+                      "format": "binary",
+                      "description": "A .md, .txt, .json, or .docx file, up to 10 MB."
+                    }
+                  },
+                  "folderId": {
+                    "type": "string",
+                    "format": "uuid"
+                  }
+                }
+              }
+            },
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "content"
+                ],
+                "properties": {
+                  "title": {
+                    "type": "string",
+                    "maxLength": 500
+                  },
+                  "content": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 5000000
+                  },
+                  "folderId": {
+                    "type": "string",
+                    "format": "uuid"
+                  }
+                }
+              }
+            }
+          }
+        },
         "responses": {
-          "200": {}
+          "201": {
+            "description": "At least one document imported. Multi-file responses include both successful and failed items in request order.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed request or invalid JSON import."
+          },
+          "413": {
+            "description": "File, batch, or extracted content exceeds an import limit."
+          },
+          "415": {
+            "description": "Unsupported content type or file extension."
+          },
+          "422": {
+            "description": "A document could not be parsed, or every item in a mixed-failure batch failed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/ImportResponse"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Error"
+                    }
+                  ]
+                }
+              }
+            }
+          }
         }
       }
     },
@@ -2445,6 +2534,54 @@
           "details": {
             "type": "object",
             "additionalProperties": true
+          }
+        }
+      },
+      "ImportResponse": {
+        "type": "object",
+        "required": [
+          "items",
+          "imported",
+          "failed"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "description": "One result per input file, in the original request order.",
+            "items": {
+              "type": "object",
+              "required": [
+                "filename",
+                "status"
+              ],
+              "properties": {
+                "filename": {
+                  "type": "string"
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "ok",
+                    "error"
+                  ]
+                },
+                "document": {
+                  "type": "object",
+                  "additionalProperties": true
+                },
+                "error": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "imported": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "failed": {
+            "type": "integer",
+            "minimum": 0
           }
         }
       },

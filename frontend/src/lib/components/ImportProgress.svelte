@@ -19,7 +19,12 @@ import {
 } from "$lib/hosts/route-context";
 import * as m from "$lib/paraglide/messages.js";
 
-export type ImportItemStatus = "uploading" | "processing" | "done" | "error";
+export type ImportItemStatus =
+	| "queued"
+	| "uploading"
+	| "processing"
+	| "done"
+	| "error";
 
 export interface ImportItem {
 	filename: string;
@@ -43,8 +48,12 @@ const total = $derived(items.length);
 const done = $derived(items.filter((i) => i.status === "done").length);
 const failed = $derived(items.filter((i) => i.status === "error").length);
 const inFlight = $derived(
-	items.filter((i) => i.status === "uploading" || i.status === "processing")
-		.length,
+	items.filter(
+		(i) =>
+			i.status === "queued" ||
+			i.status === "uploading" ||
+			i.status === "processing",
+	).length,
 );
 const settled = $derived(inFlight === 0);
 </script>
@@ -102,7 +111,12 @@ const settled = $derived(inFlight === 0);
                 <FileText class="size-4 shrink-0 text-muted-foreground" />
                 <span class="min-w-0 flex-1 truncate">{item.filename}</span>
                 <span class="inline-flex shrink-0 items-center gap-1 text-xs">
-                  {#if item.status === "uploading"}
+                  {#if item.status === "queued"}
+                    <Loader2 class="size-3.5 text-muted-foreground" />
+                    <span class="text-muted-foreground">
+                      {m.import_progress_queued()}
+                    </span>
+                  {:else if item.status === "uploading"}
                     <Loader2 class="size-3.5 animate-spin text-muted-foreground" />
                     <span class="text-muted-foreground">
                       {m.import_progress_uploading()}

@@ -518,6 +518,7 @@
   "import_progress_title": "Importing documents",
   "import_progress_total": "{done} of {total} complete",
   "import_progress_uploading": "Uploading",
+  "import_progress_queued": "Queued",
   "import_progress_processing": "Processing",
   "import_progress_done": "Done",
   "import_progress_error": "Failed",

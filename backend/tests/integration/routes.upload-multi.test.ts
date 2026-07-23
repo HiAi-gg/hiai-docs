@@ -332,6 +332,85 @@ describe("POST /api/documents/import — multipart path", () => {
     expect(getState().documents.size).toBe(3);
   });
 
+  it("imports valid files when another file in the batch is malformed", async () => {
+    const res = await multipartImport([
+      { name: "fast.md", content: "# Fast\n\nThis document is valid." },
+      { name: "broken.json", content: '{"content":' },
+      { name: "also-valid.txt", content: "This one is valid too." },
+    ]);
+
+    expect(res.status).toBe(201);
+    const body = res.body as {
+      items: Array<{
+        filename: string;
+        status: "ok" | "error";
+        document?: { title: string };
+        error?: string;
+      }>;
+      imported: number;
+      failed: number;
+    };
+    expect(body.imported).toBe(2);
+    expect(body.failed).toBe(1);
+    expect(body.items.map((item) => item.filename)).toEqual([
+      "fast.md",
+      "broken.json",
+      "also-valid.txt",
+    ]);
+    expect(body.items[0]?.status).toBe("ok");
+    expect(body.items[1]?.status).toBe("error");
+    expect(body.items[1]?.error).toBe("Invalid JSON syntax in uploaded file");
+    expect(body.items[2]?.status).toBe("ok");
+    expect(getState().documents.size).toBe(2);
+    expect(getState().enqueuedEmbeddings).toHaveLength(2);
+  });
+
+  it("reports an unsupported file without blocking valid files", async () => {
+    const res = await multipartImport([
+      { name: "valid.md", content: "# Valid" },
+      { name: "binary.exe", content: "MZ" },
+    ]);
+
+    expect(res.status).toBe(201);
+    const body = res.body as {
+      items: Array<{ filename: string; status: "ok" | "error"; error?: string }>;
+      imported: number;
+      failed: number;
+    };
+    expect(body.imported).toBe(1);
+    expect(body.failed).toBe(1);
+    expect(body.items[0]).toMatchObject({
+      filename: "valid.md",
+      status: "ok",
+    });
+    expect(body.items[1]?.filename).toBe("binary.exe");
+    expect(body.items[1]?.status).toBe("error");
+    expect(body.items[1]?.error).toContain("Invalid file type");
+    expect(getState().documents.size).toBe(1);
+  });
+
+  it("returns a complete error envelope when every batch item fails", async () => {
+    const res = await multipartImport([
+      { name: "broken.json", content: '{"content":' },
+      { name: "binary.exe", content: "MZ" },
+    ]);
+
+    expect(res.status).toBe(422);
+    const body = res.body as {
+      items: Array<{ filename: string; status: "error"; error: string }>;
+      imported: number;
+      failed: number;
+    };
+    expect(body.imported).toBe(0);
+    expect(body.failed).toBe(2);
+    expect(body.items.map((item) => item.filename)).toEqual([
+      "broken.json",
+      "binary.exe",
+    ]);
+    expect(body.items.every((item) => item.status === "error")).toBe(true);
+    expect(getState().documents.size).toBe(0);
+  });
+
   it("rejects an empty file list with 400", async () => {
     const fd = new FormData();
     const res = await request(app, "/api/documents/import", {

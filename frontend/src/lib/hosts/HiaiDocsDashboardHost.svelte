@@ -269,7 +269,7 @@ async function handleImportFile(e: Event) {
 
 	importItems = files.map((f) => ({
 		filename: f.name,
-		status: "uploading",
+		status: "queued",
 	}));
 	importOpen = true;
 
@@ -278,55 +278,62 @@ async function handleImportFile(e: Event) {
 			files,
 			activeFolderId || undefined,
 			request.fetch,
+			{
+				concurrency: 3,
+				onItemStarted: (index) => {
+					importItems = importItems.map((item, itemIndex) =>
+						itemIndex === index ? { ...item, status: "uploading" } : item,
+					);
+				},
+				onItemSettled: (result, index) => {
+					importItems = importItems.map((item, itemIndex) => {
+						if (itemIndex !== index) return item;
+						if (result.status === "ok") {
+							return {
+								...item,
+								status: "done",
+								documentId: result.document?.id,
+							};
+						}
+						return {
+							...item,
+							status: "error",
+							error: result.error || "Failed",
+						};
+					});
+
+					if (result.status === "ok" && result.document) {
+						const doc = result.document;
+						const importedDocument: Document = {
+							id: doc.id,
+							title: doc.title,
+							content: doc.content,
+							folderId: doc.folderId ?? null,
+							folderName: doc.folderName ?? "",
+							categoryId: doc.categoryId ?? null,
+							tags: (doc.tags ?? []).map((tag) => tag.id),
+							createdAt: doc.createdAt,
+							updatedAt: doc.updatedAt,
+							excerpt: doc.excerpt ?? doc.content?.slice(0, 200) ?? "",
+						};
+						optimisticDocuments = [
+							...optimisticDocuments.filter(
+								(existing) => existing.id !== importedDocument.id,
+							),
+							importedDocument,
+						];
+					}
+				},
+			},
 		);
 
-		importItems = importItems.map((item, idx) => {
-			const res = results.items[idx];
-			if (!res) return { ...item, status: "error", error: "No response" };
-			if (res.status === "ok") {
-				return {
-					...item,
-					status: "done",
-					documentId: res.document?.id,
-				};
-			}
-			return {
-				...item,
-				status: "error",
-				error: res.error || "Failed",
-			};
-		});
-
-		// The page data is immutable until SvelteKit invalidates the route. Keep
-		// successful imports in the dashboard's local projection immediately so
-		// Recent Documents updates without requiring a full reload.
-		const importedDocuments: Document[] = results.items
-			.flatMap((item) =>
-				item.status === "ok" && item.document ? [item.document] : [],
-			)
-			.map((doc) => {
-				return {
-					id: doc.id,
-					title: doc.title,
-					content: doc.content,
-					folderId: doc.folderId ?? null,
-					folderName: doc.folderName ?? "",
-					categoryId: doc.categoryId ?? null,
-					tags: (doc.tags ?? []).map((tag) => tag.id),
-					createdAt: doc.createdAt,
-					updatedAt: doc.updatedAt,
-					excerpt: doc.excerpt ?? doc.content?.slice(0, 200) ?? "",
-				};
-			});
-		if (importedDocuments.length > 0) {
-			optimisticDocuments = [
-				...optimisticDocuments.filter(
-					(existing) =>
-						!importedDocuments.some((doc) => doc.id === existing.id),
-				),
-				...importedDocuments,
-			];
-		}
+		// Force any missing response slot into an error state. Normal requests
+		// settle through onItemSettled above, so this is only a protocol guard.
+		importItems = importItems.map((item, index) =>
+			results.items[index]
+				? item
+				: { ...item, status: "error", error: "No response" },
+		);
 
 		await invalidateAll();
 		refreshDocs();

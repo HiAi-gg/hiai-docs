@@ -44,6 +44,17 @@ export interface ImportResponse {
 	failed: number;
 }
 
+export interface ImportDocumentsOptions {
+	/**
+	 * Maximum number of files with an active HTTP request. Import remains
+	 * asynchronous, but bounding concurrency prevents several large DOCX files
+	 * from exhausting browser and server memory at the same time.
+	 */
+	concurrency?: number;
+	onItemStarted?: (index: number) => void;
+	onItemSettled?: (result: ImportResult, index: number) => void;
+}
+
 // ---------------------------------------------------------------------------
 // listDocuments dedup + TTL cache
 // ---------------------------------------------------------------------------
@@ -240,7 +251,7 @@ export function deleteDocument(
 	return apiFetch(`/api/documents/${id}`, { method: "DELETE" }, fetcher);
 }
 
-export function importDocument(
+export async function importDocument(
 	file: File,
 	folderId?: string,
 	fetcher?: typeof fetch,
@@ -249,11 +260,14 @@ export function importDocument(
 	const formData = new FormData();
 	formData.append("file", file);
 	if (folderId) formData.append("folderId", folderId);
-	return apiFetch(
+	const response = await apiFetch<ImportResponse>(
 		"/api/documents/import",
-		{ method: "POST", body: formData },
+		{ method: "POST", body: formData, timeout: 120_000 },
 		fetcher,
 	);
+	const result = response.items[0];
+	if (result?.status === "ok" && result.document) return result.document;
+	throw new Error(result?.error ?? `Failed to import "${file.name}"`);
 }
 
 /**
@@ -262,23 +276,73 @@ export function importDocument(
  * a multipart body with multiple `file` parts and returns an
  * `ImportResponse` describing per-file success/failure.
  */
-export function importDocuments(
+export async function importDocuments(
 	files: File[],
 	folderId?: string,
 	fetcher?: typeof fetch,
+	options: ImportDocumentsOptions = {},
 ): Promise<ImportResponse> {
 	clearDocumentsCache();
-	const formData = new FormData();
-	for (const file of files) {
-		formData.append("file", file);
+	if (files.length === 0) {
+		return { items: [], imported: 0, failed: 0 };
 	}
-	if (folderId) formData.append("folderId", folderId);
-	return apiFetch<ImportResponse>(
-		"/api/documents/import",
-		{
-			method: "POST",
-			body: formData,
-		},
-		fetcher,
+
+	const requestedConcurrency = options.concurrency ?? 3;
+	const concurrency = Math.max(
+		1,
+		Math.min(3, files.length, Math.floor(requestedConcurrency) || 1),
 	);
+	const results = new Array<ImportResult>(files.length);
+	let nextIndex = 0;
+
+	const importOne = async (file: File, index: number): Promise<void> => {
+		options.onItemStarted?.(index);
+		const formData = new FormData();
+		formData.append("file", file);
+		if (folderId) formData.append("folderId", folderId);
+
+		let result: ImportResult;
+		try {
+			const response = await apiFetch<ImportResponse>(
+				"/api/documents/import",
+				{
+					method: "POST",
+					body: formData,
+					timeout: 120_000,
+				},
+				fetcher,
+			);
+			const item = response.items[0];
+			result = item ?? {
+				filename: file.name,
+				status: "error",
+				error: "Import response did not include a file result",
+			};
+		} catch (error) {
+			result = {
+				filename: file.name,
+				status: "error",
+				error: error instanceof Error ? error.message : "Import failed",
+			};
+		}
+		results[index] = result;
+		options.onItemSettled?.(result, index);
+	};
+
+	const worker = async (): Promise<void> => {
+		while (nextIndex < files.length) {
+			const index = nextIndex;
+			nextIndex += 1;
+			const file = files[index];
+			if (file) await importOne(file, index);
+		}
+	};
+
+	await Promise.all(Array.from({ length: concurrency }, () => worker()));
+	const imported = results.filter((result) => result.status === "ok").length;
+	return {
+		items: results,
+		imported,
+		failed: results.length - imported,
+	};
 }
